@@ -108,7 +108,7 @@ function NativeMapView({
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
-  const { Marker, Callout, PROVIDER_DEFAULT } =
+  const { Marker, PROVIDER_DEFAULT } =
     require("react-native-maps") as typeof import("react-native-maps");
 
   const mapRef = useRef<InstanceType<typeof MapView>>(null);
@@ -184,10 +184,10 @@ function NativeMapView({
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
           pinColor={Colors.primary}
           onPress={() => {
-            console.log("[MapScreen] Marker tapped:", r.name);
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            console.log("[MapScreen] Marker tapped, navigating to:", r.name);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onMarkerPress(r.id);
           }}
-          onCalloutPress={() => onMarkerPress(r.id)}
         >
           <View style={markerStyles.container}>
             <View style={[
@@ -198,17 +198,6 @@ function NativeMapView({
             </View>
             <View style={markerStyles.pinTail} />
           </View>
-          <Callout tooltip onPress={() => onMarkerPress(r.id)}>
-            <View style={markerStyles.callout}>
-              <Text style={markerStyles.calloutName}>{r.name}</Text>
-              <View style={markerStyles.calloutRow}>
-                <Star size={10} color={Colors.star} fill={Colors.star} />
-                <Text style={markerStyles.calloutRating}>{r.rating}</Text>
-                <Text style={markerStyles.calloutCuisine}> · {r.cuisine}</Text>
-              </View>
-              <Text style={markerStyles.calloutTap}>Tap to view details →</Text>
-            </View>
-          </Callout>
         </Marker>
       ))}
     </MapView>
