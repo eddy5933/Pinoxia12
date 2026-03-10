@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Search, Star, MapPin, Clock, Navigation2, Locate } from "lucide-react-native";
+import { Search, Star, MapPin, Clock, Navigation2, Locate, Map as MapIcon } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -22,7 +22,7 @@ import { useLocation, getDistanceKm, formatDistance } from "@/providers/Location
 import { CUISINE_TYPES } from "@/mocks/restaurants";
 import { Restaurant } from "@/types";
 
-function RestaurantCard({ restaurant, index, distance }: { restaurant: Restaurant; index: number; distance: string | null }) {
+function RestaurantCard({ restaurant, index, distance, showMapButton }: { restaurant: Restaurant; index: number; distance: string | null; showMapButton: boolean }) {
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -43,6 +43,11 @@ function RestaurantCard({ restaurant, index, distance }: { restaurant: Restauran
 
   const onPress = useCallback(() => {
     router.push(`/restaurant/${restaurant.id}`);
+  }, [router, restaurant.id]);
+
+  const onShowOnMap = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/map?focus=${restaurant.id}`);
   }, [router, restaurant.id]);
 
   return (
@@ -95,6 +100,17 @@ function RestaurantCard({ restaurant, index, distance }: { restaurant: Restauran
                 <Text style={styles.footerText}>{restaurant.reviewCount} reviews</Text>
               </View>
             </View>
+            {showMapButton && (
+              <TouchableOpacity
+                style={styles.showOnMapButton}
+                onPress={onShowOnMap}
+                activeOpacity={0.7}
+                testID={`show-on-map-${restaurant.id}`}
+              >
+                <MapIcon size={14} color={Colors.white} />
+                <Text style={styles.showOnMapText}>Show on Map</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -124,11 +140,13 @@ export default function ExploreScreen() {
     return map;
   }, [userLocation, filteredRestaurants]);
 
+  const hasSearch = search.trim().length > 0;
+
   const renderItem = useCallback(
     ({ item, index }: { item: Restaurant; index: number }) => (
-      <RestaurantCard restaurant={item} index={index} distance={distanceMap.get(item.id) ?? null} />
+      <RestaurantCard restaurant={item} index={index} distance={distanceMap.get(item.id) ?? null} showMapButton={hasSearch} />
     ),
-    [distanceMap]
+    [distanceMap, hasSearch]
   );
 
   const keyExtractor = useCallback((item: Restaurant) => item.id, []);
@@ -476,5 +494,20 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     color: Colors.textMuted,
+  },
+  showOnMapButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  showOnMapText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: Colors.white,
   },
 });

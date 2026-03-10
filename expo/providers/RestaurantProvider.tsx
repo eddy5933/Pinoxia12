@@ -1,11 +1,73 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import createContextHook from "@nkzw/create-context-hook";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Restaurant, Review } from "@/types";
 import { MOCK_RESTAURANTS, MOCK_REVIEWS } from "@/mocks/restaurants";
 
+const RESTAURANTS_KEY = "foodspot_restaurants";
+const REVIEWS_KEY = "foodspot_reviews";
+const INITIALIZED_KEY = "foodspot_initialized";
+
 export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>(MOCK_RESTAURANTS);
-  const [reviews, setReviews] = useState<Review[]>(MOCK_REVIEWS);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isReady, setIsReady] = useState(false);
+
+  const loadQuery = useQuery({
+    queryKey: ["restaurants_load"],
+    queryFn: async () => {
+      console.log("[RestaurantProvider] Loading data from AsyncStorage...");
+      const [storedRestaurants, storedReviews, initialized] = await Promise.all([
+        AsyncStorage.getItem(RESTAURANTS_KEY),
+        AsyncStorage.getItem(REVIEWS_KEY),
+        AsyncStorage.getItem(INITIALIZED_KEY),
+      ]);
+
+      let loadedRestaurants: Restaurant[];
+      let loadedReviews: Review[];
+
+      if (initialized && storedRestaurants && storedReviews) {
+        loadedRestaurants = JSON.parse(storedRestaurants) as Restaurant[];
+        loadedReviews = JSON.parse(storedReviews) as Review[];
+        console.log("[RestaurantProvider] Loaded from storage:", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
+      } else {
+        loadedRestaurants = MOCK_RESTAURANTS;
+        loadedReviews = MOCK_REVIEWS;
+        await Promise.all([
+          AsyncStorage.setItem(RESTAURANTS_KEY, JSON.stringify(loadedRestaurants)),
+          AsyncStorage.setItem(REVIEWS_KEY, JSON.stringify(loadedReviews)),
+          AsyncStorage.setItem(INITIALIZED_KEY, "true"),
+        ]);
+        console.log("[RestaurantProvider] Initialized with mock data");
+      }
+
+      return { restaurants: loadedRestaurants, reviews: loadedReviews };
+    },
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (loadQuery.data) {
+      setRestaurants(loadQuery.data.restaurants);
+      setReviews(loadQuery.data.reviews);
+      setIsReady(true);
+    }
+  }, [loadQuery.data]);
+
+  const persistRestaurants = useMutation({
+    mutationFn: async (updated: Restaurant[]) => {
+      await AsyncStorage.setItem(RESTAURANTS_KEY, JSON.stringify(updated));
+      console.log("[RestaurantProvider] Persisted", updated.length, "restaurants");
+    },
+  });
+
+  const persistReviews = useMutation({
+    mutationFn: async (updated: Review[]) => {
+      await AsyncStorage.setItem(REVIEWS_KEY, JSON.stringify(updated));
+      console.log("[RestaurantProvider] Persisted", updated.length, "reviews");
+    },
+  });
 
   const addRestaurant = useCallback((restaurant: Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt">) => {
     const newRestaurant: Restaurant = {
@@ -15,9 +77,14 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
       reviewCount: 0,
       createdAt: new Date().toISOString().split("T")[0],
     };
-    setRestaurants((prev) => [newRestaurant, ...prev]);
+    setRestaurants((prev) => {
+      const updated = [newRestaurant, ...prev];
+      persistRestaurants.mutate(updated);
+      return updated;
+    });
+    console.log("[RestaurantProvider] Added restaurant:", newRestaurant.name);
     return newRestaurant;
-  }, []);
+  }, [persistRestaurants]);
 
   const addReview = useCallback((review: Omit<Review, "id" | "createdAt">) => {
     const newReview: Review = {
@@ -25,9 +92,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
       id: `rev_${Date.now()}`,
       createdAt: new Date().toISOString().split("T")[0],
     };
-    setReviews((prev) => [newReview, ...prev]);
-    setRestaurants((prev) =>
-      prev.map((r) => {
+    setReviews((prev) => {
+      const updated = [newReview, ...prev];
+      persistReviews.mutate(updated);
+      return updated;
+    });
+    setRestaurants((prev) => {
+      const updated = prev.map((r) => {
         if (r.id === review.restaurantId) {
           const currentReviewCount = r.reviewCount;
           const newAvg = (r.rating * currentReviewCount + review.rating) / (currentReviewCount + 1);
@@ -38,10 +109,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
           };
         }
         return r;
-      })
-    );
+      });
+      persistRestaurants.mutate(updated);
+      return updated;
+    });
+    console.log("[RestaurantProvider] Added review for restaurant:", review.restaurantId);
     return newReview;
-  }, []);
+  }, [persistRestaurants, persistReviews]);
 
   const getReviewsForRestaurant = useCallback(
     (restaurantId: string) => reviews.filter((r) => r.restaurantId === restaurantId),
@@ -57,12 +131,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
     () => ({
       restaurants,
       reviews,
+      isReady,
       addRestaurant,
       addReview,
       getReviewsForRestaurant,
       getRestaurantsByOwner,
     }),
-    [restaurants, reviews, addRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
+    [restaurants, reviews, isReady, addRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
   );
 });
 
