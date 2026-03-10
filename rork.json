@@ -1,0 +1,9 @@
+{
+  "apps": [
+    {
+      "name": "FoodSpot",
+      "path": "expo",
+      "framework": "react-native"
+    }
+  ]
+}
