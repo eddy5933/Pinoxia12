@@ -20,49 +20,108 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     try {
       if (Platform.OS === "web") {
         if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              console.log("[LocationProvider] Web location obtained:", position.coords);
+          const getWebLocation = (highAccuracy: boolean): Promise<GeolocationPosition> =>
+            new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: highAccuracy,
+                timeout: 20000,
+                maximumAge: 120000,
+              });
+            });
+
+          try {
+            const position = await getWebLocation(true);
+            console.log("[LocationProvider] Web high-accuracy location obtained:", position.coords);
+            setUserLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          } catch (highAccError) {
+            console.log("[LocationProvider] High-accuracy failed, trying low accuracy...", highAccError);
+            try {
+              const position = await getWebLocation(false);
+              console.log("[LocationProvider] Web low-accuracy location obtained:", position.coords);
               setUserLocation({
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
               });
-              setLocationLoading(false);
-            },
-            (error) => {
-              console.log("[LocationProvider] Web geolocation error:", error.message);
-              setLocationError("Location access denied");
-              setLocationLoading(false);
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
-          );
+            } catch (lowAccError) {
+              console.log("[LocationProvider] Web geolocation error:", lowAccError);
+              setLocationError("Location access denied. Please enable location in browser settings.");
+            }
+          }
+          setLocationLoading(false);
         } else {
-          setLocationError("Geolocation not supported");
+          setLocationError("Geolocation not supported in this browser");
           setLocationLoading(false);
         }
       } else {
         const Location = require("expo-location") as typeof import("expo-location");
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          console.log("[LocationProvider] Location permission denied");
-          setLocationError("Location permission denied");
+
+        const servicesEnabled = await Location.hasServicesEnabledAsync();
+        console.log("[LocationProvider] Location services enabled:", servicesEnabled);
+        if (!servicesEnabled) {
+          setLocationError("Please enable GPS/Location Services in your device settings");
           setLocationLoading(false);
           return;
         }
 
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        console.log("[LocationProvider] Native location obtained:", loc.coords);
-        setUserLocation({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log("[LocationProvider] Permission status:", status);
+        if (status !== "granted") {
+          setLocationError("Location permission denied. Please allow location access in Settings.");
+          setLocationLoading(false);
+          return;
+        }
+
+        let loc: import("expo-location").LocationObject | null = null;
+
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            console.log("[LocationProvider] Using last known position:", lastKnown.coords);
+            setUserLocation({
+              latitude: lastKnown.coords.latitude,
+              longitude: lastKnown.coords.longitude,
+            });
+          }
+        } catch (lastErr) {
+          console.log("[LocationProvider] getLastKnownPosition failed:", lastErr);
+        }
+
+        try {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeInterval: 10000,
+          });
+          console.log("[LocationProvider] High accuracy location obtained:", loc.coords);
+        } catch (highErr) {
+          console.log("[LocationProvider] High accuracy failed, trying balanced...", highErr);
+          try {
+            loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            console.log("[LocationProvider] Balanced accuracy location obtained:", loc.coords);
+          } catch (balErr) {
+            console.log("[LocationProvider] Balanced accuracy failed, trying low...", balErr);
+            loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Low,
+            });
+            console.log("[LocationProvider] Low accuracy location obtained:", loc.coords);
+          }
+        }
+
+        if (loc) {
+          setUserLocation({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+        }
         setLocationLoading(false);
       }
     } catch (err) {
       console.log("[LocationProvider] Location error:", err);
-      setLocationError("Could not get location");
+      setLocationError("Could not get location. Please check GPS is enabled and try again.");
       setLocationLoading(false);
     }
   }, []);
