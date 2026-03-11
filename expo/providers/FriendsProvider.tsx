@@ -16,16 +16,25 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [allUsers, setAllUsers] = useState<PublicUser[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const loadQuery = useQuery({
-    queryKey: ["friends_load"],
+    queryKey: ["friends_load", currentUserId],
     queryFn: async () => {
-      console.log("[FriendsProvider] Loading data from Supabase...");
+      console.log("[FriendsProvider] Loading data from Supabase for user:", currentUserId);
+
+      const friendsQuery = currentUserId
+        ? supabase.from("friends").select("*").eq("user_id", currentUserId)
+        : supabase.from("friends").select("*").limit(0);
+
+      const requestsQuery = currentUserId
+        ? supabase.from("friend_requests").select("*").or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+        : supabase.from("friend_requests").select("*").limit(0);
 
       const [profilesRes, friendsRes, requestsRes] = await Promise.all([
         supabase.from("profiles").select("*"),
-        supabase.from("friends").select("*"),
-        supabase.from("friend_requests").select("*"),
+        friendsQuery,
+        requestsQuery,
       ]);
 
       const loadedUsers: PublicUser[] = (profilesRes.data ?? []).map((p: any) => ({
@@ -74,6 +83,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name);
+    setCurrentUserId(user.id);
     const { error } = await supabase
       .from("profiles")
       .upsert({
