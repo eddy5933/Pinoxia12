@@ -95,6 +95,89 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     }
   }, [loadQuery.data]);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+    console.log("[FriendsProvider] Setting up realtime subscriptions");
+
+    const channel = supabase
+      .channel("friends_realtime")
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "friend_requests" },
+        (payload: any) => {
+          console.log("[FriendsProvider] Realtime new friend_request:", payload.new?.id);
+          const r = payload.new;
+          if (!r) return;
+          if (r.to_user_id !== currentUserId && r.from_user_id !== currentUserId) return;
+
+          const newReq: FriendRequest = {
+            id: r.id,
+            fromUserId: r.from_user_id,
+            fromUserName: r.from_user_name,
+            fromUserEmail: r.from_user_email,
+            toUserId: r.to_user_id,
+            toUserName: r.to_user_name,
+            toUserEmail: r.to_user_email,
+            status: r.status,
+            createdAt: r.created_at,
+          };
+
+          setRequests((prev) => {
+            if (prev.some((req) => req.id === newReq.id)) return prev;
+            return [newReq, ...prev];
+          });
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "UPDATE", schema: "public", table: "friend_requests" },
+        (payload: any) => {
+          console.log("[FriendsProvider] Realtime updated friend_request:", payload.new?.id);
+          const r = payload.new;
+          if (!r) return;
+
+          setRequests((prev) =>
+            prev.map((req) =>
+              req.id === r.id ? { ...req, status: r.status } : req
+            )
+          );
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "friends" },
+        (payload: any) => {
+          console.log("[FriendsProvider] Realtime new friend:", payload.new?.id);
+          const f = payload.new;
+          if (!f) return;
+          if (f.user_id !== currentUserId) return;
+
+          const newFriend: Friend = {
+            id: f.id,
+            userId: f.friend_id,
+            name: f.friend_name,
+            email: f.friend_email,
+            avatar: f.friend_avatar ?? undefined,
+            isOnline: true,
+            isCloseFriend: f.is_close_friend ?? false,
+          };
+
+          setFriends((prev) => {
+            if (prev.some((fr) => fr.id === newFriend.id)) return prev;
+            return [newFriend, ...prev];
+          });
+        }
+      )
+      .subscribe((status: string) => {
+        console.log("[FriendsProvider] Realtime subscription status:", status);
+      });
+
+    return () => {
+      console.log("[FriendsProvider] Cleaning up realtime subscription");
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
     const { error } = await supabase

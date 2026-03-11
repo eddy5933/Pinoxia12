@@ -3,6 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useQuery } from "@tanstack/react-query";
 import { ChatMessage, Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/providers/AuthProvider";
 
 export interface LiveLocation {
   userId: string;
@@ -16,10 +17,13 @@ export interface LiveLocation {
 }
 
 export const [ChatProvider, useChat] = createContextHook(() => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [liveLocations, setLiveLocations] = useState<LiveLocation[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeConversationRef = useRef<string | null>(null);
 
   const loadQuery = useQuery({
     queryKey: ["chat_load"],
@@ -63,6 +67,87 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       setMessages(loadQuery.data.messages);
     }
   }, [loadQuery.data]);
+
+  useEffect(() => {
+    console.log("[ChatProvider] Setting up realtime subscription for messages");
+    const channel = supabase
+      .channel("messages_realtime")
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload: any) => {
+          console.log("[ChatProvider] Realtime new message:", payload.new?.id);
+          const m = payload.new;
+          if (!m) return;
+
+          const newMsg: ChatMessage = {
+            id: m.id,
+            conversationId: m.conversation_id,
+            senderId: m.sender_id,
+            senderName: m.sender_name,
+            text: m.text,
+            type: m.type ?? "text",
+            locationData: m.location_data ?? undefined,
+            createdAt: m.created_at,
+          };
+
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === newMsg.conversationId
+                ? { ...c, lastMessage: newMsg.text, lastMessageAt: newMsg.createdAt }
+                : c
+            )
+          );
+
+          if (
+            user &&
+            newMsg.senderId !== user.id &&
+            activeConversationRef.current !== newMsg.conversationId
+          ) {
+            setUnreadCounts((prev) => ({
+              ...prev,
+              [newMsg.conversationId]: (prev[newMsg.conversationId] ?? 0) + 1,
+            }));
+          }
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "INSERT", schema: "public", table: "conversations" },
+        (payload: any) => {
+          console.log("[ChatProvider] Realtime new conversation:", payload.new?.id);
+          const c = payload.new;
+          if (!c) return;
+
+          const newConvo: Conversation = {
+            id: c.id,
+            participants: c.participants ?? [],
+            participantNames: c.participant_names ?? {},
+            lastMessage: c.last_message ?? undefined,
+            lastMessageAt: c.last_message_at ?? undefined,
+            unreadCount: c.unread_count ?? 0,
+          };
+
+          setConversations((prev) => {
+            if (prev.some((conv) => conv.id === newConvo.id)) return prev;
+            return [newConvo, ...prev];
+          });
+        }
+      )
+      .subscribe((status: string) => {
+        console.log("[ChatProvider] Realtime subscription status:", status);
+      });
+
+    return () => {
+      console.log("[ChatProvider] Cleaning up realtime subscription");
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const getOrCreateConversation = useCallback(
     async (currentUserId: string, currentUserName: string, friendUserId: string, friendName: string) => {
@@ -174,7 +259,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       console.log("[ChatProvider] Sent message in", conversationId);
       return newMessage;
     },
-    [conversations]
+    []
   );
 
   const getMessagesForConversation = useCallback(
@@ -193,6 +278,26 @@ export const [ChatProvider, useChat] = createContextHook(() => {
           return bTime.localeCompare(aTime);
         }),
     [conversations]
+  );
+
+  const setActiveConversation = useCallback((conversationId: string | null) => {
+    activeConversationRef.current = conversationId;
+    if (conversationId) {
+      setUnreadCounts((prev) => {
+        const next = { ...prev };
+        delete next[conversationId];
+        return next;
+      });
+    }
+  }, []);
+
+  const totalUnreadCount = useMemo(() => {
+    return Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  }, [unreadCounts]);
+
+  const getUnreadCount = useCallback(
+    (conversationId: string) => unreadCounts[conversationId] ?? 0,
+    [unreadCounts]
   );
 
   const startSharingLocation = useCallback(
@@ -282,6 +387,9 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       stopSharingLocation,
       getLiveLocationsForConversation,
       isUserSharingLocation,
+      setActiveConversation,
+      totalUnreadCount,
+      getUnreadCount,
     }),
     [
       conversations, messages, liveLocations,
@@ -289,6 +397,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       getMessagesForConversation, getConversationsForUser,
       startSharingLocation, updateSharedLocation, stopSharingLocation,
       getLiveLocationsForConversation, isUserSharingLocation,
+      setActiveConversation, totalUnreadCount, getUnreadCount,
     ]
   );
 });
