@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import createContextHook from "@nkzw/create-context-hook";
 import { supabase } from "@/lib/supabase";
+import { registerForPushNotifications, savePushToken } from "@/lib/pushNotifications";
 import { User, UserRole } from "@/types";
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
@@ -20,14 +21,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             .single();
 
           if (profile) {
-            setUser({
+            const loadedUser: User = {
               id: profile.id,
               email: profile.email,
               name: profile.name,
               role: profile.role ?? "customer",
               avatar: profile.avatar ?? undefined,
-            });
+            };
+            setUser(loadedUser);
             console.log("[Auth] Loaded profile:", profile.name);
+
+            void registerForPushNotifications().then((token) => {
+              if (token) void savePushToken(loadedUser.id, token);
+            });
           }
         }
       } catch (e) {
@@ -97,6 +103,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         };
         setUser(u);
         console.log("[Auth] Login success:", u.name);
+
+        void registerForPushNotifications().then((token) => {
+          if (token) void savePushToken(u.id, token);
+        });
+
         return u;
       }
     }
@@ -133,6 +144,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       };
       setUser(u);
       console.log("[Auth] Signup success:", u.name);
+
+      void registerForPushNotifications().then((token) => {
+        if (token) void savePushToken(u.id, token);
+      });
+
       return u;
     }
     return null;

@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as Notifications from "expo-notifications";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { RestaurantProvider } from "@/providers/RestaurantProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
@@ -17,6 +19,31 @@ import Colors from "@/constants/colors";
 void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function useNotificationResponseHandler() {
+  const responseListener = useRef<ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, string> | undefined;
+      console.log("[Push] Notification tapped, data:", JSON.stringify(data));
+
+      if (data?.type === "message" && typeof data?.conversationId === "string") {
+        router.push(`/chat/${String(data.conversationId)}` as any);
+      } else if (data?.type === "friend_request") {
+        router.push("/(tabs)/friends" as any);
+      }
+    });
+
+    return () => {
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
+  }, []);
+}
 
 function RootLayoutNav() {
   return (
@@ -72,6 +99,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  useNotificationResponseHandler();
+
   useEffect(() => {
     void SplashScreen.hideAsync();
   }, []);

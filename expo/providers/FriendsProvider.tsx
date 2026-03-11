@@ -3,6 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useQuery } from "@tanstack/react-query";
 import { Friend, FriendRequest, User } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUser } from "@/lib/pushNotifications";
 
 export interface PublicUser {
   id: string;
@@ -162,6 +163,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         createdAt: data.created_at,
       };
       setRequests((prev) => [newRequest, ...prev]);
+      void sendPushToUser(toUser.id, "Friend Request", `${fromUser.name} sent you a friend request`, {
+        type: "friend_request",
+        fromUserId: fromUser.id,
+      });
+
       console.log("[FriendsProvider] Sent friend request to", toUser.name);
       return true;
     },
