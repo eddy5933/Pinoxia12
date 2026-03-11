@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -52,7 +53,7 @@ export default function FriendsScreen() {
   const { user } = useAuth();
   const {
     friends,
-    searchUsers,
+    searchUsersFromSupabase,
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
@@ -71,6 +72,9 @@ export default function FriendsScreen() {
 
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
+  const [liveSearchResults, setLiveSearchResults] = useState<PublicUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "", userName: "", type: "success" });
   const toastAnim = useRef(new Animated.Value(-120)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -124,15 +128,44 @@ export default function FriendsScreen() {
     [user, getSentRequests]
   );
 
-  const allAvailableUsers = useMemo(
-    () => (user ? searchUsers("", user.id) : []),
-    [user, searchUsers]
-  );
+  useEffect(() => {
+    if (!user) return;
+    if (activeTab !== "search") return;
 
-  const searchResults = useMemo(
-    () => (user ? searchUsers(searchQuery, user.id) : []),
-    [user, searchQuery, searchUsers]
-  );
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        console.log("[FriendsSearch] Searching Supabase for:", searchQuery);
+        const results = await searchUsersFromSupabase(searchQuery, user.id);
+        setLiveSearchResults(results);
+        console.log("[FriendsSearch] Got", results.length, "results");
+      } catch (err) {
+        console.warn("[FriendsSearch] Search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, [searchQuery, user, activeTab, searchUsersFromSupabase]);
+
+  useEffect(() => {
+    if (activeTab === "search" && user) {
+      setIsSearching(true);
+      searchUsersFromSupabase("", user.id).then((results) => {
+        setLiveSearchResults(results);
+        setIsSearching(false);
+      }).catch(() => setIsSearching(false));
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSendRequest = useCallback(
     async (toUser: PublicUser) => {
@@ -523,7 +556,7 @@ export default function FriendsScreen() {
 
       {activeTab === "search" && (
         <FlatList
-          data={searchQuery.trim().length > 0 ? searchResults : allAvailableUsers}
+          data={liveSearchResults}
           keyExtractor={(item) => item.id}
           renderItem={renderSearchItem}
           contentContainerStyle={styles.listContent}
@@ -536,11 +569,18 @@ export default function FriendsScreen() {
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyCenter}>
-              <Search size={40} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>No users found</Text>
-              <Text style={styles.emptySubtitle}>No users or owners available yet</Text>
-            </View>
+            isSearching ? (
+              <View style={styles.emptyCenter}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.emptyTitle}>Searching...</Text>
+              </View>
+            ) : (
+              <View style={styles.emptyCenter}>
+                <Search size={40} color={Colors.textMuted} />
+                <Text style={styles.emptyTitle}>No users found</Text>
+                <Text style={styles.emptySubtitle}>Try searching by name or email</Text>
+              </View>
+            )
           }
         />
       )}

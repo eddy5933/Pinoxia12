@@ -129,6 +129,51 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [allUsers]
   );
 
+  const searchUsersFromSupabase = useCallback(
+    async (query: string, userId: string): Promise<PublicUser[]> => {
+      if (!query.trim()) {
+        console.log("[FriendsProvider] Empty query, returning all users from Supabase");
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .neq("id", userId)
+          .limit(50);
+        if (error) {
+          console.warn("[FriendsProvider] Supabase search error:", error.message);
+          return allUsers.filter((u) => u.id !== userId);
+        }
+        return (data ?? []).map((p: any) => ({
+          id: p.id,
+          email: p.email,
+          name: p.name,
+          role: p.role ?? "customer",
+          avatar: p.avatar ?? undefined,
+        }));
+      }
+      const q = query.trim();
+      console.log("[FriendsProvider] Searching Supabase for:", q);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", userId)
+        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
+        .limit(50);
+      if (error) {
+        console.warn("[FriendsProvider] Supabase search error:", error.message);
+        return searchUsers(query, userId);
+      }
+      console.log("[FriendsProvider] Supabase search returned", data?.length ?? 0, "results");
+      return (data ?? []).map((p: any) => ({
+        id: p.id,
+        email: p.email,
+        name: p.name,
+        role: p.role ?? "customer",
+        avatar: p.avatar ?? undefined,
+      }));
+    },
+    [allUsers, searchUsers]
+  );
+
   const sendFriendRequest = useCallback(
     async (fromUser: User, toUser: PublicUser) => {
       const existing = requests.find(
@@ -385,6 +430,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       allUsers,
       registerUser,
       searchUsers,
+      searchUsersFromSupabase,
       sendFriendRequest,
       acceptFriendRequest,
       rejectFriendRequest,
@@ -401,7 +447,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     }),
     [
       friends, closeFriends, requests, allUsers, registerUser, searchUsers,
-      sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
+      searchUsersFromSupabase, sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
       removeFriend, cancelFriendRequest, toggleCloseFriend, isCloseFriend,
       getPendingRequests, getSentRequests,
       isFriend, hasPendingRequest, refetchUsers, isRefetching,
