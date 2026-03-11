@@ -222,8 +222,8 @@ export default function ExploreScreen() {
         {userLocation && (
           <View style={styles.locationRow}>
             <View style={styles.locationDot} />
-            <Text style={styles.locationLabel}>
-              GPS active · {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+            <Text style={styles.locationLabel} numberOfLines={1}>
+              {userLocation.placeName ?? `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
             </Text>
           </View>
         )}
@@ -235,94 +235,95 @@ export default function ExploreScreen() {
         )}
       </View>
 
-      <View style={styles.searchContainer}>
-        <Search size={18} color={Colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search shops, restaurants, services..."
-          placeholderTextColor={Colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          testID="search-input"
-        />
+      <View style={styles.searchRow}>
+        <View style={styles.searchContainer}>
+          <Search size={18} color={Colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search shops, restaurants, services..."
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            testID="search-input"
+          />
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.radiusToggle,
+            radiusKm > 0 && styles.radiusToggleActive,
+          ]}
+          onPress={toggleRadiusPicker}
+          activeOpacity={0.7}
+          testID="radius-toggle"
+        >
+          <SlidersHorizontal size={16} color={radiusKm > 0 ? Colors.white : Colors.textSecondary} />
+          <Text style={[styles.radiusToggleText, radiusKm > 0 && styles.radiusToggleTextActive]}>
+            {radiusKm > 0 ? `${radiusKm}km` : "All"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.filterSection}>
-        <View style={styles.filterRow}>
+      {showRadiusPicker && (
+        <View style={styles.radiusPickerContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
+            contentContainerStyle={styles.radiusPickerScroll}
           >
-            {CUISINE_TYPES.map((cuisine) => (
+            {RADIUS_OPTIONS.map((value) => (
               <TouchableOpacity
-                key={cuisine}
+                key={value}
                 style={[
-                  styles.filterChip,
-                  selectedCuisine === cuisine && styles.filterChipActive,
+                  styles.radiusChip,
+                  radiusKm === value && styles.radiusChipActive,
                 ]}
-                onPress={() => setSelectedCuisine(cuisine)}
-                testID={`filter-${cuisine}`}
+                onPress={() => selectRadius(value)}
+                testID={`radius-${value}`}
               >
                 <Text
                   style={[
-                    styles.filterChipText,
-                    selectedCuisine === cuisine && styles.filterChipTextActive,
+                    styles.radiusChipText,
+                    radiusKm === value && styles.radiusChipTextActive,
                   ]}
                 >
-                  {cuisine}
+                  {RADIUS_LABELS[value]}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity
-            style={[
-              styles.radiusToggle,
-              radiusKm > 0 && styles.radiusToggleActive,
-            ]}
-            onPress={toggleRadiusPicker}
-            activeOpacity={0.7}
-            testID="radius-toggle"
-          >
-            <SlidersHorizontal size={16} color={radiusKm > 0 ? Colors.white : Colors.textSecondary} />
-            <Text style={[styles.radiusToggleText, radiusKm > 0 && styles.radiusToggleTextActive]}>
-              {radiusKm > 0 ? `${radiusKm}km` : "Radius"}
-            </Text>
-          </TouchableOpacity>
+          {radiusKm > 0 && !userLocation && (
+            <Text style={styles.radiusHint}>Enable location to use radius filter</Text>
+          )}
         </View>
-        {showRadiusPicker && (
-          <View style={styles.radiusPickerContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.radiusPickerScroll}
+      )}
+
+      <View style={styles.filterSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {CUISINE_TYPES.map((cuisine) => (
+            <TouchableOpacity
+              key={cuisine}
+              style={[
+                styles.filterChip,
+                selectedCuisine === cuisine && styles.filterChipActive,
+              ]}
+              onPress={() => setSelectedCuisine(cuisine)}
+              testID={`filter-${cuisine}`}
             >
-              {RADIUS_OPTIONS.map((value) => (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.radiusChip,
-                    radiusKm === value && styles.radiusChipActive,
-                  ]}
-                  onPress={() => selectRadius(value)}
-                  testID={`radius-${value}`}
-                >
-                  <Text
-                    style={[
-                      styles.radiusChipText,
-                      radiusKm === value && styles.radiusChipTextActive,
-                    ]}
-                  >
-                    {RADIUS_LABELS[value]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {radiusKm > 0 && !userLocation && (
-              <Text style={styles.radiusHint}>Enable location to use radius filter</Text>
-            )}
-          </View>
-        )}
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedCuisine === cuisine && styles.filterChipTextActive,
+                ]}
+              >
+                {cuisine}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -364,12 +365,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
+  searchRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     marginHorizontal: 20,
     marginTop: 12,
+    gap: 10,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
@@ -384,12 +391,8 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? { outlineStyle: "none" as any } : {}),
   },
   filterSection: {
-    marginTop: 14,
+    marginTop: 10,
     marginBottom: 6,
-  },
-  filterRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
   },
   filterScroll: {
     paddingLeft: 20,
@@ -399,14 +402,13 @@ const styles = StyleSheet.create({
   radiusToggle: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginRight: 16,
-    gap: 5,
+    gap: 6,
   },
   radiusToggleActive: {
     backgroundColor: Colors.primary,
@@ -422,7 +424,7 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
   },
   radiusPickerContainer: {
-    marginTop: 10,
+    marginTop: 8,
     paddingBottom: 2,
   },
   radiusPickerScroll: {
@@ -584,6 +586,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: "500" as const,
+    flex: 1,
   },
   locationErrorRow: {
     flexDirection: "row",
