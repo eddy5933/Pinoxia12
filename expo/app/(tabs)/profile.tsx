@@ -4,58 +4,77 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
   User,
   LogOut,
-  ChevronRight,
   Store,
+  ChevronRight,
+  RefreshCw,
   Plus,
-  Shield,
   Mail,
-  ToggleLeft,
-  ToggleRight,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout, toggleRole } = useAuth();
   const router = useRouter();
+  const { user, isLoading, logout, toggleRole } = useAuth();
 
-  const handleLogout = useCallback(() => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
+  const handleLogout = useCallback(async () => {
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Logout",
+        text: "Log Out",
         style: "destructive",
-        onPress: () => void logout(),
+        onPress: async () => {
+          await logout();
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
       },
     ]);
   }, [logout]);
 
+  const handleToggleRole = useCallback(async () => {
+    await toggleRole();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [toggleRole]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   if (!user) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.loginPrompt}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+        <View style={styles.centered}>
           <View style={styles.avatarPlaceholder}>
-            <User size={40} color={Colors.textMuted} />
+            <User size={48} color={Colors.textMuted} />
           </View>
-          <Text style={styles.loginTitle}>Welcome to FoodSpot</Text>
-          <Text style={styles.loginSubtitle}>
-            Sign in to leave reviews and manage restaurants
+          <Text style={styles.guestTitle}>Welcome to FoodSpot</Text>
+          <Text style={styles.guestSubtitle}>
+            Sign in to leave reviews, register restaurants, and more
           </Text>
           <TouchableOpacity
-            style={styles.loginButton}
+            style={styles.signInButton}
             onPress={() => router.push("/login")}
-            testID="login-button"
+            activeOpacity={0.8}
+            testID="sign-in-button"
           >
-            <Text style={styles.loginButtonText}>Sign In</Text>
+            <Text style={styles.signInButtonText}>Sign In</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -66,29 +85,28 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.profileHeader}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+
+        <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
               {user.name.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <Text style={styles.userName}>{user.name}</Text>
-          <View style={styles.emailRow}>
-            <Mail size={14} color={Colors.textMuted} />
-            <Text style={styles.userEmail}>{user.email}</Text>
-          </View>
-          <View style={[styles.roleBadge, isOwner && styles.roleBadgeOwner]}>
-            <Shield
-              size={12}
-              color={isOwner ? Colors.primary : Colors.textSecondary}
-            />
-            <Text style={[styles.roleText, isOwner && styles.roleTextOwner]}>
-              {isOwner ? "Restaurant Owner" : "Customer"}
-            </Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{user.name}</Text>
+            <View style={styles.emailRow}>
+              <Mail size={13} color={Colors.textMuted} />
+              <Text style={styles.profileEmail}>{user.email}</Text>
+            </View>
+            <View style={[styles.roleBadge, isOwner && styles.roleBadgeOwner]}>
+              <Text style={[styles.roleBadgeText, isOwner && styles.roleBadgeTextOwner]}>
+                {isOwner ? "Restaurant Owner" : "Customer"}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -97,73 +115,67 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => void toggleRole()}
+            onPress={() => void handleToggleRole()}
+            activeOpacity={0.7}
             testID="toggle-role"
           >
             <View style={styles.menuItemLeft}>
-              {isOwner ? (
-                <ToggleRight size={20} color={Colors.primary} />
-              ) : (
-                <ToggleLeft size={20} color={Colors.textSecondary} />
-              )}
+              <View style={[styles.menuIcon, { backgroundColor: "rgba(230,57,70,0.12)" }]}>
+                <RefreshCw size={18} color={Colors.primary} />
+              </View>
               <View>
-                <Text style={styles.menuItemTitle}>Switch Role</Text>
-                <Text style={styles.menuItemSubtitle}>
+                <Text style={styles.menuItemText}>Switch Role</Text>
+                <Text style={styles.menuItemSubtext}>
                   Currently: {isOwner ? "Owner" : "Customer"}
                 </Text>
               </View>
             </View>
             <ChevronRight size={18} color={Colors.textMuted} />
           </TouchableOpacity>
+
+          {isOwner && (
+            <>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => router.push("/my-restaurants")}
+                activeOpacity={0.7}
+                testID="my-restaurants"
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.menuIcon, { backgroundColor: "rgba(255,184,0,0.12)" }]}>
+                    <Store size={18} color={Colors.star} />
+                  </View>
+                  <Text style={styles.menuItemText}>My Restaurants</Text>
+                </View>
+                <ChevronRight size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => router.push("/add-restaurant")}
+                activeOpacity={0.7}
+                testID="add-restaurant"
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.menuIcon, { backgroundColor: "rgba(76,175,80,0.12)" }]}>
+                    <Plus size={18} color={Colors.success} />
+                  </View>
+                  <Text style={styles.menuItemText}>Register Restaurant</Text>
+                </View>
+                <ChevronRight size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-
-        {isOwner && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Restaurant Management</Text>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push("/add-restaurant")}
-              testID="add-restaurant"
-            >
-              <View style={styles.menuItemLeft}>
-                <Plus size={20} color={Colors.success} />
-                <View>
-                  <Text style={styles.menuItemTitle}>Register Restaurant</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    $5 registration fee applies
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push("/my-restaurants")}
-              testID="my-restaurants"
-            >
-              <View style={styles.menuItemLeft}>
-                <Store size={20} color={Colors.primary} />
-                <View>
-                  <Text style={styles.menuItemTitle}>My Restaurants</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    View and manage your listings
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-        )}
 
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={handleLogout}
+          onPress={() => void handleLogout()}
+          activeOpacity={0.7}
           testID="logout-button"
         >
-          <LogOut size={18} color={Colors.primary} />
-          <Text style={styles.logoutText}>Logout</Text>
+          <LogOut size={18} color={Colors.error} />
+          <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -175,69 +187,93 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  loginPrompt: {
+  centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "800" as const,
+    color: Colors.white,
   },
   avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: Colors.border,
   },
-  loginTitle: {
-    fontSize: 24,
+  guestTitle: {
+    fontSize: 22,
     fontWeight: "700" as const,
     color: Colors.white,
     marginBottom: 8,
   },
-  loginSubtitle: {
+  guestSubtitle: {
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: "center",
-    marginBottom: 28,
     lineHeight: 20,
+    marginBottom: 28,
   },
-  loginButton: {
+  signInButton: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: 40,
+    paddingHorizontal: 48,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
   },
-  loginButtonText: {
-    color: Colors.white,
+  signInButtonText: {
     fontSize: 16,
     fontWeight: "700" as const,
+    color: Colors.white,
   },
-  profileHeader: {
+  profileCard: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "800" as const,
     color: Colors.white,
   },
-  userName: {
-    fontSize: 22,
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
     fontWeight: "700" as const,
     color: Colors.white,
   },
@@ -245,56 +281,50 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 6,
+    marginTop: 4,
   },
-  userEmail: {
-    fontSize: 14,
+  profileEmail: {
+    fontSize: 13,
     color: Colors.textMuted,
   },
   roleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    alignSelf: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceHighlight,
   },
   roleBadgeOwner: {
-    borderColor: Colors.primary,
-    backgroundColor: "rgba(230, 57, 70, 0.1)",
+    backgroundColor: "rgba(230,57,70,0.15)",
   },
-  roleText: {
-    fontSize: 13,
+  roleBadgeText: {
+    fontSize: 11,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
-  roleTextOwner: {
+  roleBadgeTextOwner: {
     color: Colors.primary,
   },
   section: {
-    marginTop: 10,
+    marginTop: 28,
     paddingHorizontal: 20,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600" as const,
     color: Colors.textMuted,
     textTransform: "uppercase" as const,
-    letterSpacing: 1,
-    marginBottom: 10,
-    marginLeft: 4,
+    letterSpacing: 0.5,
+    marginBottom: 12,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Colors.surface,
-    padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -303,14 +333,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    flex: 1,
   },
-  menuItemTitle: {
+  menuIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuItemText: {
     fontSize: 15,
     fontWeight: "600" as const,
     color: Colors.white,
   },
-  menuItemSubtitle: {
+  menuItemSubtext: {
     fontSize: 12,
     color: Colors.textMuted,
     marginTop: 2,
@@ -319,17 +355,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    marginTop: 30,
+    gap: 10,
     marginHorizontal: 20,
+    marginTop: 32,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: "rgba(230,57,70,0.3)",
   },
   logoutText: {
     fontSize: 15,
     fontWeight: "600" as const,
-    color: Colors.primary,
+    color: Colors.error,
   },
 });
