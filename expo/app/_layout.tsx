@@ -20,21 +20,37 @@ void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+function handleNotificationNavigation(data: Record<string, string> | undefined) {
+  if (!data) return;
+  console.log("[Push] Navigating from notification data:", JSON.stringify(data));
+
+  if (data.type === "message" && typeof data.conversationId === "string") {
+    router.push(`/chat/${String(data.conversationId)}` as any);
+  } else if (data.type === "friend_request") {
+    router.push("/(tabs)/friends" as any);
+  }
+}
+
 function useNotificationResponseHandler() {
   const responseListener = useRef<ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | null>(null);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
 
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response.notification.request.content.data as Record<string, string> | undefined;
+        console.log("[Push] App launched from killed state via notification:", JSON.stringify(data));
+        handleNotificationNavigation(data);
+      }
+    }).catch((err) => {
+      console.warn("[Push] Error checking last notification response:", err);
+    });
+
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, string> | undefined;
       console.log("[Push] Notification tapped, data:", JSON.stringify(data));
-
-      if (data?.type === "message" && typeof data?.conversationId === "string") {
-        router.push(`/chat/${String(data.conversationId)}` as any);
-      } else if (data?.type === "friend_request") {
-        router.push("/(tabs)/friends" as any);
-      }
+      handleNotificationNavigation(data);
     });
 
     return () => {

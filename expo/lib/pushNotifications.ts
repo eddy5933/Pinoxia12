@@ -39,16 +39,37 @@ export async function registerForPushNotifications(): Promise<string | null> {
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#FF6B35",
         sound: "default",
+        enableVibrate: true,
+        showBadge: true,
       });
     }
 
     const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId ?? undefined,
-    });
+    let token: string | null = null;
 
-    console.log("[Push] Token:", tokenData.data);
-    return tokenData.data;
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: projectId ?? undefined,
+      });
+      token = tokenData.data;
+      console.log("[Push] Expo push token:", token);
+    } catch (expoTokenError) {
+      console.warn("[Push] Failed to get Expo push token, trying device token:", expoTokenError);
+      try {
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        console.log("[Push] Device push token:", JSON.stringify(deviceToken));
+        const retryToken = await Notifications.getExpoPushTokenAsync({
+          projectId: projectId ?? undefined,
+          devicePushToken: deviceToken,
+        });
+        token = retryToken.data;
+        console.log("[Push] Expo push token (via device token):", token);
+      } catch (deviceTokenError) {
+        console.warn("[Push] Device token fallback also failed:", deviceTokenError);
+      }
+    }
+
+    return token;
   } catch (error) {
     console.warn("[Push] Registration error:", error);
     return null;

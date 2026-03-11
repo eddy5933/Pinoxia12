@@ -34,6 +34,15 @@
           "origin": "https://rork.com/"
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FF6B35",
+          "sounds": [],
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],
