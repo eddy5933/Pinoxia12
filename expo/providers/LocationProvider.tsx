@@ -227,11 +227,17 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     } else {
       void supabase
         .from("profiles")
-        .update({ location_sharing_enabled: false })
+        .update({
+          location_sharing_enabled: false,
+          latitude: null,
+          longitude: null,
+          location_place_name: null,
+          location_updated_at: new Date().toISOString(),
+        })
         .eq("id", currentUserId)
         .then(({ error }) => {
           if (error) console.warn("[LocationProvider] Failed to disable sharing:", error.message);
-          else console.log("[LocationProvider] Location sharing disabled in DB");
+          else console.log("[LocationProvider] Location sharing disabled and coordinates cleared in DB");
         });
     }
 
