@@ -153,10 +153,12 @@ function FriendMarkerWrapper({
   friend,
   Marker,
   Callout,
+  onPress,
 }: {
   friend: FriendLocation;
   Marker: any;
   Callout: any;
+  onPress?: (friend: FriendLocation) => void;
 }) {
   const [trackChanges, setTrackChanges] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,9 +184,17 @@ function FriendMarkerWrapper({
     <Marker
       coordinate={{ latitude: friend.latitude, longitude: friend.longitude }}
       tracksViewChanges={trackChanges}
+      onPress={() => {
+        console.log("[MapScreen] Friend marker tapped:", friend.name);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (onPress) onPress(friend);
+      }}
     >
       <FriendMarkerView friend={friend} onLoad={handleLoad} />
-      <Callout tooltip>
+      <Callout tooltip onPress={() => {
+        console.log("[MapScreen] Friend callout tapped:", friend.name);
+        if (onPress) onPress(friend);
+      }}>
         <View style={markerStyles.calloutSimple}>
           <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{friend.name}</Text>
         </View>
@@ -204,6 +214,7 @@ function NativeMapView({
   friendLocations,
   focusFriendLocation,
   focusFriendTrigger,
+  onFriendMarkerPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -214,6 +225,7 @@ function NativeMapView({
   friendLocations: FriendLocation[];
   focusFriendLocation: FriendLocation | null;
   focusFriendTrigger: number;
+  onFriendMarkerPress?: (friend: FriendLocation) => void;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -413,7 +425,7 @@ function NativeMapView({
         );
       })}
       {friendLocations.map((fl) => (
-        <FriendMarkerWrapper key={`friend-${fl.userId}`} friend={fl} Marker={Marker} Callout={Callout} />
+        <FriendMarkerWrapper key={`friend-${fl.userId}`} friend={fl} Marker={Marker} Callout={Callout} onPress={onFriendMarkerPress} />
       ))}
     </MapView>
   );
@@ -498,12 +510,7 @@ export default function MapScreenExport() {
   const sharingPulse = useRef(new Animated.Value(0)).current;
   const shareButtonScale = useRef(new Animated.Value(1)).current;
 
-  const handleFocusFriend = useCallback((friend: FriendLocation) => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setFocusFriendLocation(friend);
-    setFocusFriendTrigger((prev) => prev + 1);
-    console.log("[MapScreen] Focusing on friend:", friend.name, friend.latitude, friend.longitude);
-  }, []);
+  const friendListRef = useRef<FlatList>(null);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -632,6 +639,23 @@ export default function MapScreenExport() {
     console.log("[MapScreen] Friend locations to display:", friendLocations.length, friendLocations.map(f => ({ name: f.name, lat: f.latitude, lng: f.longitude })));
     return friendLocations;
   }, [showFriendLocations, friendLocations]);
+
+  const handleFocusFriend = useCallback((friend: FriendLocation) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setFocusFriendLocation(friend);
+    setFocusFriendTrigger((prev) => prev + 1);
+    setShowFriendLocations(true);
+    console.log("[MapScreen] Focusing on friend:", friend.name, friend.latitude, friend.longitude);
+    const idx = visibleFriendLocations.findIndex((f) => f.userId === friend.userId);
+    if (idx >= 0 && friendListRef.current) {
+      try {
+        friendListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      } catch (e) {
+        console.log("[MapScreen] scrollToIndex fallback", e);
+        friendListRef.current.scrollToOffset({ offset: idx * 78, animated: true });
+      }
+    }
+  }, [visibleFriendLocations]);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
@@ -831,11 +855,13 @@ export default function MapScreenExport() {
             <Text style={friendListStyles.headerText}>Close Friends Nearby</Text>
           </View>
           <FlatList
+            ref={friendListRef}
             data={visibleFriendLocations}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.userId}
             contentContainerStyle={friendListStyles.listContent}
+            getItemLayout={(_data, index) => ({ length: 78, offset: 78 * index, index })}
             renderItem={({ item }) => {
               const dist = userLocation
                 ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
@@ -843,7 +869,7 @@ export default function MapScreenExport() {
 
               const initials = item.name
                 .split(" ")
-                .map((w) => w[0])
+                .map((w: string) => w[0])
                 .join("")
                 .toUpperCase()
                 .slice(0, 2);
@@ -896,6 +922,7 @@ export default function MapScreenExport() {
             friendLocations={visibleFriendLocations}
             focusFriendLocation={focusFriendLocation}
             focusFriendTrigger={focusFriendTrigger}
+            onFriendMarkerPress={handleFocusFriend}
           />
         )}
 
