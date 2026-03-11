@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { User, UserRole } from "@/types";
+import { cloudUsersApi } from "@/lib/api";
 
 const AUTH_STORAGE_KEY = "foodspot_auth";
 const ALL_ACCOUNTS_KEY = "foodspot_all_accounts";
@@ -15,7 +16,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       try {
         const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
         if (stored) {
-          setUser(JSON.parse(stored));
+          const parsed = JSON.parse(stored) as User;
+          setUser(parsed);
+          cloudUsersApi.upsert({
+            id: parsed.id,
+            email: parsed.email,
+            name: parsed.name,
+            role: parsed.role,
+          }).catch((e) => console.warn("[Auth] Cloud sync on load failed:", e));
         }
       } catch (e) {
         console.log("Failed to load auth state:", e);
@@ -24,6 +32,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
     };
     void loadUser();
+  }, []);
+
+  const syncToCloud = useCallback(async (u: User) => {
+    try {
+      await cloudUsersApi.upsert({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+      });
+      console.log("[Auth] Synced user to cloud:", u.name);
+    } catch (e) {
+      console.warn("[Auth] Cloud sync failed:", e);
+    }
   }, []);
 
   const login = useCallback(async (email: string, _password: string) => {
@@ -35,6 +57,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       console.log("[Auth] Found existing account for", email, "id:", existing.id);
       setUser(existing);
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
+      void syncToCloud(existing);
       return existing;
     }
 
@@ -49,8 +72,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
     await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
     console.log("[Auth] Created new account for", email, "id:", newUser.id);
+    void syncToCloud(newUser);
     return newUser;
-  }, []);
+  }, [syncToCloud]);
 
   const signup = useCallback(async (email: string, _password: string, name: string) => {
     const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
@@ -61,6 +85,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       console.log("[Auth] Account already exists for", email, "- logging in");
       setUser(existing);
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
+      void syncToCloud(existing);
       return existing;
     }
 
@@ -75,8 +100,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
     await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
     console.log("[Auth] Signed up new account for", email, "id:", newUser.id);
+    void syncToCloud(newUser);
     return newUser;
-  }, []);
+  }, [syncToCloud]);
 
   const logout = useCallback(async () => {
     setUser(null);
@@ -90,6 +116,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
       const filtered = accounts.filter((a) => a.id !== user.id);
       await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(filtered));
+      cloudUsersApi.remove(user.id).catch((e) => console.warn("[Auth] Cloud delete failed:", e));
     }
     setUser(null);
     await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
@@ -107,7 +134,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const updatedAccounts = accounts.map((a) => (a.id === user.id ? updated : a));
     await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
     console.log("[Auth] Updated role to", newRole, "for", user.name);
-  }, [user]);
+    void syncToCloud(updated);
+  }, [user, syncToCloud]);
 
   return useMemo(
     () => ({ user, isLoading, login, signup, logout, deleteAccount, toggleRole }),

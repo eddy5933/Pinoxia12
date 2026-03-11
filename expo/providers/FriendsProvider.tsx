@@ -3,6 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Friend, FriendRequest, User } from "@/types";
+import { cloudUsersApi, CloudUser } from "@/lib/api";
 
 const FRIENDS_KEY = "foodspot_friends";
 const REQUESTS_KEY = "foodspot_friend_requests";
@@ -27,6 +28,10 @@ const MOCK_USERS: PublicUser[] = [
   { id: "user_demo_7", email: "grace@email.com", name: "Grace Kim", role: "owner" },
   { id: "user_demo_8", email: "henry@email.com", name: "Henry Patel", role: "customer" },
 ];
+
+function cloudToPublic(cu: CloudUser): PublicUser {
+  return { id: cu.id, email: cu.email, name: cu.name, role: cu.role, avatar: cu.avatar };
+}
 
 function mergeUsers(stored: PublicUser[], base: PublicUser[]): PublicUser[] {
   const map = new Map<string, PublicUser>();
@@ -57,11 +62,21 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const accounts: PublicUser[] = storedAccounts
         ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
         : [];
-      const loadedUsers = mergeUsers([...parsedUsers, ...accounts], MOCK_USERS);
+
+      let cloudUsers: PublicUser[] = [];
+      try {
+        const fetched = await cloudUsersApi.getAll();
+        cloudUsers = fetched.map(cloudToPublic);
+        console.log("[FriendsProvider] Fetched", cloudUsers.length, "users from cloud");
+      } catch (e) {
+        console.warn("[FriendsProvider] Cloud fetch failed, using local only:", e);
+      }
+
+      const loadedUsers = mergeUsers([...parsedUsers, ...accounts, ...cloudUsers], MOCK_USERS);
 
       await AsyncStorage.setItem(USERS_KEY, JSON.stringify(loadedUsers));
 
-      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests,", loadedUsers.length, "users (incl", accounts.length, "accounts)");
+      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests,", loadedUsers.length, "users (incl", cloudUsers.length, "cloud)");
       return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
     },
     staleTime: 5000,
@@ -115,6 +130,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
     setAllUsers(updated);
     await AsyncStorage.setItem(USERS_KEY, JSON.stringify(updated));
+
+    cloudUsersApi.upsert({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    }).catch((e) => console.warn("[FriendsProvider] Cloud upsert failed:", e));
   }, [allUsers]);
 
   const searchUsers = useCallback(
@@ -248,19 +270,37 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   );
 
   const refetchUsers = useCallback(async () => {
-    console.log("[FriendsProvider] Refetching users...");
-    const [storedRaw, storedAccounts] = await Promise.all([
-      AsyncStorage.getItem(USERS_KEY),
-      AsyncStorage.getItem(ALL_ACCOUNTS_KEY),
-    ]);
-    const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
-    const accounts: PublicUser[] = storedAccounts
-      ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
-      : [];
-    const merged = mergeUsers([...storedUsers, ...accounts], MOCK_USERS);
-    setAllUsers(merged);
-    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(merged));
-    console.log("[FriendsProvider] Refreshed users count:", merged.length);
+    console.log("[FriendsProvider] Refetching users from cloud...");
+    try {
+      const cloudUsers = await cloudUsersApi.getAll();
+      const cloudPublic = cloudUsers.map(cloudToPublic);
+
+      const [storedRaw, storedAccounts] = await Promise.all([
+        AsyncStorage.getItem(USERS_KEY),
+        AsyncStorage.getItem(ALL_ACCOUNTS_KEY),
+      ]);
+      const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
+      const accounts: PublicUser[] = storedAccounts
+        ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
+        : [];
+      const merged = mergeUsers([...storedUsers, ...accounts, ...cloudPublic], MOCK_USERS);
+      setAllUsers(merged);
+      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(merged));
+      console.log("[FriendsProvider] Refreshed users count:", merged.length, "(cloud:", cloudPublic.length, ")");
+    } catch (e) {
+      console.warn("[FriendsProvider] Cloud refetch failed:", e);
+      const [storedRaw, storedAccounts] = await Promise.all([
+        AsyncStorage.getItem(USERS_KEY),
+        AsyncStorage.getItem(ALL_ACCOUNTS_KEY),
+      ]);
+      const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
+      const accounts: PublicUser[] = storedAccounts
+        ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
+        : [];
+      const merged = mergeUsers([...storedUsers, ...accounts], MOCK_USERS);
+      setAllUsers(merged);
+      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(merged));
+    }
     await loadQuery.refetch();
   }, [loadQuery]);
 
