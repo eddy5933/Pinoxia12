@@ -418,7 +418,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
       const { data: existingMyFriend } = await supabase
         .from("friends")
-        .select("id")
+        .select("*")
         .eq("user_id", currentUserId)
         .eq("friend_id", otherUserId)
         .maybeSingle();
@@ -470,21 +470,32 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         console.log("[FriendsProvider] Their friend row already exists:", existingTheirFriend.id);
       }
 
-      if (f1) {
-        const newFriend: Friend = {
-          id: f1.id,
-          userId: otherUserId,
-          name: otherUserName,
-          email: otherUserEmail,
-          isOnline: true,
-          isCloseFriend: false,
+      const newFriend: Friend = {
+        id: f1?.id ?? `temp_${Date.now()}`,
+        userId: otherUserId,
+        name: otherUserName,
+        email: otherUserEmail,
+        isOnline: true,
+        isCloseFriend: false,
+      };
+      setFriends((prev) => {
+        if (prev.some((fr) => fr.userId === otherUserId)) {
+          console.log("[FriendsProvider] Friend already in local state, skipping add");
+          return prev;
+        }
+        console.log("[FriendsProvider] Adding accepted friend to acceptor local state:", otherUserName);
+        return [newFriend, ...prev];
+      });
+
+      queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+        if (!old) return old;
+        const alreadyExists = old.friends.some((f: any) => f.userId === otherUserId);
+        if (alreadyExists) return old;
+        return {
+          ...old,
+          friends: [newFriend, ...old.friends],
         };
-        setFriends((prev) => {
-          if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-          console.log("[FriendsProvider] Adding accepted friend to local state:", otherUserName);
-          return [newFriend, ...prev];
-        });
-      }
+      });
 
       console.log("[FriendsProvider] Creating conversation between users so they can chat");
       const { data: existingConvo } = await supabase
