@@ -6,6 +6,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { RestaurantProvider } from "@/providers/RestaurantProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
+import { FriendsProvider } from "@/providers/FriendsProvider";
+import { ChatProvider } from "@/providers/ChatProvider";
 import Colors from "@/constants/colors";
 
 void SplashScreen.preventAutoHideAsync();
@@ -54,6 +56,13 @@ function RootLayoutNav() {
           headerTintColor: Colors.white,
         }}
       />
+      <Stack.Screen
+        name="chat/[id]"
+        options={{
+          headerShown: false,
+          presentation: "card",
+        }}
+      />
     </Stack>
   );
 }
@@ -69,7 +78,11 @@ export default function RootLayout() {
         <AuthProvider>
           <RestaurantProvider>
             <LocationProvider>
-              <RootLayoutNav />
+              <FriendsProvider>
+                <ChatProvider>
+                  <RootLayoutNav />
+                </ChatProvider>
+              </FriendsProvider>
             </LocationProvider>
           </RestaurantProvider>
         </AuthProvider>

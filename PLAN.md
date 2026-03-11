@@ -24,6 +24,15 @@ A bold, modern restaurant discovery app with a red & black color scheme. Users c
 - View and manage your listed restaurant(s)
 - See reviews left by customers
 
+**Friends & Chat**
+- Search and add other users as friends
+- Send, accept, and reject friend requests
+- View friends list with chat and remove actions
+- Real-time chat messaging with friends
+- Share live location in chat to meet at shops/restaurants
+- Live location banner showing friend's current position
+- Start/stop location sharing toggle in chat
+
 **Authentication**
 - Sign up and log in with email and password
 - Profile screen to manage your account and switch roles
@@ -50,6 +59,8 @@ A bold, modern restaurant discovery app with a red & black color scheme. Users c
 5. **Profile Tab** — User info, role toggle (Customer ↔ Owner), and logout
 6. **Add Restaurant Screen** (Owner only) — Form to register a restaurant with photos, location, hours, food type, and $5 fee info
 7. **My Restaurants Screen** (Owner only) — List of restaurants the owner has registered
+8. **Friends Tab** — Friends list, incoming requests, and user search with add friend
+9. **Chat Screen** — 1-on-1 messaging with live location sharing for meetups
 
 ---
 

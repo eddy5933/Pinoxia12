@@ -45,3 +45,50 @@ export interface Review {
   comment: string;
   createdAt: string;
 }
+
+export type FriendStatus = "pending" | "accepted" | "rejected";
+
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  fromUserEmail: string;
+  toUserId: string;
+  toUserName: string;
+  toUserEmail: string;
+  status: FriendStatus;
+  createdAt: string;
+}
+
+export interface Friend {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  isOnline?: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  type: "text" | "location";
+  locationData?: {
+    latitude: number;
+    longitude: number;
+    placeName?: string;
+  };
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  participants: string[];
+  participantNames: Record<string, string>;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+}
