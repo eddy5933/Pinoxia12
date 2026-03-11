@@ -229,33 +229,113 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       .on(
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "friends" },
-        (payload: any) => {
-          console.log("[FriendsProvider] Realtime new friend row:", payload.new?.id, "user_id:", payload.new?.user_id);
+        async (payload: any) => {
+          console.log("[FriendsProvider] Realtime new friend row:", payload.new?.id, "user_id:", payload.new?.user_id, "friend_id:", payload.new?.friend_id);
           const f = payload.new;
           if (!f) return;
-          if (f.user_id !== currentUserId) return;
 
-          const newFriend: Friend = {
-            id: f.id,
-            userId: f.friend_id,
-            name: f.friend_name,
-            email: f.friend_email,
-            avatar: f.friend_avatar ?? undefined,
-            isOnline: true,
-            isCloseFriend: f.is_close_friend ?? false,
-          };
+          if (f.user_id === currentUserId) {
+            const newFriend: Friend = {
+              id: f.id,
+              userId: f.friend_id,
+              name: f.friend_name,
+              email: f.friend_email,
+              avatar: f.friend_avatar ?? undefined,
+              isOnline: true,
+              isCloseFriend: f.is_close_friend ?? false,
+            };
 
-          setFriends((prev) => {
-            if (prev.some((fr) => fr.id === newFriend.id || fr.userId === newFriend.userId)) return prev;
-            console.log("[FriendsProvider] Adding new friend to local state:", newFriend.name);
-            return [newFriend, ...prev];
-          });
+            setFriends((prev) => {
+              if (prev.some((fr) => fr.id === newFriend.id || fr.userId === newFriend.userId)) return prev;
+              console.log("[FriendsProvider] Adding new friend to local state:", newFriend.name);
+              return [newFriend, ...prev];
+            });
 
-          queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-            if (!old) return old;
-            if (old.friends.some((fr: any) => fr.id === newFriend.id || fr.userId === newFriend.userId)) return old;
-            return { ...old, friends: [newFriend, ...old.friends] };
-          });
+            setFollowers((prev) => prev.filter((fl) => fl.userId !== f.friend_id));
+
+            queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+              if (!old) return old;
+              const updatedFriends = old.friends.some((fr: any) => fr.id === newFriend.id || fr.userId === newFriend.userId)
+                ? old.friends
+                : [newFriend, ...old.friends];
+              const updatedFollowers = (old.followers ?? []).filter((fl: any) => fl.userId !== f.friend_id);
+              return { ...old, friends: updatedFriends, followers: updatedFollowers };
+            });
+          }
+
+          if (f.friend_id === currentUserId && f.user_id !== currentUserId) {
+            console.log("[FriendsProvider] Someone followed me:", f.user_id, "- checking if mutual");
+
+            const iMutual = await supabase
+              .from("friends")
+              .select("id")
+              .eq("user_id", currentUserId)
+              .eq("friend_id", f.user_id)
+              .maybeSingle();
+
+            if (iMutual.data) {
+              console.log("[FriendsProvider] Mutual follow detected with:", f.user_id);
+
+              setFollowers((prev) => prev.filter((fl) => fl.userId !== f.user_id));
+
+              queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                if (!old) return old;
+                return { ...old, followers: (old.followers ?? []).filter((fl: any) => fl.userId !== f.user_id) };
+              });
+
+              const { data: existingConvo } = await supabase
+                .from("conversations")
+                .select("id")
+                .contains("participants", [currentUserId])
+                .contains("participants", [f.user_id])
+                .maybeSingle();
+
+              if (!existingConvo) {
+                const { data: myProfile } = await supabase
+                  .from("profiles")
+                  .select("name")
+                  .eq("id", currentUserId)
+                  .maybeSingle();
+
+                const participantNames: Record<string, string> = {
+                  [currentUserId]: myProfile?.name ?? "",
+                  [f.user_id]: f.friend_name ?? "",
+                };
+
+                await supabase.from("conversations").insert({
+                  participants: [currentUserId, f.user_id],
+                  participant_names: participantNames,
+                  unread_count: 0,
+                });
+                console.log("[FriendsProvider] Created conversation for mutual follow");
+              }
+
+              void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+            } else {
+              const profile = allUsers.find((u) => u.id === f.user_id);
+              const newFollower: Friend = {
+                id: f.id,
+                userId: f.user_id,
+                name: profile?.name ?? f.friend_name ?? "Unknown",
+                email: profile?.email ?? f.friend_email ?? "",
+                avatar: profile?.avatar ?? undefined,
+                isOnline: true,
+                isCloseFriend: false,
+              };
+
+              setFollowers((prev) => {
+                if (prev.some((fl) => fl.userId === f.user_id)) return prev;
+                console.log("[FriendsProvider] New follower:", newFollower.name);
+                return [newFollower, ...prev];
+              });
+
+              queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                if (!old) return old;
+                if ((old.followers ?? []).some((fl: any) => fl.userId === f.user_id)) return old;
+                return { ...old, followers: [newFollower, ...(old.followers ?? [])] };
+              });
+            }
+          }
 
           void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
           void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
@@ -292,7 +372,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Cleaning up realtime subscription");
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId, queryClient]);
+  }, [currentUserId, queryClient, allUsers]);
 
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
