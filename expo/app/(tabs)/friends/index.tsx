@@ -253,8 +253,13 @@ export default function FriendsScreen() {
   const handleStartChat = useCallback(
     async (friend: Friend) => {
       if (!user) return;
-      const convo = await getOrCreateConversation(user.id, user.name, friend.userId, friend.name);
-      router.push(`/chat/${convo.id}` as any);
+      try {
+        const convo = await getOrCreateConversation(user.id, user.name, friend.userId, friend.name);
+        console.log("[Friends] Navigating to chat:", convo.id);
+        router.push(`/chat/${convo.id}` as any);
+      } catch (err) {
+        console.warn("[Friends] Failed to start chat:", err);
+      }
     },
     [user, getOrCreateConversation, router]
   );

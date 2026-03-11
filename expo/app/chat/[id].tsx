@@ -71,12 +71,14 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !user || !id) return;
-    await sendMessage(id, user.id, user.name, inputText.trim());
-    setInputText("");
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    const msg = await sendMessage(id, user.id, user.name, inputText.trim());
+    if (msg) {
+      setInputText("");
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
   }, [inputText, user, id, sendMessage]);
 
   const handleShareLocation = useCallback(() => {
@@ -122,7 +124,7 @@ export default function ChatScreen() {
         longitude: userLocation.longitude,
         placeName: userLocation.placeName,
       }
-    );
+    ).catch((err) => console.warn("[Chat] Location share message error:", err));
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
