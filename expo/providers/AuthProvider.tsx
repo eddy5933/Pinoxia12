@@ -80,6 +80,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     });
     if (error) {
       console.warn("[Auth] Login error:", error.message);
+      if (error.message === "Invalid login credentials") {
+        throw new Error("Invalid email or password. If you just signed up, please confirm your email first.");
+      }
+      if (error.message === "Email not confirmed") {
+        throw new Error("Please confirm your email before logging in. Check your inbox.");
+      }
       throw new Error(error.message);
     }
     if (data.user) {
@@ -111,12 +117,32 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { name },
+      },
     });
     if (error) {
       console.warn("[Auth] Signup error:", error.message);
       throw new Error(error.message);
     }
-    if (data.user) {
+
+    if (data.user && !data.session) {
+      console.log("[Auth] Signup requires email confirmation");
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: data.user.id,
+          email,
+          name,
+          role: "customer",
+        });
+      if (profileError) {
+        console.warn("[Auth] Profile upsert error:", profileError.message);
+      }
+      throw new Error("Account created! Please check your email to confirm, then log in.");
+    }
+
+    if (data.user && data.session) {
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({
@@ -136,7 +162,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       };
       setUser(u);
       console.log("[Auth] Signup success:", u.name);
-
       return u;
     }
     return null;
