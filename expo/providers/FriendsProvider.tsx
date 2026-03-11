@@ -295,24 +295,57 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     async (query: string, userId: string): Promise<PublicUser[]> => {
       const q = query.trim();
       if (!q) return [];
-      console.log("[Friends] Searching:", q);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .neq("id", userId)
-        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
-        .limit(50);
-      if (error) {
-        console.warn("[Friends] Search error:", error.message);
-        return [];
+      console.log("[Friends] Searching users for:", q);
+      const pattern = `%${q}%`;
+
+      const [nameRes, emailRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, email, name, role, avatar")
+          .neq("id", userId)
+          .ilike("name", pattern)
+          .limit(25),
+        supabase
+          .from("profiles")
+          .select("id, email, name, role, avatar")
+          .neq("id", userId)
+          .ilike("email", pattern)
+          .limit(25),
+      ]);
+
+      if (nameRes.error) {
+        console.warn("[Friends] Name search error:", nameRes.error.message);
       }
-      return (data ?? []).map((p: any) => ({
+      if (emailRes.error) {
+        console.warn("[Friends] Email search error:", emailRes.error.message);
+      }
+
+      const seenIds = new Set<string>();
+      const results: PublicUser[] = [];
+
+      const mapProfile = (p: any): PublicUser => ({
         id: p.id,
         email: p.email,
         name: p.name,
         role: p.role ?? "customer",
         avatar: p.avatar ?? undefined,
-      }));
+      });
+
+      for (const p of nameRes.data ?? []) {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          results.push(mapProfile(p));
+        }
+      }
+      for (const p of emailRes.data ?? []) {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          results.push(mapProfile(p));
+        }
+      }
+
+      console.log("[Friends] Search results:", results.length);
+      return results;
     },
     []
   );
