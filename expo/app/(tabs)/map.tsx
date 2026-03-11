@@ -98,23 +98,22 @@ function MapRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
 function NativeMapView({
   restaurants,
   userLocation,
-  onMarkerPress,
   focusedRestaurant,
   centerTrigger,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
-  onMarkerPress: (id: string) => void;
   focusedRestaurant: Restaurant | null;
   centerTrigger: number;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
-  const { Marker, PROVIDER_DEFAULT } =
+  const { Marker, Callout, PROVIDER_DEFAULT } =
     require("react-native-maps") as typeof import("react-native-maps");
 
   const mapRef = useRef<InstanceType<typeof MapView>>(null);
   const hasAnimatedToUser = useRef(false);
+  const router = useRouter();
 
   const initialRegion = focusedRestaurant
     ? {
@@ -201,9 +200,8 @@ function NativeMapView({
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
           pinColor={Colors.primary}
           onPress={() => {
-            console.log("[MapScreen] Marker tapped, navigating to:", r.name);
+            console.log("[MapScreen] Marker tapped:", r.name);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            onMarkerPress(r.id);
           }}
         >
           <View style={markerStyles.container}>
@@ -215,6 +213,28 @@ function NativeMapView({
             </View>
             <View style={markerStyles.pinTail} />
           </View>
+          <Callout
+            tooltip
+            onPress={() => {
+              console.log("[MapScreen] Callout pressed, navigating to:", r.name);
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(`/restaurant/${r.id}`);
+            }}
+          >
+            <View style={markerStyles.callout}>
+              <Text style={markerStyles.calloutName} numberOfLines={1}>{r.name}</Text>
+              <View style={markerStyles.calloutRow}>
+                <Star size={11} color={Colors.star} fill={Colors.star} />
+                <Text style={markerStyles.calloutRating}>{r.rating}</Text>
+                <Text style={markerStyles.calloutCuisine}> · {r.cuisine}</Text>
+              </View>
+              <Text style={markerStyles.calloutAddress} numberOfLines={1}>{r.address}</Text>
+              <View style={markerStyles.calloutButton}>
+                <Navigation size={11} color={Colors.white} />
+                <Text style={markerStyles.calloutButtonText}>View Details</Text>
+              </View>
+            </View>
+          </Callout>
         </Marker>
       ))}
     </MapView>
@@ -470,7 +490,6 @@ export default function MapScreen() {
           <NativeMapView
             restaurants={filteredRestaurants}
             userLocation={userLocation}
-            onMarkerPress={handleMarkerPress}
             focusedRestaurant={focusedRestaurant}
             centerTrigger={centerTrigger}
           />
@@ -619,10 +638,25 @@ const markerStyles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
   },
-  calloutTap: {
+  calloutAddress: {
     fontSize: 11,
-    color: Colors.primary,
-    fontWeight: "600" as const,
+    color: Colors.textMuted,
+    marginBottom: 8,
+  },
+  calloutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  calloutButtonText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.white,
   },
 });
 
