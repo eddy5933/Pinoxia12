@@ -270,13 +270,13 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
       const { data: friendRows, error: fErr } = await supabase
         .from("friends")
-        .select("friend_id, is_close_friend")
-        .eq("user_id", currentUserId);
+        .select("user_id, is_close_friend")
+        .eq("friend_id", currentUserId);
 
-      console.log("[LocationProvider] Friends query result:", {
+      console.log("[LocationProvider] Users who added me as friend:", {
         count: friendRows?.length ?? 0,
         error: fErr?.message ?? null,
-        rows: friendRows?.map((f: any) => ({ friend_id: f.friend_id, is_close_friend: f.is_close_friend })),
+        rows: friendRows?.map((f: any) => ({ user_id: f.user_id, is_close_friend: f.is_close_friend })),
       });
 
       if (fErr) {
@@ -284,18 +284,18 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         return [];
       }
       if (!friendRows || friendRows.length === 0) {
-        console.log("[LocationProvider] No friends found");
+        console.log("[LocationProvider] No one added me as friend");
         return [];
       }
 
       const closeFriendIds = friendRows
         .filter((f: any) => f.is_close_friend === true || f.is_close_friend === "true")
-        .map((f: any) => f.friend_id);
+        .map((f: any) => f.user_id);
 
-      console.log("[LocationProvider] Close friend IDs:", closeFriendIds, "out of", friendRows.length, "total friends");
+      console.log("[LocationProvider] Users who marked me as close friend:", closeFriendIds, "out of", friendRows.length, "total");
 
       if (closeFriendIds.length === 0) {
-        console.log("[LocationProvider] No close friends set, skipping location fetch");
+        console.log("[LocationProvider] No one marked me as close friend, skipping location fetch");
         return [];
       }
 
