@@ -292,23 +292,56 @@ function NativeMapView({
             }}
           >
             <View style={markerStyles.callout}>
-              <Text style={markerStyles.calloutName} numberOfLines={1}>{r.name}</Text>
-              <View style={markerStyles.calloutRow}>
-                <Star size={11} color={Colors.star} fill={Colors.star} />
-                <Text style={markerStyles.calloutRating}>{r.rating}</Text>
-                <Text style={markerStyles.calloutCuisine}> · {r.cuisine}</Text>
+              <View style={markerStyles.calloutHeader}>
+                {r.photos[0] && (
+                  <Image
+                    source={{ uri: r.photos[0] }}
+                    style={markerStyles.calloutImage}
+                    contentFit="cover"
+                  />
+                )}
+                <View style={markerStyles.calloutHeaderInfo}>
+                  <Text style={markerStyles.calloutName} numberOfLines={1}>{r.name}</Text>
+                  <View style={markerStyles.calloutRow}>
+                    <Star size={11} color={Colors.star} fill={Colors.star} />
+                    <Text style={markerStyles.calloutRating}>{r.rating}</Text>
+                    <Text style={markerStyles.calloutReviews}>({r.reviewCount})</Text>
+                    <View style={markerStyles.calloutDot} />
+                    <Text style={markerStyles.calloutPrice}>{r.priceRange}</Text>
+                  </View>
+                  {r.cuisine ? (
+                    <View style={markerStyles.calloutCuisineBadge}>
+                      <Text style={markerStyles.calloutCuisineText}>{r.cuisine}</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
-              {distanceMap.get(r.id) && (
+              {r.description ? (
+                <Text style={markerStyles.calloutDescription} numberOfLines={2}>{r.description}</Text>
+              ) : null}
+              <View style={markerStyles.calloutDivider} />
+              <View style={markerStyles.calloutAddressRow}>
+                <MapPin size={11} color={Colors.textSecondary} />
+                <Text style={markerStyles.calloutAddress} numberOfLines={1}>{r.address}</Text>
+              </View>
+              {dist && (
                 <View style={markerStyles.calloutDistanceRow}>
-                  <Navigation size={10} color={Colors.primary} />
-                  <Text style={markerStyles.calloutDistance}>{distanceMap.get(r.id)}</Text>
+                  <Navigation size={11} color={Colors.primary} />
+                  <Text style={markerStyles.calloutDistance}>{dist}</Text>
                 </View>
               )}
-              <Text style={markerStyles.calloutAddress} numberOfLines={1}>{r.address}</Text>
-              <View style={markerStyles.calloutButton}>
-                <Navigation size={11} color={Colors.white} />
-                <Text style={markerStyles.calloutButtonText}>View Details</Text>
-              </View>
+              {r.phone ? (
+                <View style={markerStyles.calloutPhoneRow}>
+                  <Text style={markerStyles.calloutPhone}>{r.phone}</Text>
+                </View>
+              ) : null}
+              <TouchableOpacity
+                style={markerStyles.calloutButton}
+                activeOpacity={0.8}
+              >
+                <Navigation size={12} color={Colors.white} />
+                <Text style={markerStyles.calloutButtonText}>View Full Details</Text>
+              </TouchableOpacity>
             </View>
           </Callout>
         </Marker>
@@ -785,42 +818,96 @@ const markerStyles = StyleSheet.create({
   },
   callout: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 160,
+    borderRadius: 14,
+    padding: 14,
+    width: 260,
     borderWidth: 1,
     borderColor: Colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  calloutHeader: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginBottom: 8,
+  },
+  calloutImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+  calloutHeaderInfo: {
+    flex: 1,
+    justifyContent: "center" as const,
   },
   calloutName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700" as const,
     color: Colors.white,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   calloutRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginBottom: 6,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    marginBottom: 4,
   },
   calloutRating: {
     fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.star,
   },
-  calloutCuisine: {
+  calloutReviews: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  calloutDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+  calloutPrice: {
     fontSize: 12,
+    fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
+  calloutCuisineBadge: {
+    backgroundColor: "rgba(230, 57, 70, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: "flex-start" as const,
+  },
+  calloutCuisineText: {
+    fontSize: 10,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+  },
+  calloutDescription: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  calloutDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginBottom: 8,
+  },
+  calloutAddressRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginBottom: 4,
+  },
   calloutDistanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
     marginBottom: 4,
   },
   calloutDistance: {
@@ -831,20 +918,30 @@ const markerStyles = StyleSheet.create({
   calloutAddress: {
     fontSize: 11,
     color: Colors.textMuted,
-    marginBottom: 8,
+    flex: 1,
+  },
+  calloutPhoneRow: {
+    marginBottom: 6,
+    paddingLeft: 17,
+  },
+  calloutPhone: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: "500" as const,
   },
   calloutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginTop: 4,
   },
   calloutButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700" as const,
     color: Colors.white,
   },
