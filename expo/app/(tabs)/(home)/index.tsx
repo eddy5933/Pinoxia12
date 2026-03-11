@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Search, Star, MapPin, Clock, Navigation2, Locate, Map as MapIcon } from "lucide-react-native";
+import { Search, Star, MapPin, Clock, Navigation2, Locate, Map as MapIcon, SlidersHorizontal } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -21,6 +21,17 @@ import { useFilteredRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
 import { CUISINE_TYPES } from "@/mocks/restaurants";
 import { Restaurant } from "@/types";
+
+const RADIUS_OPTIONS = [1, 3, 5, 10, 25, 50, 0] as const;
+const RADIUS_LABELS: Record<number, string> = {
+  1: "1 km",
+  3: "3 km",
+  5: "5 km",
+  10: "10 km",
+  25: "25 km",
+  50: "50 km",
+  0: "All",
+};
 
 function RestaurantCard({ restaurant, index, distance, showMapButton }: { restaurant: Restaurant; index: number; distance: string | null; showMapButton: boolean }) {
   const router = useRouter();
@@ -122,6 +133,8 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState("All");
+  const [radiusKm, setRadiusKm] = useState<number>(0);
+  const [showRadiusPicker, setShowRadiusPicker] = useState(false);
   const filteredRestaurants = useFilteredRestaurants(search, selectedCuisine);
   const { userLocation, locationLoading, locationError, requestLocation } = useLocation();
 
@@ -140,6 +153,19 @@ export default function ExploreScreen() {
     return map;
   }, [userLocation, filteredRestaurants]);
 
+  const radiusFiltered = useMemo(() => {
+    if (radiusKm === 0 || !userLocation) return filteredRestaurants;
+    return filteredRestaurants.filter((r) => {
+      const km = getDistanceKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        r.latitude,
+        r.longitude
+      );
+      return km <= radiusKm;
+    });
+  }, [filteredRestaurants, radiusKm, userLocation]);
+
   const hasSearch = search.trim().length > 0;
 
   const renderItem = useCallback(
@@ -148,6 +174,20 @@ export default function ExploreScreen() {
     ),
     [distanceMap, hasSearch]
   );
+
+  const toggleRadiusPicker = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowRadiusPicker((prev) => !prev);
+  }, []);
+
+  const selectRadius = useCallback((value: number) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRadiusKm(value);
+    setShowRadiusPicker(false);
+    if (value > 0 && !userLocation) {
+      void requestLocation();
+    }
+  }, [userLocation, requestLocation]);
 
   const keyExtractor = useCallback((item: Restaurant) => item.id, []);
 
@@ -208,36 +248,85 @@ export default function ExploreScreen() {
       </View>
 
       <View style={styles.filterSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          {CUISINE_TYPES.map((cuisine) => (
-            <TouchableOpacity
-              key={cuisine}
-              style={[
-                styles.filterChip,
-                selectedCuisine === cuisine && styles.filterChipActive,
-              ]}
-              onPress={() => setSelectedCuisine(cuisine)}
-              testID={`filter-${cuisine}`}
-            >
-              <Text
+        <View style={styles.filterRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {CUISINE_TYPES.map((cuisine) => (
+              <TouchableOpacity
+                key={cuisine}
                 style={[
-                  styles.filterChipText,
-                  selectedCuisine === cuisine && styles.filterChipTextActive,
+                  styles.filterChip,
+                  selectedCuisine === cuisine && styles.filterChipActive,
                 ]}
+                onPress={() => setSelectedCuisine(cuisine)}
+                testID={`filter-${cuisine}`}
               >
-                {cuisine}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selectedCuisine === cuisine && styles.filterChipTextActive,
+                  ]}
+                >
+                  {cuisine}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.radiusToggle,
+              radiusKm > 0 && styles.radiusToggleActive,
+            ]}
+            onPress={toggleRadiusPicker}
+            activeOpacity={0.7}
+            testID="radius-toggle"
+          >
+            <SlidersHorizontal size={16} color={radiusKm > 0 ? Colors.white : Colors.textSecondary} />
+            <Text style={[styles.radiusToggleText, radiusKm > 0 && styles.radiusToggleTextActive]}>
+              {radiusKm > 0 ? `${radiusKm}km` : "Radius"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {showRadiusPicker && (
+          <View style={styles.radiusPickerContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.radiusPickerScroll}
+            >
+              {RADIUS_OPTIONS.map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[
+                    styles.radiusChip,
+                    radiusKm === value && styles.radiusChipActive,
+                  ]}
+                  onPress={() => selectRadius(value)}
+                  testID={`radius-${value}`}
+                >
+                  <Text
+                    style={[
+                      styles.radiusChipText,
+                      radiusKm === value && styles.radiusChipTextActive,
+                    ]}
+                  >
+                    {RADIUS_LABELS[value]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {radiusKm > 0 && !userLocation && (
+              <Text style={styles.radiusHint}>Enable location to use radius filter</Text>
+            )}
+          </View>
+        )}
       </View>
 
       <FlatList
-        data={filteredRestaurants}
+        data={radiusFiltered}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={styles.listContent}
@@ -298,9 +387,74 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 6,
   },
+  filterRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+  },
   filterScroll: {
+    paddingLeft: 20,
+    paddingRight: 8,
+    gap: 8,
+  },
+  radiusToggle: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginRight: 16,
+    gap: 5,
+  },
+  radiusToggleActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  radiusToggleText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: "600" as const,
+  },
+  radiusToggleTextActive: {
+    color: Colors.white,
+    fontWeight: "700" as const,
+  },
+  radiusPickerContainer: {
+    marginTop: 10,
+    paddingBottom: 2,
+  },
+  radiusPickerScroll: {
     paddingHorizontal: 20,
     gap: 8,
+  },
+  radiusChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceHighlight,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  radiusChipActive: {
+    backgroundColor: "rgba(230,57,70,0.15)",
+    borderColor: Colors.primary,
+  },
+  radiusChipText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontWeight: "500" as const,
+  },
+  radiusChipTextActive: {
+    color: Colors.primary,
+    fontWeight: "700" as const,
+  },
+  radiusHint: {
+    fontSize: 11,
+    color: Colors.warning,
+    marginTop: 6,
+    marginLeft: 20,
   },
   filterChip: {
     paddingHorizontal: 16,
