@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useRestaurants } from "@/providers/RestaurantProvider";
-import { useLocation } from "@/providers/LocationProvider";
+import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
 import type { UserLocation } from "@/providers/LocationProvider";
 import { Restaurant } from "@/types";
 
@@ -37,7 +37,7 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.08,
 };
 
-function MapRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+function MapRestaurantCard({ restaurant, distance }: { restaurant: Restaurant; distance: string | null }) {
   const router = useRouter();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -85,6 +85,13 @@ function MapRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
             <Text style={cardStyles.reviews}>({restaurant.reviewCount})</Text>
             <View style={cardStyles.dot} />
             <Text style={cardStyles.price}>{restaurant.priceRange}</Text>
+            {distance && (
+              <>
+                <View style={cardStyles.dot} />
+                <Navigation size={10} color={Colors.primary} />
+                <Text style={cardStyles.distanceText}>{distance}</Text>
+              </>
+            )}
           </View>
         </View>
         <View style={cardStyles.arrow}>
@@ -100,11 +107,13 @@ function NativeMapView({
   userLocation,
   focusedRestaurant,
   centerTrigger,
+  distanceMap,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
   focusedRestaurant: Restaurant | null;
   centerTrigger: number;
+  distanceMap: Map<string, string>;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -231,6 +240,12 @@ function NativeMapView({
                 <Text style={markerStyles.calloutRating}>{r.rating}</Text>
                 <Text style={markerStyles.calloutCuisine}> · {r.cuisine}</Text>
               </View>
+              {distanceMap.get(r.id) && (
+                <View style={markerStyles.calloutDistanceRow}>
+                  <Navigation size={10} color={Colors.primary} />
+                  <Text style={markerStyles.calloutDistance}>{distanceMap.get(r.id)}</Text>
+                </View>
+              )}
               <Text style={markerStyles.calloutAddress} numberOfLines={1}>{r.address}</Text>
               <View style={markerStyles.calloutButton}>
                 <Navigation size={11} color={Colors.white} />
@@ -315,6 +330,21 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation } = useLocation();
+
+  const distanceMap = useMemo(() => {
+    if (!userLocation) return new Map<string, string>();
+    const map = new Map<string, string>();
+    restaurants.forEach((r) => {
+      const km = getDistanceKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        r.latitude,
+        r.longitude
+      );
+      map.set(r.id, formatDistance(km));
+    });
+    return map;
+  }, [userLocation, restaurants]);
   const [listExpanded, setListExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -384,8 +414,8 @@ export default function MapScreen() {
   }, []);
 
   const renderRestaurantItem = useCallback(
-    ({ item }: { item: Restaurant }) => <MapRestaurantCard restaurant={item} />,
-    []
+    ({ item }: { item: Restaurant }) => <MapRestaurantCard restaurant={item} distance={distanceMap.get(item.id) ?? null} />,
+    [distanceMap]
   );
 
   return (
@@ -496,6 +526,7 @@ export default function MapScreen() {
             userLocation={userLocation}
             focusedRestaurant={focusedRestaurant}
             centerTrigger={centerTrigger}
+            distanceMap={distanceMap}
           />
         )}
 
@@ -662,6 +693,17 @@ const markerStyles = StyleSheet.create({
   calloutCuisine: {
     fontSize: 12,
     color: Colors.textSecondary,
+  },
+  calloutDistanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+  calloutDistance: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.primary,
   },
   calloutAddress: {
     fontSize: 11,
@@ -980,6 +1022,11 @@ const cardStyles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: "600" as const,
+  },
+  distanceText: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontWeight: "700" as const,
   },
   arrow: {
     justifyContent: "center",
