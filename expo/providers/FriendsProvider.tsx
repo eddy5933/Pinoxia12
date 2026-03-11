@@ -180,14 +180,12 @@ async function ensureConversation(
 ) {
   console.log("[Friends] Ensuring conversation between", userAName, "and", userBName);
 
-  const { data: allConvos } = await supabase
+  const { data: existing } = await supabase
     .from("conversations")
-    .select("id, participants");
-
-  const existing = (allConvos ?? []).find((c: any) => {
-    const parts: string[] = c.participants ?? [];
-    return parts.includes(userAId) && parts.includes(userBId);
-  });
+    .select("id")
+    .contains("participants", [userAId])
+    .contains("participants", [userBId])
+    .maybeSingle();
 
   if (existing) {
     console.log("[Friends] Conversation already exists:", existing.id);
@@ -293,61 +291,26 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const searchUsersFromSupabase = useCallback(
     async (query: string, userId: string): Promise<PublicUser[]> => {
-      const q = query.trim().toLowerCase();
+      const q = query.trim();
       if (!q) return [];
-      console.log("[Friends] Searching users for:", q, "excluding:", userId);
-      const pattern = `%${q}%`;
-
-      const { data: allProfiles, error: allError } = await supabase
+      console.log("[Friends] Searching:", q);
+      const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, name, role, avatar")
+        .select("*")
         .neq("id", userId)
-        .or(`name.ilike.${pattern},email.ilike.${pattern}`)
-        .limit(30);
-
-      if (allError) {
-        console.warn("[Friends] Search error:", allError.message, allError.details, allError.hint);
-
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("profiles")
-          .select("id, email, name, role, avatar")
-          .neq("id", userId)
-          .limit(50);
-
-        if (fallbackError) {
-          console.warn("[Friends] Fallback search error:", fallbackError.message, fallbackError.details);
-          return [];
-        }
-
-        console.log("[Friends] Fallback got", (fallbackData ?? []).length, "profiles, filtering client-side");
-        const results: PublicUser[] = [];
-        for (const p of fallbackData ?? []) {
-          const nameMatch = (p.name ?? "").toLowerCase().includes(q);
-          const emailMatch = (p.email ?? "").toLowerCase().includes(q);
-          if (nameMatch || emailMatch) {
-            results.push({
-              id: p.id,
-              email: p.email,
-              name: p.name,
-              role: p.role ?? "customer",
-              avatar: p.avatar ?? undefined,
-            });
-          }
-        }
-        console.log("[Friends] Client-side filtered results:", results.length);
-        return results;
+        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
+        .limit(50);
+      if (error) {
+        console.warn("[Friends] Search error:", error.message);
+        return [];
       }
-
-      const results: PublicUser[] = (allProfiles ?? []).map((p: any) => ({
+      return (data ?? []).map((p: any) => ({
         id: p.id,
         email: p.email,
         name: p.name,
         role: p.role ?? "customer",
         avatar: p.avatar ?? undefined,
       }));
-
-      console.log("[Friends] Search results:", results.length);
-      return results;
     },
     []
   );
