@@ -27,6 +27,7 @@ import {
   Star,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter as useExpoRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -47,6 +48,7 @@ interface ToastState {
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const expoRouter = useExpoRouter();
   const { user } = useAuth();
   const {
     friends,
@@ -407,6 +409,23 @@ export default function FriendsScreen() {
             <Text style={styles.badgeText}>{pendingRequests.length}</Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.closeFriendsRow}>
+        <TouchableOpacity
+          style={styles.closeFriendsBtn}
+          onPress={() => expoRouter.push("/(tabs)/friends/close-friends" as any)}
+          activeOpacity={0.7}
+          testID="close-friends-list-btn"
+        >
+          <Star size={15} color="#FFB800" fill="#FFB800" />
+          <Text style={styles.closeFriendsBtnText}>Close Friends</Text>
+          <View style={styles.closeFriendsCount}>
+            <Text style={styles.closeFriendsCountText}>
+              {friends.filter((f) => f.isCloseFriend).length}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.tabBar}>
@@ -875,6 +894,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.error,
+  },
+  closeFriendsRow: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  closeFriendsBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,184,0,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,184,0,0.2)",
+    alignSelf: "flex-start" as const,
+  },
+  closeFriendsBtnText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: "#FFB800",
+  },
+  closeFriendsCount: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,184,0,0.15)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 6,
+  },
+  closeFriendsCountText: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#FFB800",
   },
   emptyCenter: {
     flex: 1,
