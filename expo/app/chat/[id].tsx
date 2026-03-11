@@ -40,7 +40,6 @@ export default function ChatScreen() {
     getLiveLocationsForConversation,
     updateSharedLocation,
     setActiveConversation,
-    refetchChats,
   } = useChat();
   const { userLocation, requestLocation } = useLocation();
 
@@ -147,12 +146,11 @@ export default function ChatScreen() {
   useEffect(() => {
     if (id) {
       setActiveConversation(id);
-      refetchChats();
     }
     return () => {
       setActiveConversation(null);
     };
-  }, [id, setActiveConversation, refetchChats]);
+  }, [id, setActiveConversation]);
 
   useEffect(() => {
     if (chatMessages.length > 0) {
