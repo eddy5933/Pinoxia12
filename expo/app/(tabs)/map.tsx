@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   TextInput,
+  Image as RNImage,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -110,7 +111,7 @@ function MapRestaurantCard({ restaurant, distance }: { restaurant: Restaurant; d
   );
 }
 
-function FriendMarkerView({ friend }: { friend: FriendLocation }) {
+function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?: () => void }) {
   const initials = friend.name
     .split(" ")
     .map((w) => w[0])
@@ -118,11 +119,22 @@ function FriendMarkerView({ friend }: { friend: FriendLocation }) {
     .toUpperCase()
     .slice(0, 2);
 
+  useEffect(() => {
+    if (!friend.avatar && onLoad) {
+      onLoad();
+    }
+  }, [friend.avatar, onLoad]);
+
   return (
     <View style={friendMarkerStyles.container}>
       <View style={friendMarkerStyles.avatarRing}>
         {friend.avatar ? (
-          <Image source={{ uri: friend.avatar }} style={friendMarkerStyles.avatar} contentFit="cover" />
+          <RNImage
+            source={{ uri: friend.avatar }}
+            style={friendMarkerStyles.avatar}
+            resizeMode="cover"
+            onLoad={onLoad}
+          />
         ) : (
           <View style={friendMarkerStyles.avatarFallback}>
             <Text style={friendMarkerStyles.initials}>{initials}</Text>
@@ -134,6 +146,51 @@ function FriendMarkerView({ friend }: { friend: FriendLocation }) {
         <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
       </View>
     </View>
+  );
+}
+
+function FriendMarkerWrapper({
+  friend,
+  Marker,
+  Callout,
+}: {
+  friend: FriendLocation;
+  Marker: any;
+  Callout: any;
+}) {
+  const [trackChanges, setTrackChanges] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLoad = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setTrackChanges(false);
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    const fallback = setTimeout(() => {
+      setTrackChanges(false);
+    }, 3000);
+    return () => {
+      clearTimeout(fallback);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <Marker
+      coordinate={{ latitude: friend.latitude, longitude: friend.longitude }}
+      tracksViewChanges={trackChanges}
+    >
+      <FriendMarkerView friend={friend} onLoad={handleLoad} />
+      <Callout tooltip>
+        <View style={markerStyles.calloutSimple}>
+          <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{friend.name}</Text>
+        </View>
+        <View style={markerStyles.calloutArrow} />
+      </Callout>
+    </Marker>
   );
 }
 
@@ -356,19 +413,7 @@ function NativeMapView({
         );
       })}
       {friendLocations.map((fl) => (
-        <Marker
-          key={`friend-${fl.userId}`}
-          coordinate={{ latitude: fl.latitude, longitude: fl.longitude }}
-          tracksViewChanges={false}
-        >
-          <FriendMarkerView friend={fl} />
-          <Callout tooltip>
-            <View style={markerStyles.calloutSimple}>
-              <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{fl.name}</Text>
-            </View>
-            <View style={markerStyles.calloutArrow} />
-          </Callout>
-        </Marker>
+        <FriendMarkerWrapper key={`friend-${fl.userId}`} friend={fl} Marker={Marker} Callout={Callout} />
       ))}
     </MapView>
   );
