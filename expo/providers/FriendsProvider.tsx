@@ -293,56 +293,58 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const searchUsersFromSupabase = useCallback(
     async (query: string, userId: string): Promise<PublicUser[]> => {
-      const q = query.trim();
+      const q = query.trim().toLowerCase();
       if (!q) return [];
-      console.log("[Friends] Searching users for:", q);
+      console.log("[Friends] Searching users for:", q, "excluding:", userId);
       const pattern = `%${q}%`;
 
-      const [nameRes, emailRes] = await Promise.all([
-        supabase
+      const { data: allProfiles, error: allError } = await supabase
+        .from("profiles")
+        .select("id, email, name, role, avatar")
+        .neq("id", userId)
+        .or(`name.ilike.${pattern},email.ilike.${pattern}`)
+        .limit(30);
+
+      if (allError) {
+        console.warn("[Friends] Search error:", allError.message, allError.details, allError.hint);
+
+        const { data: fallbackData, error: fallbackError } = await supabase
           .from("profiles")
           .select("id, email, name, role, avatar")
           .neq("id", userId)
-          .ilike("name", pattern)
-          .limit(25),
-        supabase
-          .from("profiles")
-          .select("id, email, name, role, avatar")
-          .neq("id", userId)
-          .ilike("email", pattern)
-          .limit(25),
-      ]);
+          .limit(50);
 
-      if (nameRes.error) {
-        console.warn("[Friends] Name search error:", nameRes.error.message);
+        if (fallbackError) {
+          console.warn("[Friends] Fallback search error:", fallbackError.message, fallbackError.details);
+          return [];
+        }
+
+        console.log("[Friends] Fallback got", (fallbackData ?? []).length, "profiles, filtering client-side");
+        const results: PublicUser[] = [];
+        for (const p of fallbackData ?? []) {
+          const nameMatch = (p.name ?? "").toLowerCase().includes(q);
+          const emailMatch = (p.email ?? "").toLowerCase().includes(q);
+          if (nameMatch || emailMatch) {
+            results.push({
+              id: p.id,
+              email: p.email,
+              name: p.name,
+              role: p.role ?? "customer",
+              avatar: p.avatar ?? undefined,
+            });
+          }
+        }
+        console.log("[Friends] Client-side filtered results:", results.length);
+        return results;
       }
-      if (emailRes.error) {
-        console.warn("[Friends] Email search error:", emailRes.error.message);
-      }
 
-      const seenIds = new Set<string>();
-      const results: PublicUser[] = [];
-
-      const mapProfile = (p: any): PublicUser => ({
+      const results: PublicUser[] = (allProfiles ?? []).map((p: any) => ({
         id: p.id,
         email: p.email,
         name: p.name,
         role: p.role ?? "customer",
         avatar: p.avatar ?? undefined,
-      });
-
-      for (const p of nameRes.data ?? []) {
-        if (!seenIds.has(p.id)) {
-          seenIds.add(p.id);
-          results.push(mapProfile(p));
-        }
-      }
-      for (const p of emailRes.data ?? []) {
-        if (!seenIds.has(p.id)) {
-          seenIds.add(p.id);
-          results.push(mapProfile(p));
-        }
-      }
+      }));
 
       console.log("[Friends] Search results:", results.length);
       return results;
