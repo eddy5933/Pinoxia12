@@ -132,7 +132,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         "postgres_changes" as any,
         { event: "UPDATE", schema: "public", table: "friend_requests" },
         (payload: any) => {
-          console.log("[FriendsProvider] Realtime updated friend_request:", payload.new?.id);
+          console.log("[FriendsProvider] Realtime updated friend_request:", payload.new?.id, "status:", payload.new?.status);
           const r = payload.new;
           if (!r) return;
 
@@ -141,16 +141,20 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               req.id === r.id ? { ...req, status: r.status } : req
             )
           );
+
+          if (r.status === "accepted" && (r.from_user_id === currentUserId || r.to_user_id === currentUserId)) {
+            console.log("[FriendsProvider] Friend request accepted, refetching friends list");
+            void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+          }
         }
       )
       .on(
         "postgres_changes" as any,
-        { event: "INSERT", schema: "public", table: "friends" },
+        { event: "INSERT", schema: "public", table: "friends", filter: `user_id=eq.${currentUserId}` },
         (payload: any) => {
-          console.log("[FriendsProvider] Realtime new friend:", payload.new?.id);
+          console.log("[FriendsProvider] Realtime new friend for current user:", payload.new?.id);
           const f = payload.new;
           if (!f) return;
-          if (f.user_id !== currentUserId) return;
 
           const newFriend: Friend = {
             id: f.id,
@@ -163,7 +167,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           };
 
           setFriends((prev) => {
-            if (prev.some((fr) => fr.id === newFriend.id)) return prev;
+            if (prev.some((fr) => fr.id === newFriend.id || fr.userId === newFriend.userId)) return prev;
+            console.log("[FriendsProvider] Adding new friend to local state:", newFriend.name);
             return [newFriend, ...prev];
           });
         }
@@ -176,7 +181,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Cleaning up realtime subscription");
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentUserId, queryClient]);
 
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
@@ -417,11 +422,15 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           email: otherUserEmail,
           isOnline: true,
         };
-        setFriends((prev) => [newFriend, ...prev]);
+        setFriends((prev) => {
+          if (prev.some((fr) => fr.userId === otherUserId)) return prev;
+          return [newFriend, ...prev];
+        });
       }
       console.log("[FriendsProvider] Accepted request from", otherUserName);
+      await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
     },
-    [requests, allUsers]
+    [requests, allUsers, queryClient, currentUserId]
   );
 
   const rejectFriendRequest = useCallback(
