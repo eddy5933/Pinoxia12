@@ -27,6 +27,13 @@ const MOCK_USERS: PublicUser[] = [
   { id: "user_demo_8", email: "henry@email.com", name: "Henry Patel", role: "customer" },
 ];
 
+function mergeUsers(stored: PublicUser[], base: PublicUser[]): PublicUser[] {
+  const map = new Map<string, PublicUser>();
+  for (const u of base) map.set(u.id, u);
+  for (const u of stored) map.set(u.id, u);
+  return Array.from(map.values());
+}
+
 export const [FriendsProvider, useFriends] = createContextHook(() => {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -44,13 +51,12 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
       const loadedFriends: Friend[] = storedFriends ? JSON.parse(storedFriends) : [];
       const loadedRequests: FriendRequest[] = storedRequests ? JSON.parse(storedRequests) : [];
-      const loadedUsers: PublicUser[] = storedUsers ? JSON.parse(storedUsers) : MOCK_USERS;
+      const parsedUsers: PublicUser[] = storedUsers ? JSON.parse(storedUsers) : [];
+      const loadedUsers = mergeUsers(parsedUsers, MOCK_USERS);
 
-      if (!storedUsers) {
-        await AsyncStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
-      }
+      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(loadedUsers));
 
-      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests");
+      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests,", loadedUsers.length, "users");
       return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
     },
     staleTime: 5000,
@@ -62,6 +68,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       setFriends(loadQuery.data.friends);
       setRequests(loadQuery.data.requests);
       setAllUsers(loadQuery.data.users);
+      console.log("[FriendsProvider] State updated - users:", loadQuery.data.users.length);
     }
   }, [loadQuery.data]);
 
@@ -78,21 +85,31 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   });
 
   const registerUser = useCallback(async (user: User) => {
-    const exists = allUsers.find((u) => u.id === user.id);
+    const storedRaw = await AsyncStorage.getItem(USERS_KEY);
+    const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
+    const currentUsers = mergeUsers(storedUsers, MOCK_USERS);
+
+    const exists = currentUsers.find((u) => u.id === user.id);
+    const newUser: PublicUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+
+    let updated: PublicUser[];
     if (!exists) {
-      const newUser: PublicUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-      const updated = [...allUsers, newUser];
-      setAllUsers(updated);
-      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(updated));
+      updated = [...currentUsers, newUser];
       console.log("[FriendsProvider] Registered user:", user.name, "role:", user.role);
     } else if (exists.role !== user.role || exists.name !== user.name || exists.email !== user.email) {
-      const updated = allUsers.map((u) =>
+      updated = currentUsers.map((u) =>
         u.id === user.id ? { ...u, name: user.name, email: user.email, role: user.role } : u
       );
-      setAllUsers(updated);
-      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(updated));
       console.log("[FriendsProvider] Updated user profile:", user.name, "role:", user.role);
+    } else {
+      if (currentUsers.length !== allUsers.length) {
+        setAllUsers(currentUsers);
+      }
+      return;
     }
+
+    setAllUsers(updated);
+    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(updated));
   }, [allUsers]);
 
   const searchUsers = useCallback(
@@ -227,10 +244,15 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const refetchUsers = useCallback(async () => {
     console.log("[FriendsProvider] Refetching users...");
+    const storedRaw = await AsyncStorage.getItem(USERS_KEY);
+    const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
+    const merged = mergeUsers(storedUsers, MOCK_USERS);
+    setAllUsers(merged);
+    console.log("[FriendsProvider] Refreshed users count:", merged.length);
     await loadQuery.refetch();
   }, [loadQuery]);
 
-  const isRefetching = loadQuery.isRefetching;
+  const isRefetching = loadQuery.isRefetching || loadQuery.isLoading;
 
   return useMemo(
     () => ({
