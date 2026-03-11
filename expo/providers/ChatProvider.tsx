@@ -19,16 +19,49 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [liveLocations, setLiveLocations] = useState<LiveLocation[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        console.log("[ChatProvider] Auth user found:", session.user.id);
+        setCurrentUserId(session.user.id);
+      } else {
+        console.log("[ChatProvider] No auth session found");
+        setCurrentUserId(null);
+      }
+    };
+    void getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      console.log("[ChatProvider] Auth state changed, user:", uid);
+      setCurrentUserId(uid);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const loadQuery = useQuery({
-    queryKey: ["chat_load"],
+    queryKey: ["chat_load", currentUserId],
     queryFn: async () => {
-      console.log("[ChatProvider] Loading data from Supabase...");
-      const [convosRes, messagesRes] = await Promise.all([
-        supabase.from("conversations").select("*"),
-        supabase.from("messages").select("*").order("created_at", { ascending: true }),
-      ]);
+      if (!currentUserId) {
+        console.log("[ChatProvider] No user, skipping load");
+        return { conversations: [], messages: [] };
+      }
+
+      console.log("[ChatProvider] Loading data for user:", currentUserId);
+
+      const convosRes = await supabase
+        .from("conversations")
+        .select("*")
+        .contains("participants", [currentUserId]);
+
+      if (convosRes.error) {
+        console.warn("[ChatProvider] Conversations fetch error:", convosRes.error.message);
+      }
 
       const loadedConversations: Conversation[] = (convosRes.data ?? []).map((c: any) => ({
         id: c.id,
@@ -39,22 +72,40 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         unreadCount: c.unread_count ?? 0,
       }));
 
-      const loadedMessages: ChatMessage[] = (messagesRes.data ?? []).map((m: any) => ({
-        id: m.id,
-        conversationId: m.conversation_id,
-        senderId: m.sender_id,
-        senderName: m.sender_name,
-        text: m.text,
-        type: m.type ?? "text",
-        locationData: m.location_data ?? undefined,
-        createdAt: m.created_at,
-      }));
+      console.log("[ChatProvider] Loaded", loadedConversations.length, "conversations");
 
-      console.log("[ChatProvider] Loaded", loadedConversations.length, "conversations,", loadedMessages.length, "messages");
+      const convoIds = loadedConversations.map((c) => c.id);
+      let loadedMessages: ChatMessage[] = [];
+
+      if (convoIds.length > 0) {
+        const messagesRes = await supabase
+          .from("messages")
+          .select("*")
+          .in("conversation_id", convoIds)
+          .order("created_at", { ascending: true });
+
+        if (messagesRes.error) {
+          console.warn("[ChatProvider] Messages fetch error:", messagesRes.error.message);
+        }
+
+        loadedMessages = (messagesRes.data ?? []).map((m: any) => ({
+          id: m.id,
+          conversationId: m.conversation_id,
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          text: m.text,
+          type: m.type ?? "text",
+          locationData: m.location_data ?? undefined,
+          createdAt: m.created_at,
+        }));
+      }
+
+      console.log("[ChatProvider] Loaded", loadedMessages.length, "messages");
       return { conversations: loadedConversations, messages: loadedMessages };
     },
-    staleTime: 5000,
-    refetchInterval: 8000,
+    enabled: !!currentUserId,
+    staleTime: 3000,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -174,7 +225,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       console.log("[ChatProvider] Sent message in", conversationId);
       return newMessage;
     },
-    [conversations]
+    []
   );
 
   const getMessagesForConversation = useCallback(
