@@ -144,13 +144,26 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted, refetching friends list immediately");
-            setTimeout(() => {
-              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-            }, 500);
-            setTimeout(() => {
-              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-            }, 2000);
+            console.log("[FriendsProvider] Friend request accepted, refetching friends list with retries");
+            const refetchFriends = async () => {
+              console.log("[FriendsProvider] Refetching friends after acceptance...");
+              await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+              const freshData = await queryClient.fetchQuery({
+                queryKey: ["friends_load", currentUserId],
+                staleTime: 0,
+              });
+              if (freshData) {
+                const typedData = freshData as { friends: Friend[]; requests: FriendRequest[]; users: PublicUser[] };
+                setFriends(typedData.friends);
+                setRequests(typedData.requests);
+                setAllUsers(typedData.users);
+                console.log("[FriendsProvider] Force refreshed friends count:", typedData.friends.length);
+              }
+            };
+            setTimeout(() => void refetchFriends(), 500);
+            setTimeout(() => void refetchFriends(), 1500);
+            setTimeout(() => void refetchFriends(), 3000);
+            setTimeout(() => void refetchFriends(), 5000);
           }
         }
       )
