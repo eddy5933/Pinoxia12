@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import createContextHook from "@nkzw/create-context-hook";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Friend, FriendRequest, User } from "@/types";
 import { supabase } from "@/lib/supabase";
 
@@ -13,6 +13,7 @@ export interface PublicUser {
 }
 
 export const [FriendsProvider, useFriends] = createContextHook(() => {
+  const queryClient = useQueryClient();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [allUsers, setAllUsers] = useState<PublicUser[]>([]);
@@ -258,6 +259,16 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         prev.map((f) => (f.id === friendId ? { ...f, isCloseFriend: newValue } : f))
       );
 
+      queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          friends: old.friends.map((f: any) =>
+            f.id === friendId ? { ...f, isCloseFriend: newValue } : f
+          ),
+        };
+      });
+
       const { error } = await supabase
         .from("friends")
         .update({ is_close_friend: newValue })
@@ -268,9 +279,20 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         setFriends((prev) =>
           prev.map((f) => (f.id === friendId ? { ...f, isCloseFriend: !newValue } : f))
         );
+        queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            friends: old.friends.map((f: any) =>
+              f.id === friendId ? { ...f, isCloseFriend: !newValue } : f
+            ),
+          };
+        });
+      } else {
+        console.log("[FriendsProvider] Close friend saved successfully:", friend.name, "=>", newValue);
       }
     },
-    [friends]
+    [friends, queryClient, currentUserId]
   );
 
   const closeFriends = useMemo(
