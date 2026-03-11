@@ -127,6 +127,10 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
 
   return (
     <View style={friendMarkerStyles.container}>
+      <View style={friendMarkerStyles.label}>
+        <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
+      </View>
+      <View style={friendMarkerStyles.labelArrow} />
       <View style={friendMarkerStyles.avatarRing}>
         {friend.avatar ? (
           <RNImage
@@ -141,9 +145,6 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
           </View>
         )}
         <View style={friendMarkerStyles.onlineDot} />
-      </View>
-      <View style={friendMarkerStyles.label}>
-        <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
       </View>
     </View>
   );
@@ -1457,14 +1458,25 @@ const friendMarkerStyles = StyleSheet.create({
   },
   label: {
     backgroundColor: "#1E3A5F",
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
+    borderRadius: 5,
     maxWidth: 80,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#3B82F6",
+  },
+  labelArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 4,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#1E3A5F",
+    alignSelf: "center" as const,
+    marginBottom: 1,
   },
   labelName: {
     fontSize: 8,
