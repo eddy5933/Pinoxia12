@@ -1,68 +1,61 @@
-# FoodSpot — Restaurant Discovery & Listing App
-
+# Connect Everything to Supabase
 
 ## Overview
-A bold, modern restaurant discovery app with a red & black color scheme. Users can browse nearby restaurants on a map, view photos, read reviews, and find food. Restaurant owners can register their shop (with a $5 fee) to list their location, photos, menu type, hours, and collect reviews.
+Replace all local-only storage with Supabase as the real backend — authentication, users, restaurants, reviews, friends, and chats will all live in Supabase so data works across devices.
 
 ---
 
-## Features
+## Step 1: Create Tables in Supabase
+You'll need to run SQL in the **Supabase Dashboard → SQL Editor** to create these tables. I'll provide the exact SQL after you approve this plan.
 
-**For Customers (Browse Mode)**
-- Browse a list of nearby restaurants with photos, ratings, and cuisine type
-- View restaurants on an interactive map with location pins
-- See full restaurant details: photos, opening hours, food type, address, and reviews
-- Leave star ratings and written reviews for restaurants
-- Search restaurants by name or food type
-- See your current location on the map
-
-**For Restaurant Owners (Owner Mode)**
-- Toggle between "Customer" and "Owner" role from your profile
-- Register a new restaurant with name, description, photos, food type, and opening hours
-- Set your restaurant's location on the map
-- See a $5 registration fee notice (payment handled in a future update)
-- View and manage your listed restaurant(s)
-- See reviews left by customers
-
-**Friends & Chat**
-- Search and add other users as friends
-- Send, accept, and reject friend requests
-- View friends list with chat and remove actions
-- Real-time chat messaging with friends
-- Share live location in chat to meet at shops/restaurants
-- Live location banner showing friend's current position
-- Start/stop location sharing toggle in chat
-
-**Authentication**
-- Sign up and log in with email and password
-- Profile screen to manage your account and switch roles
+**Tables to create:**
+- **profiles** — user profiles (synced from Supabase Auth)
+- **restaurants** — all restaurant listings
+- **reviews** — user reviews for restaurants
+- **friend_requests** — pending/accepted/rejected friend requests
+- **friends** — accepted friend connections
+- **conversations** — chat conversations between users
+- **messages** — individual chat messages
 
 ---
 
-## Design
-- **Bold & vibrant** theme: deep black backgrounds, bright red accents (#E63946), crisp white text
-- Cards with subtle dark gray surfaces and red highlights for ratings and CTAs
-- Restaurant photos displayed in large, rounded cards with overlay text
-- Map view with custom red pins for restaurant locations
-- Clean bottom tab bar with red active indicator
-- Smooth micro-interactions on buttons and card taps
-- Inspired by Yelp's browsing experience mixed with Uber Eats' dark modern aesthetic
+## Step 2: Set Up Supabase in the App
+- Install the Supabase client library
+- Create a Supabase client using your project URL and anon key
+- You'll need to paste your **anon key** as an environment variable
 
 ---
 
-## Screens
-
-1. **Welcome / Login Screen** — Bold branding with email & password login and sign-up option
-2. **Home (Explore) Tab** — Scrollable list of restaurant cards with search bar at top
-3. **Map Tab** — Full-screen web-based map showing restaurant pins and your location
-4. **Restaurant Detail Screen** — Hero photo, info section (hours, cuisine, address), reviews list, and "Write a Review" button
-5. **Profile Tab** — User info, role toggle (Customer ↔ Owner), and logout
-6. **Add Restaurant Screen** (Owner only) — Form to register a restaurant with photos, location, hours, food type, and $5 fee info
-7. **My Restaurants Screen** (Owner only) — List of restaurants the owner has registered
-8. **Friends Tab** — Friends list, incoming requests, and user search with add friend
-9. **Chat Screen** — 1-on-1 messaging with live location sharing for meetups
+## Step 3: Real Authentication
+- Login and signup will use **Supabase Auth** (email + password)
+- On signup, a profile is automatically created in the profiles table
+- Session persists across app restarts
+- Logout properly signs out of Supabase
 
 ---
 
-## App Icon
-- A bold red circle on a black background with a white fork-and-knife symbol, clean and modern
+## Step 4: Sync All Data to Supabase
+
+**Users & Profiles**
+- User profiles stored in Supabase instead of AsyncStorage
+- All users discoverable across devices in the Find People tab
+
+**Restaurants & Reviews**
+- Restaurants and reviews stored in Supabase
+- Any user can see all restaurants from any device
+- Mock restaurants seeded on first load
+
+**Friends**
+- Friend requests and friendships stored in Supabase
+- Send/accept/reject/cancel requests work across devices in real-time
+
+**Chats**
+- Conversations and messages stored in Supabase
+- Messages persist and are visible from any device
+
+---
+
+## What Stays the Same
+- All existing screens, design, and navigation remain unchanged
+- The app looks and works exactly the same — just backed by real data
+- Notification toasts still appear for friend requests and messages
