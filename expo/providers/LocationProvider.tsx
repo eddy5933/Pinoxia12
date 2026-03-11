@@ -190,9 +190,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     void requestLocation();
   }, [requestLocation]);
 
-  const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string) => {
+  const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
     try {
-      console.log("[LocationProvider] Sharing location to Supabase for user:", userId);
+      console.log("[LocationProvider] Sharing location to Supabase for user:", userId, "enabled:", sharing);
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -200,6 +200,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           longitude: loc.longitude,
           location_place_name: loc.placeName ?? null,
           location_updated_at: new Date().toISOString(),
+          location_sharing_enabled: sharing,
         })
         .eq("id", userId);
       if (error) {
@@ -218,18 +219,31 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   }, []);
 
   useEffect(() => {
-    if (!currentUserId || !userLocation || !sharingEnabled) return;
+    if (!currentUserId || !userLocation) return;
 
-    void shareLocationToSupabase(userLocation, currentUserId);
+    if (sharingEnabled) {
+      void shareLocationToSupabase(userLocation, currentUserId, true);
+    } else {
+      void supabase
+        .from("profiles")
+        .update({ location_sharing_enabled: false })
+        .eq("id", currentUserId)
+        .then(({ error }) => {
+          if (error) console.warn("[LocationProvider] Failed to disable sharing:", error.message);
+          else console.log("[LocationProvider] Location sharing disabled in DB");
+        });
+    }
 
     if (shareIntervalRef.current) {
       clearInterval(shareIntervalRef.current);
     }
-    shareIntervalRef.current = setInterval(() => {
-      if (userLocation && currentUserId && sharingEnabled) {
-        void shareLocationToSupabase(userLocation, currentUserId);
-      }
-    }, 30000);
+    if (sharingEnabled) {
+      shareIntervalRef.current = setInterval(() => {
+        if (userLocation && currentUserId && sharingEnabled) {
+          void shareLocationToSupabase(userLocation, currentUserId, true);
+        }
+      }, 30000);
+    }
 
     return () => {
       if (shareIntervalRef.current) {
@@ -246,7 +260,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
       const { data: friendRows, error: fErr } = await supabase
         .from("friends")
-        .select("friend_id")
+        .select("friend_id, is_close_friend")
         .eq("user_id", currentUserId);
 
       if (fErr || !friendRows || friendRows.length === 0) {
@@ -254,13 +268,22 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         return [];
       }
 
-      const friendIds = friendRows.map((f: any) => f.friend_id);
-      console.log("[LocationProvider] Fetching locations for friend IDs:", friendIds);
+      const closeFriendIds = friendRows
+        .filter((f: any) => f.is_close_friend === true)
+        .map((f: any) => f.friend_id);
+
+      if (closeFriendIds.length === 0) {
+        console.log("[LocationProvider] No close friends set, skipping location fetch");
+        return [];
+      }
+
+      console.log("[LocationProvider] Fetching locations for close friend IDs:", closeFriendIds);
 
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at")
-        .in("id", friendIds)
+        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled")
+        .in("id", closeFriendIds)
+        .eq("location_sharing_enabled", true)
         .not("latitude", "is", null)
         .not("longitude", "is", null);
 
@@ -285,7 +308,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         updatedAt: p.location_updated_at,
       }));
 
-      console.log("[LocationProvider] Found", locations.length, "friends with active locations");
+      console.log("[LocationProvider] Found", locations.length, "close friends with sharing enabled");
       return locations;
     },
     enabled: !!currentUserId,

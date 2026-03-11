@@ -560,21 +560,11 @@ export default function MapScreen() {
     console.log("[MapScreen] Toggle friend locations visibility");
   }, []);
 
-  const closeFriendIds = useMemo(
-    () => new Set(closeFriends.map((f) => f.userId)),
-    [closeFriends]
-  );
-
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) return [];
-    if (closeFriends.length === 0) {
-      console.log("[MapScreen] No close friends set, showing all friend locations:", friendLocations.length);
-      return friendLocations;
-    }
-    const filtered = friendLocations.filter((fl) => closeFriendIds.has(fl.userId));
-    console.log("[MapScreen] Visible friend locations:", filtered.length, "of", friendLocations.length, "(close friends:", closeFriends.length, ")");
-    return filtered;
-  }, [showFriendLocations, friendLocations, closeFriendIds, closeFriends.length]);
+    console.log("[MapScreen] Visible friend locations:", friendLocations.length, "(only close friends with sharing enabled)");
+    return friendLocations;
+  }, [showFriendLocations, friendLocations]);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
