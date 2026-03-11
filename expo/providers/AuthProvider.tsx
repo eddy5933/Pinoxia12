@@ -148,6 +148,41 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     setUser(null);
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    console.log("[Auth] Sending password reset to:", email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      console.warn("[Auth] Reset password error:", error.message);
+      throw new Error(error.message);
+    }
+    console.log("[Auth] Password reset email sent");
+  }, []);
+
+  const verifyOtpAndUpdatePassword = useCallback(
+    async (email: string, token: string, newPassword: string) => {
+      console.log("[Auth] Verifying OTP for:", email);
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "recovery",
+      });
+      if (error) {
+        console.warn("[Auth] OTP verification error:", error.message);
+        throw new Error(error.message);
+      }
+      console.log("[Auth] OTP verified, updating password");
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) {
+        console.warn("[Auth] Update password error:", updateError.message);
+        throw new Error(updateError.message);
+      }
+      console.log("[Auth] Password updated successfully");
+    },
+    []
+  );
+
   const deleteAccount = useCallback(async () => {
     if (!user) return;
     console.log("[Auth] Deleting account:", user.id);
@@ -174,7 +209,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [user]);
 
   return useMemo(
-    () => ({ user, isLoading, login, signup, logout, deleteAccount, toggleRole }),
-    [user, isLoading, login, signup, logout, deleteAccount, toggleRole]
+    () => ({ user, isLoading, login, signup, logout, deleteAccount, toggleRole, resetPassword, verifyOtpAndUpdatePassword }),
+    [user, isLoading, login, signup, logout, deleteAccount, toggleRole, resetPassword, verifyOtpAndUpdatePassword]
   );
 });

@@ -30,6 +30,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen
         name="restaurant/[id]"
         options={{ headerShown: false, presentation: "card" }}

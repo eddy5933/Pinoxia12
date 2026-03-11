@@ -171,6 +171,16 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </Animated.View>
 
+            {!isSignup && (
+              <TouchableOpacity
+                style={styles.forgotButton}
+                onPress={() => router.push("/forgot-password")}
+                testID="forgot-password-button"
+              >
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.switchButton}
               onPress={() => setIsSignup(!isSignup)}
@@ -263,6 +273,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.white,
+  },
+  forgotButton: {
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  forgotText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: "600" as const,
   },
   switchButton: {
     alignItems: "center",
