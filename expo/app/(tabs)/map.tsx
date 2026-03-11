@@ -212,6 +212,9 @@ function NativeMapView({
               <MapPin size={16} color={Colors.white} />
             </View>
             <View style={markerStyles.pinTail} />
+            <View style={markerStyles.labelContainer}>
+              <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
+            </View>
           </View>
           <Callout
             tooltip
@@ -603,6 +606,21 @@ const markerStyles = StyleSheet.create({
     borderRightColor: "transparent",
     borderTopColor: Colors.white,
     marginTop: -1,
+  },
+  labelContainer: {
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 2,
+    maxWidth: 120,
+    alignSelf: "center",
+  },
+  labelText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    textAlign: "center" as const,
   },
   callout: {
     backgroundColor: Colors.surface,
