@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -20,6 +22,8 @@ import {
   Users,
   Clock,
   Store,
+  Bell,
+  Send,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -31,6 +35,13 @@ import { Friend, FriendRequest } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
 type TabType = "friends" | "requests" | "search";
+
+interface ToastState {
+  visible: boolean;
+  message: string;
+  userName: string;
+  type: "success" | "error" | "info";
+}
 
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
@@ -55,6 +66,42 @@ export default function FriendsScreen() {
 
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState<ToastState>({ visible: false, message: "", userName: "", type: "success" });
+  const toastAnim = useRef(new Animated.Value(-120)).current;
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  const showToast = useCallback((message: string, userName: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ visible: true, message, userName, type });
+    toastAnim.setValue(-120);
+    toastOpacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(toastAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 10,
+      }),
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(toastAnim, {
+          toValue: -120,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(toastOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setToast((prev) => ({ ...prev, visible: false })));
+    }, 3000);
+  }, [toastAnim, toastOpacity]);
 
   useEffect(() => {
     if (user) {
@@ -88,21 +135,24 @@ export default function FriendsScreen() {
       const success = sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert("Request Sent", `Friend request sent to ${toUser.name}`);
+        showToast("Friend request sent!", toUser.name, "success");
       } else {
-        Alert.alert("Already Connected", "You already have a pending request or are friends.");
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        showToast("Already connected", toUser.name, "info");
       }
     },
-    [user, sendFriendRequest]
+    [user, sendFriendRequest, showToast]
   );
 
   const handleAccept = useCallback(
     (requestId: string) => {
       if (!user) return;
+      const req = pendingRequests.find((r) => r.id === requestId);
       acceptFriendRequest(requestId, user.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast("Friend added!", req?.fromUserName ?? "User", "success");
     },
-    [user, acceptFriendRequest]
+    [user, acceptFriendRequest, pendingRequests, showToast]
   );
 
   const handleReject = useCallback(
@@ -401,9 +451,50 @@ export default function FriendsScreen() {
           }
         />
       )}
+      {toast.visible && (
+        <Animated.View
+          style={[
+            styles.toastContainer,
+            { paddingTop: insets.top + 8 },
+            {
+              transform: [{ translateY: toastAnim }],
+              opacity: toastOpacity,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <View style={[
+            styles.toastInner,
+            toast.type === "success" && styles.toastSuccess,
+            toast.type === "error" && styles.toastError,
+            toast.type === "info" && styles.toastInfo,
+          ]}>
+            <View style={[
+              styles.toastIconWrap,
+              toast.type === "success" && styles.toastIconSuccess,
+              toast.type === "error" && styles.toastIconError,
+              toast.type === "info" && styles.toastIconInfo,
+            ]}>
+              {toast.type === "success" ? (
+                <Send size={16} color="#fff" />
+              ) : toast.type === "error" ? (
+                <X size={16} color="#fff" />
+              ) : (
+                <Bell size={16} color="#fff" />
+              )}
+            </View>
+            <View style={styles.toastTextWrap}>
+              <Text style={styles.toastTitle}>{toast.message}</Text>
+              <Text style={styles.toastSubtitle}>{toast.userName}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: {
@@ -682,5 +773,71 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700" as const,
     color: Colors.white,
+  },
+  toastContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 999,
+  },
+  toastInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: SCREEN_WIDTH - 32,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  toastSuccess: {
+    backgroundColor: "#1B3A2A",
+    borderWidth: 1,
+    borderColor: "rgba(76,175,80,0.3)",
+  },
+  toastError: {
+    backgroundColor: "#3A1B1B",
+    borderWidth: 1,
+    borderColor: "rgba(230,57,70,0.3)",
+  },
+  toastInfo: {
+    backgroundColor: "#1B2A3A",
+    borderWidth: 1,
+    borderColor: "rgba(30,136,229,0.3)",
+  },
+  toastIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  toastIconSuccess: {
+    backgroundColor: Colors.success,
+  },
+  toastIconError: {
+    backgroundColor: Colors.error,
+  },
+  toastIconInfo: {
+    backgroundColor: "#1E88E5",
+  },
+  toastTextWrap: {
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  toastSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 1,
   },
 });
