@@ -100,11 +100,13 @@ function NativeMapView({
   userLocation,
   onMarkerPress,
   focusedRestaurant,
+  centerTrigger,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
   onMarkerPress: (id: string) => void;
   focusedRestaurant: Restaurant | null;
+  centerTrigger: number;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -166,6 +168,21 @@ function NativeMapView({
       );
     }
   }, [userLocation, focusedRestaurant, restaurants]);
+
+  useEffect(() => {
+    if (centerTrigger > 0 && userLocation && mapRef.current) {
+      console.log("[MapScreen] Centering map on user location via button");
+      mapRef.current.animateToRegion(
+        {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        800
+      );
+    }
+  }, [centerTrigger, userLocation]);
 
   return (
     <MapView
@@ -282,6 +299,7 @@ export default function MapScreen() {
   const { focus } = useLocalSearchParams<{ focus?: string }>();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const searchInputRef = useRef<TextInput>(null);
+  const [centerTrigger, setCenterTrigger] = useState(0);
 
   const focusedRestaurant = useMemo(
     () => (focus ? restaurants.find((r) => r.id === focus) ?? null : null),
@@ -366,7 +384,15 @@ export default function MapScreen() {
             styles.locateButton,
             locationLoading && styles.locateButtonLoading,
           ]}
-          onPress={requestLocation}
+          onPress={() => {
+            if (userLocation) {
+              console.log("[MapScreen] Centering on current location");
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setCenterTrigger((prev) => prev + 1);
+            } else {
+              void requestLocation();
+            }
+          }}
           disabled={locationLoading}
           activeOpacity={0.7}
           testID="locate-button"
@@ -446,6 +472,7 @@ export default function MapScreen() {
             userLocation={userLocation}
             onMarkerPress={handleMarkerPress}
             focusedRestaurant={focusedRestaurant}
+            centerTrigger={centerTrigger}
           />
         )}
 
