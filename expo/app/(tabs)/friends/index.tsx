@@ -16,7 +16,6 @@ import { useRouter } from "expo-router";
 import {
   UserPlus,
   Search,
-  Check,
   X,
   MessageCircle,
   UserMinus,
@@ -29,16 +28,15 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter as useExpoRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useChat } from "@/providers/ChatProvider";
-import { Friend, FriendRequest } from "@/types";
+import { Friend } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
-type TabType = "friends" | "followers" | "requests" | "discover";
+type TabType = "friends" | "followers" | "following" | "discover";
 
 interface ToastState {
   visible: boolean;
@@ -50,23 +48,20 @@ interface ToastState {
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const expoRouter = useExpoRouter();
   const { user } = useAuth();
   const {
     friends,
     followers,
+    following,
     searchUsersFromSupabase,
     sendFriendRequest,
-    acceptFriendRequest,
-    rejectFriendRequest,
-    removeFriend,
-    cancelFriendRequest,
-    toggleCloseFriend,
     followBack,
-    getPendingRequests,
-    getSentRequests,
+    removeFriend,
+    unfollowUser,
+    toggleCloseFriend,
     isFriend,
-    hasPendingRequest,
+    isFollowing,
+    getPendingRequests,
     registerUser,
     refetchUsers,
     isRefetching,
@@ -81,7 +76,6 @@ export default function FriendsScreen() {
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "", userName: "", type: "success" });
   const toastAnim = useRef(new Animated.Value(-120)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
-
   const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
 
   const showToast = useCallback((message: string, userName: string, type: "success" | "error" | "info" = "success") => {
@@ -89,30 +83,13 @@ export default function FriendsScreen() {
     toastAnim.setValue(-120);
     toastOpacity.setValue(0);
     Animated.parallel([
-      Animated.spring(toastAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 10,
-      }),
-      Animated.timing(toastOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
+      Animated.spring(toastAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }),
+      Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
     setTimeout(() => {
       Animated.parallel([
-        Animated.timing(toastAnim, {
-          toValue: -120,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(toastOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        Animated.timing(toastAnim, { toValue: -120, duration: 300, useNativeDriver: true }),
+        Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start(() => setToast((prev) => ({ ...prev, visible: false })));
     }, 3000);
   }, [toastAnim, toastOpacity]);
@@ -123,7 +100,7 @@ export default function FriendsScreen() {
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tabs: TabType[] = ["friends", "followers", "requests", "discover"];
+  const tabs: TabType[] = ["friends", "followers", "following", "discover"];
   const tabIndex = tabs.indexOf(activeTab);
 
   useEffect(() => {
@@ -140,11 +117,6 @@ export default function FriendsScreen() {
     [user, getPendingRequests]
   );
 
-  const sentRequests = useMemo(
-    () => (user ? getSentRequests(user.id) : []),
-    [user, getSentRequests]
-  );
-
   useEffect(() => {
     if (!user) return;
     if (activeTab !== "discover") return;
@@ -156,28 +128,23 @@ export default function FriendsScreen() {
       return;
     }
 
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
 
     setIsSearching(true);
     searchTimerRef.current = setTimeout(async () => {
       try {
-        console.log("[FriendsSearch] Searching Supabase for:", trimmed);
+        console.log("[FriendsSearch] Searching:", trimmed);
         const results = await searchUsersFromSupabase(trimmed, user.id);
         setLiveSearchResults(results);
-        console.log("[FriendsSearch] Got", results.length, "results");
       } catch (err) {
-        console.warn("[FriendsSearch] Search error:", err);
+        console.warn("[FriendsSearch] Error:", err);
       } finally {
         setIsSearching(false);
       }
     }, 300);
 
     return () => {
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-      }
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchQuery, user, activeTab, searchUsersFromSupabase]);
 
@@ -194,7 +161,7 @@ export default function FriendsScreen() {
       const success = await followBack(follower.userId);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Followed back!", follower.name, "success");
+        showToast("Followed back! You are now friends", follower.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         showToast("Already following", follower.name, "info");
@@ -209,50 +176,13 @@ export default function FriendsScreen() {
       const success = await sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Follow request sent!", toUser.name, "success");
+        showToast("Now following!", toUser.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already requested", toUser.name, "info");
+        showToast("Already following", toUser.name, "info");
       }
     },
     [user, sendFriendRequest, showToast]
-  );
-
-  const handleAccept = useCallback(
-    async (requestId: string) => {
-      if (!user) return;
-      const req = pendingRequests.find((r) => r.id === requestId);
-      await acceptFriendRequest(requestId, user.id);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast("You are now friends!", req?.fromUserName ?? "User", "success");
-    },
-    [user, acceptFriendRequest, pendingRequests, showToast]
-  );
-
-  const handleReject = useCallback(
-    async (requestId: string) => {
-      await rejectFriendRequest(requestId);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-    [rejectFriendRequest]
-  );
-
-  const handleCancelFollow = useCallback(
-    (requestId: string, userName: string) => {
-      Alert.alert("Unfollow", `Cancel follow request to ${userName}?`, [
-        { text: "No", style: "cancel" },
-        {
-          text: "Unfollow",
-          style: "destructive",
-          onPress: async () => {
-            await cancelFriendRequest(requestId);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            showToast("Follow request cancelled", userName, "info");
-          },
-        },
-      ]);
-    },
-    [cancelFriendRequest, showToast]
   );
 
   const handleToggleCloseFriend = useCallback(
@@ -271,7 +201,7 @@ export default function FriendsScreen() {
 
   const handleRemoveFriend = useCallback(
     (friend: Friend) => {
-      Alert.alert("Unfollow & Remove", `Remove ${friend.name} from your friends?`, [
+      Alert.alert("Remove Friend", `Remove ${friend.name} from your friends? This will unfollow both ways.`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
@@ -279,11 +209,30 @@ export default function FriendsScreen() {
           onPress: async () => {
             await removeFriend(friend.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            showToast("Friend removed", friend.name, "info");
           },
         },
       ]);
     },
-    [removeFriend]
+    [removeFriend, showToast]
+  );
+
+  const handleUnfollow = useCallback(
+    (followingUser: Friend) => {
+      Alert.alert("Unfollow", `Unfollow ${followingUser.name}?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unfollow",
+          style: "destructive",
+          onPress: async () => {
+            await unfollowUser(followingUser.userId);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            showToast("Unfollowed", followingUser.name, "info");
+          },
+        },
+      ]);
+    },
+    [unfollowUser, showToast]
   );
 
   const handleStartChat = useCallback(
@@ -306,9 +255,7 @@ export default function FriendsScreen() {
     ({ item }: { item: Friend }) => (
       <View style={styles.card}>
         <View style={[styles.avatar, styles.followerAvatar]}>
-          <Text style={styles.avatarText}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
         </View>
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
@@ -328,6 +275,29 @@ export default function FriendsScreen() {
     [handleFollowBack]
   );
 
+  const renderFollowingItem = useCallback(
+    ({ item }: { item: Friend }) => (
+      <View style={styles.card}>
+        <View style={[styles.avatar, styles.followingAvatar]}>
+          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.cardEmail} numberOfLines={1}>{item.email}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.unfollowBtn}
+          onPress={() => handleUnfollow(item)}
+          activeOpacity={0.7}
+        >
+          <X size={12} color={Colors.error} />
+          <Text style={styles.unfollowBtnText}>Unfollow</Text>
+        </TouchableOpacity>
+      </View>
+    ),
+    [handleUnfollow]
+  );
+
   const renderFriendItem = useCallback(
     ({ item }: { item: Friend }) => (
       <View style={[styles.card, item.isCloseFriend && styles.cardCloseFriend]}>
@@ -337,9 +307,7 @@ export default function FriendsScreen() {
           activeOpacity={0.7}
           testID={`close-friend-toggle-${item.userId}`}
         >
-          <Text style={styles.avatarText}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
           {item.isCloseFriend && (
             <View style={styles.closeBadge}>
               <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
@@ -390,60 +358,16 @@ export default function FriendsScreen() {
     [handleStartChat, handleRemoveFriend, handleToggleCloseFriend]
   );
 
-  const renderRequestItem = useCallback(
-    ({ item }: { item: FriendRequest }) => (
-      <View style={styles.requestCard}>
-        <View style={styles.requestAvatarWrap}>
-          <View style={styles.requestAvatar}>
-            <Text style={styles.avatarText}>
-              {item.fromUserName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.requestFollowIcon}>
-            <UserPlus size={10} color={Colors.white} />
-          </View>
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>{item.fromUserName}</Text>
-          <Text style={styles.requestLabel}>wants to follow you</Text>
-          <Text style={styles.requestTime}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-        <View style={styles.requestActions}>
-          <TouchableOpacity
-            style={styles.acceptBtn}
-            onPress={() => void handleAccept(item.id)}
-            activeOpacity={0.7}
-          >
-            <Check size={16} color={Colors.white} />
-            <Text style={styles.acceptBtnText}>Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.declineBtn}
-            onPress={() => void handleReject(item.id)}
-            activeOpacity={0.7}
-          >
-            <X size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    ),
-    [handleAccept, handleReject]
-  );
-
   const renderSearchItem = useCallback(
     ({ item }: { item: PublicUser }) => {
       const alreadyFriend = isFriend(item.id);
-      const pendingReq = user ? hasPendingRequest(user.id, item.id) : false;
+      const alreadyFollowing = isFollowing(item.id);
       const isOwnerUser = item.role === "owner";
 
       return (
         <View style={styles.card}>
           <View style={[styles.avatar, styles.searchAvatar]}>
-            <Text style={styles.avatarText}>
-              {item.name.charAt(0).toUpperCase()}
-            </Text>
+            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
           </View>
           <View style={styles.cardInfo}>
             <View style={styles.nameRow}>
@@ -462,10 +386,10 @@ export default function FriendsScreen() {
               <UserCheck size={13} color={Colors.success} />
               <Text style={styles.friendsBadgeText}>Friends</Text>
             </View>
-          ) : pendingReq ? (
+          ) : alreadyFollowing ? (
             <View style={styles.followingBadge}>
               <Clock size={13} color={Colors.warning} />
-              <Text style={styles.followingBadgeText}>Requested</Text>
+              <Text style={styles.followingBadgeText}>Following</Text>
             </View>
           ) : (
             <TouchableOpacity
@@ -480,7 +404,7 @@ export default function FriendsScreen() {
         </View>
       );
     },
-    [isFriend, hasPendingRequest, user, handleFollow]
+    [isFriend, isFollowing, handleFollow]
   );
 
   if (!user) {
@@ -511,7 +435,7 @@ export default function FriendsScreen() {
     switch (tab) {
       case "friends": return "Friends";
       case "followers": return "Followers";
-      case "requests": return "Requests";
+      case "following": return "Following";
       case "discover": return "Discover";
     }
   };
@@ -520,7 +444,7 @@ export default function FriendsScreen() {
     switch (tab) {
       case "friends": return friends.length;
       case "followers": return followers.length;
-      case "requests": return pendingRequests.length + sentRequests.length;
+      case "following": return following.length;
       case "discover": return 0;
     }
   };
@@ -529,16 +453,16 @@ export default function FriendsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Connect</Text>
-        {pendingRequests.length > 0 && (
+        {(pendingRequests.length > 0 || followers.length > 0) && (
           <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>{pendingRequests.length}</Text>
+            <Text style={styles.headerBadgeText}>{pendingRequests.length + followers.length}</Text>
           </View>
         )}
       </View>
 
       <TouchableOpacity
         style={styles.closeFriendsRow}
-        onPress={() => expoRouter.push("/(tabs)/friends/close-friends" as any)}
+        onPress={() => router.push("/(tabs)/friends/close-friends" as any)}
         activeOpacity={0.7}
         testID="close-friends-list-btn"
       >
@@ -604,12 +528,7 @@ export default function FriendsScreen() {
           renderItem={renderFollowerItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetchUsers}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetchUsers} tintColor={Colors.primary} colors={[Colors.primary]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyCenter}>
@@ -617,9 +536,36 @@ export default function FriendsScreen() {
                 <Users size={32} color={Colors.textMuted} />
               </View>
               <Text style={styles.emptyTitle}>No followers yet</Text>
-              <Text style={styles.emptySubtitle}>
-                When people follow you, they{"\n"}will appear here
-              </Text>
+              <Text style={styles.emptySubtitle}>When people follow you, they{"\n"}will appear here</Text>
+            </View>
+          }
+        />
+      )}
+
+      {activeTab === "following" && (
+        <FlatList
+          data={following}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFollowingItem}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetchUsers} tintColor={Colors.primary} colors={[Colors.primary]} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyCenter}>
+              <View style={styles.emptyIconWrap}>
+                <Users size={32} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>Not following anyone</Text>
+              <Text style={styles.emptySubtitle}>Find people in the Discover tab{"\n"}and follow them</Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => setActiveTab("discover")}
+                activeOpacity={0.8}
+              >
+                <Search size={16} color={Colors.white} />
+                <Text style={styles.emptyActionBtnText}>Discover People</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -647,12 +593,7 @@ export default function FriendsScreen() {
           renderItem={renderFriendItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetchUsers}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetchUsers} tintColor={Colors.primary} colors={[Colors.primary]} />
           }
           ListEmptyComponent={
             <View style={styles.emptyCenter}>
@@ -661,7 +602,7 @@ export default function FriendsScreen() {
               </View>
               <Text style={styles.emptyTitle}>No friends yet</Text>
               <Text style={styles.emptySubtitle}>
-                Follow people in the Discover tab.{"\n"}When they accept, you become friends!
+                Follow people in the Discover tab.{"\n"}When they follow back, you become friends!
               </Text>
               <TouchableOpacity
                 style={styles.emptyActionBtn}
@@ -676,68 +617,6 @@ export default function FriendsScreen() {
         />
       )}
 
-      {activeTab === "requests" && (
-        <FlatList
-          data={pendingRequests}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRequestItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetchUsers}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
-          }
-          ListHeaderComponent={
-            sentRequests.length > 0 ? (
-              <View style={styles.sentSection}>
-                <Text style={styles.sectionLabel}>PENDING FOLLOWS</Text>
-                <Text style={styles.sectionHint}>Waiting for them to accept your follow</Text>
-                {sentRequests.map((req) => (
-                  <View key={req.id} style={styles.sentCard}>
-                    <View style={[styles.avatar, styles.sentAvatar]}>
-                      <Text style={styles.avatarTextSmall}>{req.toUserName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <View style={styles.cardInfo}>
-                      <Text style={styles.cardName}>{req.toUserName}</Text>
-                      <Text style={styles.sentStatus}>Awaiting approval</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.unfollowBtn}
-                      onPress={() => handleCancelFollow(req.id, req.toUserName)}
-                      activeOpacity={0.7}
-                    >
-                      <X size={12} color={Colors.error} />
-                      <Text style={styles.unfollowBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {pendingRequests.length > 0 && (
-                  <Text style={[styles.sectionLabel, { marginTop: 20 }]}>FOLLOW REQUESTS</Text>
-                )}
-              </View>
-            ) : pendingRequests.length > 0 ? (
-              <Text style={[styles.sectionLabel, { marginLeft: 0, marginBottom: 12 }]}>FOLLOW REQUESTS</Text>
-            ) : null
-          }
-          ListEmptyComponent={
-            sentRequests.length === 0 ? (
-              <View style={styles.emptyCenter}>
-                <View style={styles.emptyIconWrap}>
-                  <Bell size={32} color={Colors.textMuted} />
-                </View>
-                <Text style={styles.emptyTitle}>No requests</Text>
-                <Text style={styles.emptySubtitle}>
-                  Follow requests will appear here
-                </Text>
-              </View>
-            ) : null
-          }
-        />
-      )}
-
       {activeTab === "discover" && (
         <FlatList
           data={liveSearchResults}
@@ -745,12 +624,7 @@ export default function FriendsScreen() {
           renderItem={renderSearchItem}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetchUsers}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
+            <RefreshControl refreshing={isRefetching} onRefresh={refetchUsers} tintColor={Colors.primary} colors={[Colors.primary]} />
           }
           ListEmptyComponent={
             isSearching ? (
@@ -764,9 +638,7 @@ export default function FriendsScreen() {
                   <Search size={32} color={Colors.textMuted} />
                 </View>
                 <Text style={styles.emptyTitle}>Discover People</Text>
-                <Text style={styles.emptySubtitle}>
-                  Search by name or email to find{"\n"}and follow people
-                </Text>
+                <Text style={styles.emptySubtitle}>Search by name or email to find{"\n"}and follow people</Text>
               </View>
             ) : (
               <View style={styles.emptyCenter}>
@@ -786,10 +658,7 @@ export default function FriendsScreen() {
           style={[
             styles.toastContainer,
             { paddingTop: insets.top + 8 },
-            {
-              transform: [{ translateY: toastAnim }],
-              opacity: toastOpacity,
-            },
+            { transform: [{ translateY: toastAnim }], opacity: toastOpacity },
           ]}
           pointerEvents="none"
         >
@@ -921,7 +790,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
@@ -1000,19 +869,11 @@ const styles = StyleSheet.create({
   followerAvatar: {
     backgroundColor: "#1565C0",
   },
-  sentAvatar: {
-    backgroundColor: Colors.surfaceLight,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  followingAvatar: {
+    backgroundColor: "#00897B",
   },
   avatarText: {
     fontSize: 17,
-    fontWeight: "700" as const,
-    color: Colors.white,
-  },
-  avatarTextSmall: {
-    fontSize: 14,
     fontWeight: "700" as const,
     color: Colors.white,
   },
@@ -1095,77 +956,6 @@ const styles = StyleSheet.create({
   iconBtnCloseFriendActive: {
     backgroundColor: "rgba(255,107,138,0.15)",
   },
-  requestCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "rgba(230,57,70,0.15)",
-  },
-  requestAvatarWrap: {
-    position: "relative" as const,
-  },
-  requestAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surfaceHighlight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  requestFollowIcon: {
-    position: "absolute" as const,
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: Colors.primary,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
-  },
-  requestLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  requestTime: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  requestActions: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-  },
-  acceptBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.success,
-  },
-  acceptBtnText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.white,
-  },
-  declineBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.surfaceHighlight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   followBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1225,34 +1015,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.warning,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: Colors.textMuted,
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-  },
-  sentSection: {
-    marginBottom: 8,
-  },
-  sentCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surfaceHighlight,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 6,
-  },
-  sentStatus: {
-    fontSize: 12,
-    color: Colors.warning,
-    marginTop: 1,
   },
   unfollowBtn: {
     flexDirection: "row" as const,

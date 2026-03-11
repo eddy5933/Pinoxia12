@@ -17,6 +17,9 @@ export interface LiveLocation {
   isSharing: boolean;
 }
 
+const EMPTY_CONVOS: Conversation[] = [];
+const EMPTY_MSGS: ChatMessage[] = [];
+
 export const [ChatProvider, useChat] = createContextHook(() => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -24,14 +27,14 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeConversationRef = useRef<string | null>(null);
-  const realtimeMessagesRef = useRef<ChatMessage[]>([]);
-  const realtimeConvosRef = useRef<Conversation[]>([]);
+  const conversationsRef = useRef<Conversation[]>(EMPTY_CONVOS);
+  const messagesRef = useRef<ChatMessage[]>(EMPTY_MSGS);
 
   const conversationsQuery = useQuery({
     queryKey: ["chat_conversations", user?.id],
     queryFn: async (): Promise<Conversation[]> => {
       if (!user) return [];
-      console.log("[ChatProvider] Fetching conversations for user:", user.id);
+      console.log("[Chat] Fetching conversations for:", user.id);
 
       const { data, error } = await supabase
         .from("conversations")
@@ -39,7 +42,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         .contains("participants", [user.id]);
 
       if (error) {
-        console.warn("[ChatProvider] Conversations query error:", error.message, error.details, error.hint);
+        console.warn("[Chat] Conversations error:", error.message);
         return [];
       }
 
@@ -52,29 +55,27 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         unreadCount: c.unread_count ?? 0,
       }));
 
-      console.log("[ChatProvider] Loaded", convos.length, "conversations");
+      console.log("[Chat] Loaded", convos.length, "conversations");
       return convos;
     },
     enabled: !!user?.id,
     staleTime: 2000,
-    refetchInterval: 4000,
+    refetchInterval: 5000,
   });
 
-  const conversations = useMemo(() => {
-    const polled = conversationsQuery.data ?? [];
-    const realtimeExtras = realtimeConvosRef.current.filter(
-      (rc) => !polled.some((p) => p.id === rc.id)
-    );
-    return [...polled, ...realtimeExtras];
-  }, [conversationsQuery.data]);
+  const currentConversations = conversationsQuery.data ?? EMPTY_CONVOS;
+  conversationsRef.current = currentConversations;
 
-  const convoIds = useMemo(() => conversations.map((c) => c.id), [conversations]);
+  const convoIds = useMemo(
+    () => currentConversations.map((c) => c.id),
+    [currentConversations]
+  );
 
   const messagesQuery = useQuery({
     queryKey: ["chat_messages", convoIds],
     queryFn: async (): Promise<ChatMessage[]> => {
       if (convoIds.length === 0) return [];
-      console.log("[ChatProvider] Fetching messages for", convoIds.length, "conversations");
+      console.log("[Chat] Fetching messages for", convoIds.length, "conversations");
 
       const { data, error } = await supabase
         .from("messages")
@@ -83,7 +84,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         .order("created_at", { ascending: true });
 
       if (error) {
-        console.warn("[ChatProvider] Messages query error:", error.message, error.details, error.hint);
+        console.warn("[Chat] Messages error:", error.message);
         return [];
       }
 
@@ -98,142 +99,77 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         createdAt: m.created_at,
       }));
 
-      console.log("[ChatProvider] Loaded", msgs.length, "messages");
-      realtimeMessagesRef.current = [];
+      console.log("[Chat] Loaded", msgs.length, "messages");
       return msgs;
     },
     enabled: convoIds.length > 0,
     staleTime: 2000,
-    refetchInterval: 4000,
+    refetchInterval: 5000,
   });
 
-  const messages = useMemo(() => {
-    const polled = messagesQuery.data ?? [];
-    const realtimeExtras = realtimeMessagesRef.current.filter(
-      (rm) => !polled.some((p) => p.id === rm.id)
-    );
-    return [...polled, ...realtimeExtras];
-  }, [messagesQuery.data]);
+  const currentMessages = messagesQuery.data ?? EMPTY_MSGS;
+  messagesRef.current = currentMessages;
 
   useEffect(() => {
     if (!user?.id) return;
-    console.log("[ChatProvider] Setting up realtime subscription for user:", user.id);
+    console.log("[Chat] Setting up realtime for:", user.id);
 
     const channel = supabase
       .channel(`chat_rt_${user.id}_${Date.now()}`)
-      .on(
-        "postgres_changes" as any,
-        { event: "INSERT", schema: "public", table: "messages" },
-        (payload: any) => {
-          const m = payload.new;
-          if (!m) return;
-          console.log("[ChatProvider] RT new message:", m.id, "in conv:", m.conversation_id, "from:", m.sender_name);
+      .on("postgres_changes" as any, { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
+        const m = payload.new;
+        if (!m) return;
+        console.log("[Chat] RT new message:", m.id, "from:", m.sender_name);
 
-          const newMsg: ChatMessage = {
-            id: m.id,
-            conversationId: m.conversation_id,
-            senderId: m.sender_id,
-            senderName: m.sender_name,
-            text: m.text,
-            type: m.type ?? "text",
-            locationData: m.location_data ?? undefined,
-            createdAt: m.created_at,
-          };
+        void queryClient.invalidateQueries({ queryKey: ["chat_messages"] });
+        void queryClient.invalidateQueries({ queryKey: ["chat_conversations", user.id] });
 
-          realtimeMessagesRef.current = [
-            ...realtimeMessagesRef.current.filter((rm) => rm.id !== newMsg.id),
-            newMsg,
-          ];
-
-          void queryClient.invalidateQueries({ queryKey: ["chat_messages"] });
-          void queryClient.invalidateQueries({ queryKey: ["chat_conversations", user.id] });
-
-          if (
-            newMsg.senderId !== user.id &&
-            activeConversationRef.current !== newMsg.conversationId
-          ) {
-            setUnreadCounts((prev) => ({
-              ...prev,
-              [newMsg.conversationId]: (prev[newMsg.conversationId] ?? 0) + 1,
-            }));
-          }
+        if (m.sender_id !== user.id && activeConversationRef.current !== m.conversation_id) {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [m.conversation_id]: (prev[m.conversation_id] ?? 0) + 1,
+          }));
         }
-      )
-      .on(
-        "postgres_changes" as any,
-        { event: "INSERT", schema: "public", table: "conversations" },
-        (payload: any) => {
-          const c = payload.new;
-          if (!c) return;
-          const participants: string[] = c.participants ?? [];
-          if (!participants.includes(user.id)) return;
-          console.log("[ChatProvider] RT new conversation:", c.id);
-
-          const newConvo: Conversation = {
-            id: c.id,
-            participants,
-            participantNames: c.participant_names ?? {},
-            lastMessage: c.last_message ?? undefined,
-            lastMessageAt: c.last_message_at ?? undefined,
-            unreadCount: c.unread_count ?? 0,
-          };
-
-          realtimeConvosRef.current = [
-            ...realtimeConvosRef.current.filter((rc) => rc.id !== newConvo.id),
-            newConvo,
-          ];
-
-          void queryClient.invalidateQueries({ queryKey: ["chat_conversations", user.id] });
-        }
-      )
-      .on(
-        "postgres_changes" as any,
-        { event: "UPDATE", schema: "public", table: "conversations" },
-        (payload: any) => {
-          const c = payload.new;
-          if (!c) return;
-          console.log("[ChatProvider] RT conversation updated:", c.id);
-          void queryClient.invalidateQueries({ queryKey: ["chat_conversations", user.id] });
-        }
-      )
+      })
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "conversations" }, (payload: any) => {
+        const c = payload.new;
+        if (!c) return;
+        const participants: string[] = c.participants ?? [];
+        if (!participants.includes(user.id)) return;
+        console.log("[Chat] RT conversation change:", c.id);
+        void queryClient.invalidateQueries({ queryKey: ["chat_conversations", user.id] });
+      })
       .subscribe((status: string) => {
-        console.log("[ChatProvider] RT subscription status:", status);
-        if (status === "CHANNEL_ERROR") {
-          console.warn("[ChatProvider] RT channel error - relying on polling");
-        }
+        console.log("[Chat] RT subscription:", status);
       });
 
     return () => {
-      console.log("[ChatProvider] Cleaning up RT subscription");
+      console.log("[Chat] Cleaning up RT");
       void supabase.removeChannel(channel);
     };
   }, [user?.id, queryClient]);
 
   const getOrCreateConversation = useCallback(
     async (currentUserId: string, currentUserName: string, friendUserId: string, friendName: string) => {
-      const localExisting = conversations.find(
+      const localExisting = conversationsRef.current.find(
         (c) => c.participants.includes(currentUserId) && c.participants.includes(friendUserId)
       );
       if (localExisting) {
-        console.log("[ChatProvider] Found conversation locally:", localExisting.id);
+        console.log("[Chat] Found conversation locally:", localExisting.id);
         return localExisting;
       }
 
-      console.log("[ChatProvider] Checking Supabase for existing conversation...");
+      console.log("[Chat] Checking DB for conversation...");
       const { data: dbConvos, error: dbError } = await supabase
         .from("conversations")
         .select("*")
         .contains("participants", [currentUserId])
         .contains("participants", [friendUserId]);
 
-      if (dbError) {
-        console.warn("[ChatProvider] DB conversation lookup error:", dbError.message, dbError.details);
-      }
-
       if (!dbError && dbConvos && dbConvos.length > 0) {
         const dbConvo = dbConvos[0];
-        console.log("[ChatProvider] Found conversation in DB:", dbConvo.id);
-        const existingConvo: Conversation = {
+        console.log("[Chat] Found in DB:", dbConvo.id);
+        const convo: Conversation = {
           id: dbConvo.id,
           participants: dbConvo.participants ?? [],
           participantNames: dbConvo.participant_names ?? {},
@@ -242,10 +178,10 @@ export const [ChatProvider, useChat] = createContextHook(() => {
           unreadCount: dbConvo.unread_count ?? 0,
         };
         void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-        return existingConvo;
+        return convo;
       }
 
-      console.log("[ChatProvider] Creating new conversation:", currentUserName, "<->", friendName);
+      console.log("[Chat] Creating new conversation:", currentUserName, "<->", friendName);
       const participantNames: Record<string, string> = {
         [currentUserId]: currentUserName,
         [friendUserId]: friendName,
@@ -262,7 +198,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         .single();
 
       if (error) {
-        console.warn("[ChatProvider] Create conversation error:", error.message, error.code, error.details);
+        console.warn("[Chat] Create conversation error:", error.message);
 
         const { data: retryData } = await supabase
           .from("conversations")
@@ -271,7 +207,6 @@ export const [ChatProvider, useChat] = createContextHook(() => {
           .contains("participants", [friendUserId]);
 
         if (retryData && retryData.length > 0) {
-          console.log("[ChatProvider] Found conversation on retry:", retryData[0].id);
           const retryConvo: Conversation = {
             id: retryData[0].id,
             participants: retryData[0].participants ?? [],
@@ -295,22 +230,29 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         unreadCount: 0,
       };
 
-      console.log("[ChatProvider] Created conversation:", newConvo.id);
+      console.log("[Chat] Created conversation:", newConvo.id);
       void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
       return newConvo;
     },
-    [conversations, queryClient]
+    [queryClient]
   );
 
   const sendMessage = useCallback(
-    async (conversationId: string, senderId: string, senderName: string, text: string, type: "text" | "location" = "text", locationData?: ChatMessage["locationData"]) => {
+    async (
+      conversationId: string,
+      senderId: string,
+      senderName: string,
+      text: string,
+      type: "text" | "location" = "text",
+      locationData?: ChatMessage["locationData"]
+    ) => {
       if (conversationId.startsWith("conv_")) {
-        console.warn("[ChatProvider] Cannot send message to local-only conversation:", conversationId);
+        console.warn("[Chat] Cannot send to local-only conversation:", conversationId);
         Alert.alert("Chat Error", "This conversation wasn't saved properly. Please go back and try again.");
         return null;
       }
 
-      console.log("[ChatProvider] Sending message in", conversationId, "from", senderName);
+      console.log("[Chat] Sending message in", conversationId);
 
       const { data, error } = await supabase
         .from("messages")
@@ -326,8 +268,8 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         .single();
 
       if (error) {
-        console.warn("[ChatProvider] Send message error:", error.message, error.code, error.details);
-        Alert.alert("Message Error", "Failed to send message. Please check your connection and try again.");
+        console.warn("[Chat] Send message error:", error.message);
+        Alert.alert("Message Error", "Failed to send message.");
         return null;
       }
 
@@ -342,12 +284,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         createdAt: data.created_at,
       };
 
-      realtimeMessagesRef.current = [
-        ...realtimeMessagesRef.current.filter((rm) => rm.id !== data.id),
-        newMessage,
-      ];
-
-      const { error: updateError } = await supabase
+      await supabase
         .from("conversations")
         .update({
           last_message: text,
@@ -355,35 +292,30 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         })
         .eq("id", conversationId);
 
-      if (updateError) {
-        console.warn("[ChatProvider] Update conversation error:", updateError.message);
-      }
-
       void queryClient.invalidateQueries({ queryKey: ["chat_messages"] });
       void queryClient.invalidateQueries({ queryKey: ["chat_conversations", senderId] });
 
-      console.log("[ChatProvider] Message sent successfully:", data.id);
+      console.log("[Chat] Message sent:", data.id);
       return newMessage;
     },
     [queryClient]
   );
 
   const getMessagesForConversation = useCallback(
-    (conversationId: string) =>
-      messages.filter((m) => m.conversationId === conversationId),
-    [messages]
+    (conversationId: string) => messagesRef.current.filter((m) => m.conversationId === conversationId),
+    []
   );
 
   const getConversationsForUser = useCallback(
     (userId: string) =>
-      conversations
+      conversationsRef.current
         .filter((c) => c.participants.includes(userId))
         .sort((a, b) => {
           const aTime = a.lastMessageAt || "0";
           const bTime = b.lastMessageAt || "0";
           return bTime.localeCompare(aTime);
         }),
-    [conversations]
+    []
   );
 
   const setActiveConversation = useCallback((conversationId: string | null) => {
@@ -397,9 +329,10 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     }
   }, []);
 
-  const totalUnreadCount = useMemo(() => {
-    return Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
-  }, [unreadCounts]);
+  const totalUnreadCount = useMemo(
+    () => Object.values(unreadCounts).reduce((sum, count) => sum + count, 0),
+    [unreadCounts]
+  );
 
   const getUnreadCount = useCallback(
     (conversationId: string) => unreadCounts[conversationId] ?? 0,
@@ -409,24 +342,15 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const startSharingLocation = useCallback(
     (userId: string, userName: string, conversationId: string, latitude: number, longitude: number, placeName?: string) => {
       const newLocation: LiveLocation = {
-        userId,
-        userName,
-        latitude,
-        longitude,
-        placeName,
+        userId, userName, latitude, longitude, placeName,
         updatedAt: new Date().toISOString(),
-        conversationId,
-        isSharing: true,
+        conversationId, isSharing: true,
       };
-
       setLiveLocations((prev) => {
-        const filtered = prev.filter(
-          (l) => !(l.userId === userId && l.conversationId === conversationId)
-        );
+        const filtered = prev.filter((l) => !(l.userId === userId && l.conversationId === conversationId));
         return [...filtered, newLocation];
       });
-
-      console.log("[ChatProvider] Started sharing location for", userName);
+      console.log("[Chat] Started sharing location for", userName);
     },
     []
   );
@@ -447,11 +371,9 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const stopSharingLocation = useCallback(
     (userId: string, conversationId: string) => {
       setLiveLocations((prev) =>
-        prev.filter(
-          (l) => !(l.userId === userId && l.conversationId === conversationId)
-        )
+        prev.filter((l) => !(l.userId === userId && l.conversationId === conversationId))
       );
-      console.log("[ChatProvider] Stopped sharing location");
+      console.log("[Chat] Stopped sharing location");
     },
     []
   );
@@ -464,25 +386,21 @@ export const [ChatProvider, useChat] = createContextHook(() => {
 
   const isUserSharingLocation = useCallback(
     (userId: string, conversationId: string) =>
-      liveLocations.some(
-        (l) => l.userId === userId && l.conversationId === conversationId && l.isSharing
-      ),
+      liveLocations.some((l) => l.userId === userId && l.conversationId === conversationId && l.isSharing),
     [liveLocations]
   );
 
   useEffect(() => {
     const ref = locationIntervalRef;
     return () => {
-      if (ref.current) {
-        clearInterval(ref.current);
-      }
+      if (ref.current) clearInterval(ref.current);
     };
   }, []);
 
   return useMemo(
     () => ({
-      conversations,
-      messages,
+      conversations: currentConversations,
+      messages: currentMessages,
       liveLocations,
       getOrCreateConversation,
       sendMessage,
@@ -498,7 +416,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       getUnreadCount,
     }),
     [
-      conversations, messages, liveLocations,
+      currentConversations, currentMessages, liveLocations,
       getOrCreateConversation, sendMessage,
       getMessagesForConversation, getConversationsForUser,
       startSharingLocation, updateSharedLocation, stopSharingLocation,

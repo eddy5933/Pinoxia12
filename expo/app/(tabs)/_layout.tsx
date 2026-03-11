@@ -54,12 +54,12 @@ const tabIconStyles = StyleSheet.create({
 
 export default function TabLayout() {
   const { user } = useAuth();
-  const { getPendingRequests } = useFriends();
+  const { followers } = useFriends();
   const { totalUnreadCount } = useChat();
   const friendBadgeCount = useMemo(() => {
     if (!user) return 0;
-    return getPendingRequests(user.id).length + totalUnreadCount;
-  }, [user, getPendingRequests, totalUnreadCount]);
+    return followers.length + totalUnreadCount;
+  }, [user, followers.length, totalUnreadCount]);
 
   return (
     <Tabs
