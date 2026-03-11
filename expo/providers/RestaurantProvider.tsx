@@ -69,6 +69,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
     },
   });
 
+  const updateRestaurant = useCallback((id: string, updates: Partial<Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt" | "ownerId">>) => {
+    setRestaurants((prev) => {
+      const updated = prev.map((r) => {
+        if (r.id === id) {
+          return { ...r, ...updates };
+        }
+        return r;
+      });
+      persistRestaurants.mutate(updated);
+      return updated;
+    });
+    console.log("[RestaurantProvider] Updated restaurant:", id);
+  }, [persistRestaurants]);
+
   const addRestaurant = useCallback((restaurant: Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt">) => {
     const newRestaurant: Restaurant = {
       ...restaurant,
@@ -133,11 +147,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
       reviews,
       isReady,
       addRestaurant,
+      updateRestaurant,
       addReview,
       getReviewsForRestaurant,
       getRestaurantsByOwner,
     }),
-    [restaurants, reviews, isReady, addRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
+    [restaurants, reviews, isReady, addRestaurant, updateRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
   );
 });
 
@@ -153,7 +168,7 @@ export function useFilteredRestaurants(search: string, cuisine: string) {
       filtered = filtered.filter(
         (r) =>
           r.name.toLowerCase().includes(q) ||
-          r.cuisine.toLowerCase().includes(q) ||
+          (r.cuisine?.toLowerCase().includes(q) ?? false) ||
           r.address.toLowerCase().includes(q)
       );
     }

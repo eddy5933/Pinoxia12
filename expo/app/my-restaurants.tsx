@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Star, MapPin, Plus, Store } from "lucide-react-native";
+import { Star, MapPin, Plus, Store, Pencil } from "lucide-react-native";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRestaurants } from "@/providers/RestaurantProvider";
@@ -27,6 +27,15 @@ function OwnerRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
         style={styles.cardImage}
         contentFit="cover"
       />
+      <TouchableOpacity
+        style={styles.editBadge}
+        onPress={() => router.push({ pathname: "/edit-restaurant", params: { id: restaurant.id } })}
+        activeOpacity={0.7}
+        hitSlop={8}
+      >
+        <Pencil size={14} color={Colors.white} />
+        <Text style={styles.editBadgeText}>Edit</Text>
+      </TouchableOpacity>
       <View style={styles.cardContent}>
         <Text style={styles.cardName} numberOfLines={1}>
           {restaurant.name}
@@ -128,6 +137,24 @@ const styles = StyleSheet.create({
   cardImage: {
     width: "100%",
     height: 160,
+  },
+  editBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    zIndex: 2,
+  },
+  editBadgeText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.white,
   },
   cardContent: {
     padding: 16,

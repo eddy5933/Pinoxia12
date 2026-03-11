@@ -45,6 +45,15 @@ function RootLayoutNav() {
           headerTintColor: Colors.white,
         }}
       />
+      <Stack.Screen
+        name="edit-restaurant"
+        options={{
+          title: "Edit Business",
+          presentation: "modal",
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.white,
+        }}
+      />
     </Stack>
   );
 }

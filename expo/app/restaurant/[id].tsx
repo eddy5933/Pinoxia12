@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Send,
   Navigation,
+  Pencil,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -157,6 +158,15 @@ export default function RestaurantDetailScreen() {
           >
             <ArrowLeft size={22} color={Colors.white} />
           </TouchableOpacity>
+          {user && user.id === restaurant.ownerId && (
+            <TouchableOpacity
+              style={[styles.heroEditButton, { top: insets.top + 10 }]}
+              onPress={() => router.push({ pathname: "/edit-restaurant", params: { id: restaurant.id } })}
+            >
+              <Pencil size={16} color={Colors.white} />
+              <Text style={styles.heroEditText}>Edit</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.heroInfo}>
             <Text style={styles.heroName}>{restaurant.name}</Text>
             <View style={styles.heroBadges}>
@@ -395,6 +405,22 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  heroEditButton: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  heroEditText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.white,
   },
   heroInfo: {
     position: "absolute",
