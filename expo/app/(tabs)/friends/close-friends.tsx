@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
-  Star,
+  Heart,
   ChevronLeft,
   MessageCircle,
   UserMinus,
@@ -104,8 +104,8 @@ export default function CloseFriendsScreen() {
               {item.name.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={styles.starBadge}>
-            <Star size={10} color="#FFB800" fill="#FFB800" />
+          <View style={styles.heartBadge}>
+            <Heart size={9} color="#FF6B8A" fill="#FF6B8A" />
           </View>
         </View>
 
@@ -124,12 +124,12 @@ export default function CloseFriendsScreen() {
             <MessageCircle size={16} color="#1E88E5" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionBtn}
+            style={[styles.actionBtn, styles.actionBtnHeart]}
             onPress={() => void handleRemoveCloseFriend(item)}
             activeOpacity={0.7}
             testID={`close-friend-remove-star-${item.userId}`}
           >
-            <Star size={16} color="#FFB800" fill="#FFB800" />
+            <Heart size={16} color="#FF6B8A" fill="#FF6B8A" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
@@ -157,7 +157,7 @@ export default function CloseFriendsScreen() {
           <ChevronLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Star size={18} color="#FFB800" fill="#FFB800" />
+          <Heart size={18} color="#FF6B8A" fill="#FF6B8A" />
           <Text style={styles.headerTitle}>Close Friends</Text>
         </View>
         <View style={styles.countBadge}>
@@ -181,11 +181,11 @@ export default function CloseFriendsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
-              <Sparkles size={32} color="#FFB800" />
+              <Sparkles size={32} color="#FF6B8A" />
             </View>
             <Text style={styles.emptyTitle}>No close friends yet</Text>
             <Text style={styles.emptySubtitle}>
-              Tap the star icon on any friend to add them to your close friends list
+              Tap the heart icon on any friend to add them to your close friends list
             </Text>
             <TouchableOpacity
               style={styles.emptyBtn}
@@ -209,7 +209,7 @@ export default function CloseFriendsScreen() {
           pointerEvents="none"
         >
           <View style={[styles.toast, toast.type === "info" && styles.toastInfo]}>
-            <Star size={14} color="#FFB800" fill={toast.type === "success" ? "#FFB800" : "transparent"} />
+            <Heart size={14} color="#FF6B8A" fill={toast.type === "success" ? "#FF6B8A" : "transparent"} />
             <Text style={styles.toastText}>{toast.message}</Text>
           </View>
         </Animated.View>
@@ -256,17 +256,17 @@ const styles = StyleSheet.create({
     minWidth: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(255,184,0,0.15)",
+    backgroundColor: "rgba(255,107,138,0.15)",
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.3)",
+    borderColor: "rgba(255,107,138,0.3)",
   },
   countText: {
     fontSize: 13,
     fontWeight: "700" as const,
-    color: "#FFB800",
+    color: "#FF6B8A",
   },
   descriptionBar: {
     flexDirection: "row",
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.18)",
+    borderColor: "rgba(255,107,138,0.18)",
   },
   cardFirst: {
     marginTop: 0,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#B8860B",
+    backgroundColor: "#C2185B",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.white,
   },
-  starBadge: {
+  heartBadge: {
     position: "absolute",
     bottom: -2,
     right: -2,
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1.5,
-    borderColor: "rgba(255,184,0,0.4)",
+    borderColor: "rgba(255,107,138,0.4)",
   },
   info: {
     flex: 1,
@@ -360,6 +360,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  actionBtnHeart: {
+    backgroundColor: "rgba(255,107,138,0.12)",
+  },
   actionBtnDanger: {
     backgroundColor: "rgba(230,57,70,0.1)",
   },
@@ -372,11 +375,11 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "rgba(255,184,0,0.1)",
+    backgroundColor: "rgba(255,107,138,0.1)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.2)",
+    borderColor: "rgba(255,107,138,0.2)",
     marginBottom: 20,
   },
   emptyTitle: {
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#1B3A2A",
     borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.25)",
+    borderColor: "rgba(255,107,138,0.25)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

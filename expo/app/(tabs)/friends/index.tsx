@@ -24,8 +24,9 @@ import {
   Clock,
   Store,
   Bell,
-  Send,
-  Star,
+  Heart,
+  UserCheck,
+  ChevronRight,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter as useExpoRouter } from "expo-router";
@@ -37,7 +38,7 @@ import { useChat } from "@/providers/ChatProvider";
 import { Friend, FriendRequest } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
-type TabType = "friends" | "requests" | "search";
+type TabType = "friends" | "requests" | "discover";
 
 interface ToastState {
   visible: boolean;
@@ -79,6 +80,8 @@ export default function FriendsScreen() {
   const toastAnim = useRef(new Animated.Value(-120)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
+  const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
+
   const showToast = useCallback((message: string, userName: string, type: "success" | "error" | "info" = "success") => {
     setToast({ visible: true, message, userName, type });
     toastAnim.setValue(-120);
@@ -118,6 +121,18 @@ export default function FriendsScreen() {
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const tabs: TabType[] = ["friends", "requests", "discover"];
+  const tabIndex = tabs.indexOf(activeTab);
+
+  useEffect(() => {
+    Animated.spring(tabIndicatorAnim, {
+      toValue: tabIndex,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 14,
+    }).start();
+  }, [tabIndex, tabIndicatorAnim]);
+
   const pendingRequests = useMemo(
     () => (user ? getPendingRequests(user.id) : []),
     [user, getPendingRequests]
@@ -130,7 +145,7 @@ export default function FriendsScreen() {
 
   useEffect(() => {
     if (!user) return;
-    if (activeTab !== "search") return;
+    if (activeTab !== "discover") return;
 
     const trimmed = searchQuery.trim();
     if (!trimmed) {
@@ -165,22 +180,22 @@ export default function FriendsScreen() {
   }, [searchQuery, user, activeTab, searchUsersFromSupabase]);
 
   useEffect(() => {
-    if (activeTab === "search") {
+    if (activeTab === "discover") {
       setLiveSearchResults([]);
       setSearchQuery("");
     }
   }, [activeTab]);
 
-  const handleAddFriend = useCallback(
+  const handleFollow = useCallback(
     async (toUser: PublicUser) => {
       if (!user) return;
       const success = await sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Friend request sent!", toUser.name, "success");
+        showToast("Follow request sent!", toUser.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Request already pending", toUser.name, "info");
+        showToast("Already requested", toUser.name, "info");
       }
     },
     [user, sendFriendRequest, showToast]
@@ -192,7 +207,7 @@ export default function FriendsScreen() {
       const req = pendingRequests.find((r) => r.id === requestId);
       await acceptFriendRequest(requestId, user.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast("Friend added!", req?.fromUserName ?? "User", "success");
+      showToast("You are now friends!", req?.fromUserName ?? "User", "success");
     },
     [user, acceptFriendRequest, pendingRequests, showToast]
   );
@@ -205,17 +220,17 @@ export default function FriendsScreen() {
     [rejectFriendRequest]
   );
 
-  const handleCancelRequest = useCallback(
+  const handleCancelFollow = useCallback(
     (requestId: string, userName: string) => {
-      Alert.alert("Cancel Request", `Cancel friend request to ${userName}?`, [
+      Alert.alert("Unfollow", `Cancel follow request to ${userName}?`, [
         { text: "No", style: "cancel" },
         {
-          text: "Cancel Request",
+          text: "Unfollow",
           style: "destructive",
           onPress: async () => {
             await cancelFriendRequest(requestId);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            showToast("Request cancelled", userName, "info");
+            showToast("Follow request cancelled", userName, "info");
           },
         },
       ]);
@@ -239,7 +254,7 @@ export default function FriendsScreen() {
 
   const handleRemoveFriend = useCallback(
     (friend: Friend) => {
-      Alert.alert("Remove Friend", `Remove ${friend.name} from friends?`, [
+      Alert.alert("Unfollow & Remove", `Remove ${friend.name} from your friends?`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
@@ -268,64 +283,63 @@ export default function FriendsScreen() {
     [user, getOrCreateConversation, router]
   );
 
+  const closeFriendsCount = useMemo(() => friends.filter((f) => f.isCloseFriend).length, [friends]);
+
   const renderFriendItem = useCallback(
     ({ item }: { item: Friend }) => (
-      <View style={[styles.friendCard, item.isCloseFriend && styles.friendCardClose]}>
+      <View style={[styles.card, item.isCloseFriend && styles.cardCloseFriend]}>
         <TouchableOpacity
-          style={[styles.friendAvatar, item.isCloseFriend && styles.friendAvatarClose]}
+          style={[styles.avatar, item.isCloseFriend && styles.avatarCloseFriend]}
           onPress={() => void handleToggleCloseFriend(item)}
           activeOpacity={0.7}
           testID={`close-friend-toggle-${item.userId}`}
         >
-          <Text style={styles.friendAvatarText}>
+          <Text style={styles.avatarText}>
             {item.name.charAt(0).toUpperCase()}
           </Text>
           {item.isCloseFriend && (
             <View style={styles.closeBadge}>
-              <Star size={10} color="#FFB800" fill="#FFB800" />
+              <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
             </View>
           )}
         </TouchableOpacity>
-        <View style={styles.friendInfo}>
+        <View style={styles.cardInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.friendName}>{item.name}</Text>
+            <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
             {item.isCloseFriend && (
               <View style={styles.closeTag}>
-                <Star size={9} color="#FFB800" fill="#FFB800" />
+                <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
                 <Text style={styles.closeTagText}>Close</Text>
               </View>
             )}
           </View>
-          <Text style={styles.friendEmail}>{item.email}</Text>
+          <Text style={styles.cardEmail} numberOfLines={1}>{item.email}</Text>
         </View>
-        <View style={styles.friendActions}>
+        <View style={styles.cardActions}>
           <TouchableOpacity
-            style={[
-              styles.starButton,
-              item.isCloseFriend && styles.starButtonActive,
-            ]}
+            style={[styles.iconBtn, item.isCloseFriend ? styles.iconBtnCloseFriendActive : null]}
             onPress={() => void handleToggleCloseFriend(item)}
             activeOpacity={0.7}
           >
-            <Star
-              size={16}
-              color={item.isCloseFriend ? "#FFB800" : Colors.textMuted}
-              fill={item.isCloseFriend ? "#FFB800" : "transparent"}
+            <Heart
+              size={15}
+              color={item.isCloseFriend ? "#FF6B8A" : Colors.textMuted}
+              fill={item.isCloseFriend ? "#FF6B8A" : "transparent"}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.chatButton}
+            style={[styles.iconBtn, styles.iconBtnChat]}
             onPress={() => void handleStartChat(item)}
             activeOpacity={0.7}
           >
-            <MessageCircle size={18} color={Colors.white} />
+            <MessageCircle size={15} color={Colors.white} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.removeButton}
+            style={styles.iconBtn}
             onPress={() => handleRemoveFriend(item)}
             activeOpacity={0.7}
           >
-            <UserMinus size={16} color={Colors.textMuted} />
+            <UserMinus size={14} color={Colors.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -336,32 +350,38 @@ export default function FriendsScreen() {
   const renderRequestItem = useCallback(
     ({ item }: { item: FriendRequest }) => (
       <View style={styles.requestCard}>
-        <View style={styles.friendAvatar}>
-          <Text style={styles.friendAvatarText}>
-            {item.fromUserName.charAt(0).toUpperCase()}
-          </Text>
+        <View style={styles.requestAvatarWrap}>
+          <View style={styles.requestAvatar}>
+            <Text style={styles.avatarText}>
+              {item.fromUserName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.requestFollowIcon}>
+            <UserPlus size={10} color={Colors.white} />
+          </View>
         </View>
-        <View style={styles.friendInfo}>
-          <Text style={styles.friendName}>{item.fromUserName}</Text>
-          <Text style={styles.friendEmail}>{item.fromUserEmail}</Text>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{item.fromUserName}</Text>
+          <Text style={styles.requestLabel}>wants to follow you</Text>
           <Text style={styles.requestTime}>
             {new Date(item.createdAt).toLocaleDateString()}
           </Text>
         </View>
         <View style={styles.requestActions}>
           <TouchableOpacity
-            style={styles.acceptButton}
+            style={styles.acceptBtn}
             onPress={() => void handleAccept(item.id)}
             activeOpacity={0.7}
           >
-            <Check size={18} color={Colors.white} />
+            <Check size={16} color={Colors.white} />
+            <Text style={styles.acceptBtnText}>Accept</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.rejectButton}
+            style={styles.declineBtn}
             onPress={() => void handleReject(item.id)}
             activeOpacity={0.7}
           >
-            <X size={18} color={Colors.textMuted} />
+            <X size={16} color={Colors.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -376,60 +396,60 @@ export default function FriendsScreen() {
       const isOwnerUser = item.role === "owner";
 
       return (
-        <View style={styles.friendCard}>
-          <View style={[styles.friendAvatar, styles.searchAvatar]}>
-            <Text style={styles.friendAvatarText}>
+        <View style={styles.card}>
+          <View style={[styles.avatar, styles.searchAvatar]}>
+            <Text style={styles.avatarText}>
               {item.name.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={styles.friendInfo}>
+          <View style={styles.cardInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.friendName}>{item.name}</Text>
+              <Text style={styles.cardName}>{item.name}</Text>
               {isOwnerUser && (
                 <View style={styles.ownerBadge}>
-                  <Store size={10} color={Colors.star} />
-                  <Text style={styles.ownerBadgeText}>Business</Text>
+                  <Store size={9} color={Colors.star} />
+                  <Text style={styles.ownerBadgeText}>Biz</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.friendEmail}>{item.email}</Text>
+            <Text style={styles.cardEmail}>{item.email}</Text>
           </View>
           {alreadyFriend ? (
-            <View style={styles.statusBadge}>
-              <Check size={14} color={Colors.success} />
-              <Text style={styles.statusText}>Friends</Text>
+            <View style={styles.friendsBadge}>
+              <UserCheck size={13} color={Colors.success} />
+              <Text style={styles.friendsBadgeText}>Friends</Text>
             </View>
           ) : pendingReq ? (
-            <View style={styles.statusBadge}>
-              <Clock size={14} color={Colors.warning} />
-              <Text style={[styles.statusText, { color: Colors.warning }]}>Pending</Text>
+            <View style={styles.followingBadge}>
+              <Clock size={13} color={Colors.warning} />
+              <Text style={styles.followingBadgeText}>Requested</Text>
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => void handleAddFriend(item)}
+              style={styles.followBtn}
+              onPress={() => void handleFollow(item)}
               activeOpacity={0.7}
             >
-              <UserPlus size={16} color={Colors.white} />
-              <Text style={styles.addButtonText}>Request</Text>
+              <UserPlus size={14} color={Colors.white} />
+              <Text style={styles.followBtnText}>Follow</Text>
             </TouchableOpacity>
           )}
         </View>
       );
     },
-    [isFriend, hasPendingRequest, user, handleAddFriend]
+    [isFriend, hasPendingRequest, user, handleFollow]
   );
 
   if (!user) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Friends</Text>
+          <Text style={styles.headerTitle}>Connect</Text>
         </View>
         <View style={styles.emptyCenter}>
           <Users size={48} color={Colors.textMuted} />
           <Text style={styles.emptyTitle}>Sign in to connect</Text>
-          <Text style={styles.emptySubtitle}>Add friends and chat to plan your meetups</Text>
+          <Text style={styles.emptySubtitle}>Follow people, make friends, and chat</Text>
           <TouchableOpacity
             style={styles.signInBtn}
             onPress={() => router.push("/login")}
@@ -442,50 +462,97 @@ export default function FriendsScreen() {
     );
   }
 
+  const tabWidth = (SCREEN_WIDTH - 40) / 3;
+
+  const getTabLabel = (tab: TabType) => {
+    switch (tab) {
+      case "friends": return `Friends`;
+      case "requests": return `Requests`;
+      case "discover": return `Discover`;
+    }
+  };
+
+  const getTabCount = (tab: TabType) => {
+    switch (tab) {
+      case "friends": return friends.length;
+      case "requests": return pendingRequests.length + sentRequests.length;
+      case "discover": return 0;
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends</Text>
+        <Text style={styles.headerTitle}>Connect</Text>
         {pendingRequests.length > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{pendingRequests.length}</Text>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>{pendingRequests.length}</Text>
           </View>
         )}
       </View>
 
-      <View style={styles.closeFriendsRow}>
-        <TouchableOpacity
-          style={styles.closeFriendsBtn}
-          onPress={() => expoRouter.push("/(tabs)/friends/close-friends" as any)}
-          activeOpacity={0.7}
-          testID="close-friends-list-btn"
-        >
-          <Star size={15} color="#FFB800" fill="#FFB800" />
-          <Text style={styles.closeFriendsBtnText}>Close Friends</Text>
-          <View style={styles.closeFriendsCount}>
-            <Text style={styles.closeFriendsCountText}>
-              {friends.filter((f) => f.isCloseFriend).length}
+      <TouchableOpacity
+        style={styles.closeFriendsRow}
+        onPress={() => expoRouter.push("/(tabs)/friends/close-friends" as any)}
+        activeOpacity={0.7}
+        testID="close-friends-list-btn"
+      >
+        <View style={styles.closeFriendsLeft}>
+          <View style={styles.closeFriendsIcon}>
+            <Heart size={16} color="#FF6B8A" fill="#FF6B8A" />
+          </View>
+          <View>
+            <Text style={styles.closeFriendsTitle}>Close Friends</Text>
+            <Text style={styles.closeFriendsSubtitle}>
+              {closeFriendsCount} {closeFriendsCount === 1 ? "person" : "people"}
             </Text>
           </View>
-        </TouchableOpacity>
-      </View>
+        </View>
+        <ChevronRight size={18} color={Colors.textMuted} />
+      </TouchableOpacity>
 
       <View style={styles.tabBar}>
-        {(["friends", "requests", "search"] as TabType[]).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === "friends" ? `Friends (${friends.length})` : tab === "requests" ? `Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}` : "Find People"}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <Animated.View
+          style={[
+            styles.tabIndicator,
+            {
+              width: tabWidth - 4,
+              transform: [
+                {
+                  translateX: tabIndicatorAnim.interpolate({
+                    inputRange: [0, 1, 2],
+                    outputRange: [2, tabWidth + 2, tabWidth * 2 + 2],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        {tabs.map((tab) => {
+          const count = getTabCount(tab);
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, { width: tabWidth }]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {getTabLabel(tab)}
+              </Text>
+              {count > 0 && (
+                <View style={[styles.tabCount, activeTab === tab && styles.tabCountActive]}>
+                  <Text style={[styles.tabCountText, activeTab === tab && styles.tabCountTextActive]}>
+                    {count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {activeTab === "search" && (
+      {activeTab === "discover" && (
         <View style={styles.searchContainer}>
           <Search size={18} color={Colors.textMuted} />
           <TextInput
@@ -506,11 +573,31 @@ export default function FriendsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderFriendItem}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetchUsers}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyCenter}>
-              <Users size={40} color={Colors.textMuted} />
+              <View style={styles.emptyIconWrap}>
+                <Users size={32} color={Colors.textMuted} />
+              </View>
               <Text style={styles.emptyTitle}>No friends yet</Text>
-              <Text style={styles.emptySubtitle}>Search for people to add as friends</Text>
+              <Text style={styles.emptySubtitle}>
+                Follow people in the Discover tab.{"\n"}When they accept, you become friends!
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => setActiveTab("discover")}
+                activeOpacity={0.8}
+              >
+                <Search size={16} color={Colors.white} />
+                <Text style={styles.emptyActionBtnText}>Discover People</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -522,48 +609,63 @@ export default function FriendsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderRequestItem}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetchUsers}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
           ListHeaderComponent={
             sentRequests.length > 0 ? (
               <View style={styles.sentSection}>
-                <Text style={styles.sentTitle}>Sent Requests ({sentRequests.length})</Text>
+                <Text style={styles.sectionLabel}>PENDING FOLLOWS</Text>
+                <Text style={styles.sectionHint}>Waiting for them to accept your follow</Text>
                 {sentRequests.map((req) => (
                   <View key={req.id} style={styles.sentCard}>
-                    <View style={[styles.friendAvatar, styles.sentAvatar]}>
-                      <Text style={styles.friendAvatarText}>{req.toUserName.charAt(0).toUpperCase()}</Text>
+                    <View style={[styles.avatar, styles.sentAvatar]}>
+                      <Text style={styles.avatarTextSmall}>{req.toUserName.charAt(0).toUpperCase()}</Text>
                     </View>
-                    <View style={styles.friendInfo}>
-                      <Text style={styles.friendName}>{req.toUserName}</Text>
-                      <Text style={styles.friendEmail}>Pending...</Text>
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardName}>{req.toUserName}</Text>
+                      <Text style={styles.sentStatus}>Awaiting approval</Text>
                     </View>
                     <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => handleCancelRequest(req.id, req.toUserName)}
+                      style={styles.unfollowBtn}
+                      onPress={() => handleCancelFollow(req.id, req.toUserName)}
                       activeOpacity={0.7}
                     >
-                      <X size={14} color={Colors.error} />
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                      <X size={12} color={Colors.error} />
+                      <Text style={styles.unfollowBtnText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
                 {pendingRequests.length > 0 && (
-                  <Text style={styles.sentTitle}>Incoming Requests</Text>
+                  <Text style={[styles.sectionLabel, { marginTop: 20 }]}>FOLLOW REQUESTS</Text>
                 )}
               </View>
+            ) : pendingRequests.length > 0 ? (
+              <Text style={[styles.sectionLabel, { marginLeft: 0, marginBottom: 12 }]}>FOLLOW REQUESTS</Text>
             ) : null
           }
           ListEmptyComponent={
             sentRequests.length === 0 ? (
               <View style={styles.emptyCenter}>
-                <Clock size={40} color={Colors.textMuted} />
+                <View style={styles.emptyIconWrap}>
+                  <Bell size={32} color={Colors.textMuted} />
+                </View>
                 <Text style={styles.emptyTitle}>No requests</Text>
-                <Text style={styles.emptySubtitle}>Friend requests will appear here</Text>
+                <Text style={styles.emptySubtitle}>
+                  Follow requests will appear here
+                </Text>
               </View>
             ) : null
           }
         />
       )}
 
-      {activeTab === "search" && (
+      {activeTab === "discover" && (
         <FlatList
           data={liveSearchResults}
           keyExtractor={(item) => item.id}
@@ -581,24 +683,31 @@ export default function FriendsScreen() {
             isSearching ? (
               <View style={styles.emptyCenter}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.emptyTitle}>Searching...</Text>
+                <Text style={[styles.emptyTitle, { marginTop: 16 }]}>Searching...</Text>
               </View>
             ) : searchQuery.trim().length === 0 ? (
               <View style={styles.emptyCenter}>
-                <Search size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>Find People</Text>
-                <Text style={styles.emptySubtitle}>Search by name or email to find friends</Text>
+                <View style={styles.emptyIconWrap}>
+                  <Search size={32} color={Colors.textMuted} />
+                </View>
+                <Text style={styles.emptyTitle}>Discover People</Text>
+                <Text style={styles.emptySubtitle}>
+                  Search by name or email to find{"\n"}and follow people
+                </Text>
               </View>
             ) : (
               <View style={styles.emptyCenter}>
-                <Search size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No users found</Text>
+                <View style={styles.emptyIconWrap}>
+                  <Search size={32} color={Colors.textMuted} />
+                </View>
+                <Text style={styles.emptyTitle}>No one found</Text>
                 <Text style={styles.emptySubtitle}>Try a different name or email</Text>
               </View>
             )
           }
         />
       )}
+
       {toast.visible && (
         <Animated.View
           style={[
@@ -624,7 +733,7 @@ export default function FriendsScreen() {
               toast.type === "info" && styles.toastIconInfo,
             ]}>
               {toast.type === "success" ? (
-                <Send size={16} color="#fff" />
+                <UserCheck size={16} color="#fff" />
               ) : toast.type === "error" ? (
                 <X size={16} color="#fff" />
               ) : (
@@ -654,15 +763,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 6,
     gap: 10,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: "800" as const,
     color: Colors.white,
+    letterSpacing: -0.5,
   },
-  badge: {
+  headerBadge: {
     backgroundColor: Colors.primary,
     borderRadius: 12,
     minWidth: 24,
@@ -671,25 +781,71 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 8,
   },
-  badgeText: {
+  headerBadgeText: {
     fontSize: 12,
     fontWeight: "700" as const,
     color: Colors.white,
   },
+  closeFriendsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255,107,138,0.15)",
+  },
+  closeFriendsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  closeFriendsIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,107,138,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeFriendsTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  closeFriendsSubtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
   tabBar: {
     flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 12,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 2,
+    position: "relative" as const,
+  },
+  tabIndicator: {
+    position: "absolute" as const,
+    top: 2,
+    bottom: 2,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
   },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-  },
-  tabActive: {
-    backgroundColor: Colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    gap: 5,
+    zIndex: 1,
   },
   tabText: {
     fontSize: 13,
@@ -697,6 +853,26 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tabTextActive: {
+    color: Colors.white,
+  },
+  tabCount: {
+    minWidth: 20,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  tabCountActive: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  tabCountText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.textMuted,
+  },
+  tabCountTextActive: {
     color: Colors.white,
   },
   searchContainer: {
@@ -721,184 +897,100 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
-  friendCard: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  friendAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  cardCloseFriend: {
+    borderColor: "rgba(255,107,138,0.2)",
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
   },
+  avatarCloseFriend: {
+    backgroundColor: "#C2185B",
+  },
   searchAvatar: {
     backgroundColor: Colors.surfaceHighlight,
   },
-  friendAvatarText: {
-    fontSize: 18,
+  sentAvatar: {
+    backgroundColor: Colors.surfaceLight,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  avatarText: {
+    fontSize: 17,
     fontWeight: "700" as const,
     color: Colors.white,
   },
-  friendInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  friendName: {
-    fontSize: 15,
-    fontWeight: "600" as const,
+  avatarTextSmall: {
+    fontSize: 14,
+    fontWeight: "700" as const,
     color: Colors.white,
-  },
-  friendEmail: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  friendActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chatButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#1E88E5",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  removeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surfaceHighlight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  starButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surfaceHighlight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  starButtonActive: {
-    backgroundColor: "rgba(255,184,0,0.15)",
-  },
-  friendCardClose: {
-    borderColor: "rgba(255,184,0,0.25)",
-  },
-  friendAvatarClose: {
-    backgroundColor: "#B8860B",
   },
   closeBadge: {
     position: "absolute" as const,
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: Colors.surface,
     justifyContent: "center" as const,
     alignItems: "center" as const,
     borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.4)",
+    borderColor: "rgba(255,107,138,0.3)",
   },
   closeTag: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 3,
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: "rgba(255,184,0,0.12)",
+    backgroundColor: "rgba(255,107,138,0.12)",
   },
   closeTagText: {
     fontSize: 10,
     fontWeight: "700" as const,
-    color: "#FFB800",
+    color: "#FF6B8A",
   },
-  requestCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "rgba(230,57,70,0.2)",
-  },
-  requestTime: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  requestActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  acceptButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.success,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rejectButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surfaceHighlight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-  },
-  addButtonText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.white,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceHighlight,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-    color: Colors.success,
+  cardInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
   nameRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 6,
   },
+  cardName: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  cardEmail: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
   ownerBadge: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 3,
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     backgroundColor: "rgba(255,184,0,0.12)",
@@ -908,95 +1000,206 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.star,
   },
-  sentSection: {
-    marginBottom: 16,
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  sentTitle: {
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  iconBtnChat: {
+    backgroundColor: "#1E88E5",
+  },
+  iconBtnCloseFriendActive: {
+    backgroundColor: "rgba(255,107,138,0.15)",
+  },
+  requestCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(230,57,70,0.15)",
+  },
+  requestAvatarWrap: {
+    position: "relative" as const,
+  },
+  requestAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  requestFollowIcon: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.primary,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
+  },
+  requestLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  requestTime: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  requestActions: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+  },
+  acceptBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.success,
+  },
+  acceptBtnText: {
     fontSize: 13,
     fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  declineBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  followBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+  },
+  followBtnText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  friendsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "rgba(76,175,80,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(76,175,80,0.2)",
+  },
+  friendsBadgeText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.success,
+  },
+  followingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,152,0,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,152,0,0.2)",
+  },
+  followingBadgeText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.warning,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700" as const,
     color: Colors.textMuted,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    marginTop: 8,
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  sentSection: {
+    marginBottom: 8,
   },
   sentCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surfaceHighlight,
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 12,
+    padding: 10,
     marginBottom: 6,
   },
-  sentAvatar: {
-    backgroundColor: Colors.surfaceLight,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  sentStatus: {
+    fontSize: 12,
+    color: Colors.warning,
+    marginTop: 1,
   },
-  cancelButton: {
+  unfollowBtn: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: "rgba(230,57,70,0.12)",
+    backgroundColor: "rgba(230,57,70,0.1)",
     borderWidth: 1,
-    borderColor: "rgba(230,57,70,0.25)",
+    borderColor: "rgba(230,57,70,0.2)",
   },
-  cancelButtonText: {
+  unfollowBtnText: {
     fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.error,
   },
-  closeFriendsRow: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  closeFriendsBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,184,0,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,184,0,0.2)",
-    alignSelf: "flex-start" as const,
-  },
-  closeFriendsBtnText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: "#FFB800",
-  },
-  closeFriendsCount: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "rgba(255,184,0,0.15)",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    paddingHorizontal: 6,
-  },
-  closeFriendsCountText: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#FFB800",
-  },
   emptyCenter: {
-    flex: 1,
+    alignItems: "center",
+    paddingTop: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 80,
-    paddingHorizontal: 40,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700" as const,
     color: Colors.white,
-    marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
@@ -1004,6 +1207,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
     lineHeight: 20,
+  },
+  emptyActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    marginTop: 24,
+  },
+  emptyActionBtnText: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
   },
   signInBtn: {
     backgroundColor: Colors.primary,
