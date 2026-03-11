@@ -54,6 +54,7 @@ export default function FriendsScreen() {
     acceptFriendRequest,
     rejectFriendRequest,
     removeFriend,
+    cancelFriendRequest,
     getPendingRequests,
     getSentRequests,
     isFriend,
@@ -161,6 +162,24 @@ export default function FriendsScreen() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
     [rejectFriendRequest]
+  );
+
+  const handleCancelRequest = useCallback(
+    (requestId: string, userName: string) => {
+      Alert.alert("Cancel Request", `Cancel friend request to ${userName}?`, [
+        { text: "No", style: "cancel" },
+        {
+          text: "Cancel Request",
+          style: "destructive",
+          onPress: () => {
+            cancelFriendRequest(requestId);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            showToast("Request cancelled", userName, "info");
+          },
+        },
+      ]);
+    },
+    [cancelFriendRequest, showToast]
   );
 
   const handleRemoveFriend = useCallback(
@@ -407,7 +426,14 @@ export default function FriendsScreen() {
                       <Text style={styles.friendName}>{req.toUserName}</Text>
                       <Text style={styles.friendEmail}>Pending...</Text>
                     </View>
-                    <Clock size={16} color={Colors.warning} />
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      onPress={() => handleCancelRequest(req.id, req.toUserName)}
+                      activeOpacity={0.7}
+                    >
+                      <X size={14} color={Colors.error} />
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
                   </View>
                 ))}
                 {pendingRequests.length > 0 && (
@@ -741,6 +767,22 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
+  },
+  cancelButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(230,57,70,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(230,57,70,0.25)",
+  },
+  cancelButtonText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.error,
   },
   emptyCenter: {
     flex: 1,

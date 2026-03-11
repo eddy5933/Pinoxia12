@@ -231,6 +231,16 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [requests, persistRequests]
   );
 
+  const cancelFriendRequest = useCallback(
+    (requestId: string) => {
+      const updated = requests.filter((r) => r.id !== requestId);
+      setRequests(updated);
+      persistRequests.mutate(updated);
+      console.log("[FriendsProvider] Cancelled request", requestId);
+    },
+    [requests, persistRequests]
+  );
+
   const removeFriend = useCallback(
     (friendId: string) => {
       const updated = friends.filter((f) => f.id !== friendId);
@@ -317,6 +327,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       acceptFriendRequest,
       rejectFriendRequest,
       removeFriend,
+      cancelFriendRequest,
       getPendingRequests,
       getSentRequests,
       isFriend,
@@ -327,7 +338,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [
       friends, requests, allUsers, registerUser, searchUsers,
       sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
-      removeFriend, getPendingRequests, getSentRequests, isFriend, hasPendingRequest,
+      removeFriend, cancelFriendRequest, getPendingRequests, getSentRequests, isFriend, hasPendingRequest,
       refetchUsers, isRefetching,
     ]
   );

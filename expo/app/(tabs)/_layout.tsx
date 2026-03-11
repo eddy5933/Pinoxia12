@@ -1,9 +1,64 @@
 import { Tabs } from "expo-router";
 import { Search, MapPin, User, Users } from "lucide-react-native";
-import React from "react";
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/providers/AuthProvider";
+import { useFriends } from "@/providers/FriendsProvider";
+
+
+function TabIcon({ icon: Icon, color, size, badgeCount }: { icon: typeof Users; color: string; size: number; badgeCount: number }) {
+  return (
+    <View style={tabIconStyles.wrapper}>
+      <Icon color={color} size={size} />
+      {badgeCount > 0 && (
+        <View style={tabIconStyles.badge}>
+          <Text style={tabIconStyles.badgeText}>
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const tabIconStyles = StyleSheet.create({
+  wrapper: {
+    position: "relative" as const,
+    width: 28,
+    height: 28,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  badge: {
+    position: "absolute" as const,
+    top: -4,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.primary,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: Colors.tabBar,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+});
 
 export default function TabLayout() {
+  const { user } = useAuth();
+  const { getPendingRequests } = useFriends();
+  const friendBadgeCount = useMemo(() => {
+    if (!user) return 0;
+    return getPendingRequests(user.id).length;
+  }, [user, getPendingRequests]);
+
   return (
     <Tabs
       screenOptions={{
@@ -39,7 +94,9 @@ export default function TabLayout() {
         name="friends"
         options={{
           title: "Friends",
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon icon={Users} color={color} size={size} badgeCount={friendBadgeCount} />
+          ),
         }}
       />
       <Tabs.Screen
