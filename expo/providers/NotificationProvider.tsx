@@ -43,6 +43,14 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
   const seenRequestIdsRef = useRef<Set<string>>(new Set());
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    prevRequestCountRef.current = null;
+    prevMessageCountRef.current = null;
+    seenRequestIdsRef.current = new Set();
+    seenMessageIdsRef.current = new Set();
+    console.log("[Notification] Reset seen refs for user:", user?.id ?? "none");
+  }, [user?.id]);
+
   const hideNotification = useCallback(() => {
     Animated.parallel([
       Animated.timing(slideAnim, {

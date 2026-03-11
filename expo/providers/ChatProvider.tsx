@@ -24,15 +24,22 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeConversationRef = useRef<string | null>(null);
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
 
   const loadQuery = useQuery({
-    queryKey: ["chat_load"],
+    queryKey: ["chat_load", user?.id],
     queryFn: async () => {
-      console.log("[ChatProvider] Loading data from Supabase...");
-      const [convosRes, messagesRes] = await Promise.all([
-        supabase.from("conversations").select("*"),
-        supabase.from("messages").select("*").order("created_at", { ascending: true }),
-      ]);
+      if (!user) return { conversations: [], messages: [] };
+      console.log("[ChatProvider] Loading data from Supabase for user:", user.id);
+
+      const convosRes = await supabase
+        .from("conversations")
+        .select("*")
+        .contains("participants", [user.id]);
+
+      if (convosRes.error) {
+        console.warn("[ChatProvider] Conversations query error:", convosRes.error.message);
+      }
 
       const loadedConversations: Conversation[] = (convosRes.data ?? []).map((c: any) => ({
         id: c.id,
@@ -43,20 +50,36 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         unreadCount: c.unread_count ?? 0,
       }));
 
-      const loadedMessages: ChatMessage[] = (messagesRes.data ?? []).map((m: any) => ({
-        id: m.id,
-        conversationId: m.conversation_id,
-        senderId: m.sender_id,
-        senderName: m.sender_name,
-        text: m.text,
-        type: m.type ?? "text",
-        locationData: m.location_data ?? undefined,
-        createdAt: m.created_at,
-      }));
+      const convoIds = loadedConversations.map((c) => c.id);
+      let loadedMessages: ChatMessage[] = [];
+
+      if (convoIds.length > 0) {
+        const messagesRes = await supabase
+          .from("messages")
+          .select("*")
+          .in("conversation_id", convoIds)
+          .order("created_at", { ascending: true });
+
+        if (messagesRes.error) {
+          console.warn("[ChatProvider] Messages query error:", messagesRes.error.message);
+        }
+
+        loadedMessages = (messagesRes.data ?? []).map((m: any) => ({
+          id: m.id,
+          conversationId: m.conversation_id,
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          text: m.text,
+          type: m.type ?? "text",
+          locationData: m.location_data ?? undefined,
+          createdAt: m.created_at,
+        }));
+      }
 
       console.log("[ChatProvider] Loaded", loadedConversations.length, "conversations,", loadedMessages.length, "messages");
       return { conversations: loadedConversations, messages: loadedMessages };
     },
+    enabled: !!user?.id,
     staleTime: 5000,
     refetchInterval: 8000,
   });
@@ -65,13 +88,17 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     if (loadQuery.data) {
       setConversations(loadQuery.data.conversations);
       setMessages(loadQuery.data.messages);
+      const ids = new Set<string>();
+      loadQuery.data.messages.forEach((m) => ids.add(m.id));
+      knownMessageIdsRef.current = ids;
     }
   }, [loadQuery.data]);
 
   useEffect(() => {
-    console.log("[ChatProvider] Setting up realtime subscription for messages");
+    if (!user?.id) return;
+    console.log("[ChatProvider] Setting up realtime subscription for messages, user:", user.id);
     const channel = supabase
-      .channel("messages_realtime")
+      .channel(`chat_realtime_${user.id}`)
       .on(
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "messages" },
@@ -79,6 +106,12 @@ export const [ChatProvider, useChat] = createContextHook(() => {
           console.log("[ChatProvider] Realtime new message:", payload.new?.id);
           const m = payload.new;
           if (!m) return;
+
+          if (knownMessageIdsRef.current.has(m.id)) {
+            console.log("[ChatProvider] Skipping known message:", m.id);
+            return;
+          }
+          knownMessageIdsRef.current.add(m.id);
 
           const newMsg: ChatMessage = {
             id: m.id,
@@ -96,16 +129,17 @@ export const [ChatProvider, useChat] = createContextHook(() => {
             return [...prev, newMsg];
           });
 
-          setConversations((prev) =>
-            prev.map((c) =>
+          setConversations((prev) => {
+            const hasConvo = prev.some((c) => c.id === newMsg.conversationId);
+            if (!hasConvo) return prev;
+            return prev.map((c) =>
               c.id === newMsg.conversationId
                 ? { ...c, lastMessage: newMsg.text, lastMessageAt: newMsg.createdAt }
                 : c
-            )
-          );
+            );
+          });
 
           if (
-            user &&
             newMsg.senderId !== user.id &&
             activeConversationRef.current !== newMsg.conversationId
           ) {
@@ -124,9 +158,12 @@ export const [ChatProvider, useChat] = createContextHook(() => {
           const c = payload.new;
           if (!c) return;
 
+          const participants: string[] = c.participants ?? [];
+          if (!participants.includes(user.id)) return;
+
           const newConvo: Conversation = {
             id: c.id,
-            participants: c.participants ?? [],
+            participants,
             participantNames: c.participant_names ?? {},
             lastMessage: c.last_message ?? undefined,
             lastMessageAt: c.last_message_at ?? undefined,
@@ -147,7 +184,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       console.log("[ChatProvider] Cleaning up realtime subscription");
       void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const getOrCreateConversation = useCallback(
     async (currentUserId: string, currentUserName: string, friendUserId: string, friendName: string) => {
@@ -238,7 +275,11 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         createdAt: data.created_at,
       };
 
-      setMessages((prev) => [...prev, newMessage]);
+      knownMessageIdsRef.current.add(data.id);
+      setMessages((prev) => {
+        if (prev.some((msg) => msg.id === data.id)) return prev;
+        return [...prev, newMessage];
+      });
 
       await supabase
         .from("conversations")
