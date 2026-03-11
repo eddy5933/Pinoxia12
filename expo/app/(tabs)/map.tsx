@@ -108,12 +108,14 @@ function NativeMapView({
   focusedRestaurant,
   centerTrigger,
   distanceMap,
+  searchQuery,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
   focusedRestaurant: Restaurant | null;
   centerTrigger: number;
   distanceMap: Map<string, string>;
+  searchQuery: string;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -123,6 +125,7 @@ function NativeMapView({
   const mapRef = useRef<InstanceType<typeof MapView>>(null);
   const hasAnimatedToUser = useRef(false);
   const router = useRouter();
+  const prevSearchRef = useRef("");
 
   const initialRegion = focusedRestaurant
     ? {
@@ -192,6 +195,44 @@ function NativeMapView({
     }
   }, [centerTrigger, userLocation]);
 
+  useEffect(() => {
+    if (searchQuery.trim().length > 0 && restaurants.length > 0 && mapRef.current && prevSearchRef.current !== searchQuery) {
+      prevSearchRef.current = searchQuery;
+      console.log("[MapScreen] Fitting map to search results:", restaurants.length);
+      if (restaurants.length === 1) {
+        mapRef.current.animateToRegion(
+          {
+            latitude: restaurants[0].latitude,
+            longitude: restaurants[0].longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          800
+        );
+      } else {
+        const lats = restaurants.map((r) => r.latitude);
+        const lngs = restaurants.map((r) => r.longitude);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const padding = 0.01;
+        mapRef.current.animateToRegion(
+          {
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2,
+            latitudeDelta: Math.max(maxLat - minLat + padding * 2, 0.01),
+            longitudeDelta: Math.max(maxLng - minLng + padding * 2, 0.01),
+          },
+          800
+        );
+      }
+    }
+    if (searchQuery.trim().length === 0) {
+      prevSearchRef.current = "";
+    }
+  }, [searchQuery, restaurants]);
+
   return (
     <MapView
       ref={mapRef}
@@ -203,7 +244,11 @@ function NativeMapView({
       showsCompass={false}
       customMapStyle={brightMapStyle}
     >
-      {restaurants.map((r) => (
+      {restaurants.map((r) => {
+        const isSearchResult = searchQuery.trim().length > 0;
+        const isFocused = focusedRestaurant?.id === r.id;
+        const dist = distanceMap.get(r.id);
+        return (
         <Marker
           key={r.id}
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
@@ -216,13 +261,23 @@ function NativeMapView({
           <View style={markerStyles.container}>
             <View style={[
               markerStyles.pin,
-              focusedRestaurant?.id === r.id && markerStyles.pinFocused,
+              isFocused && markerStyles.pinFocused,
+              isSearchResult && markerStyles.pinSearchResult,
             ]}>
               <MapPin size={16} color={Colors.white} />
             </View>
-            <View style={markerStyles.pinTail} />
-            <View style={markerStyles.labelContainer}>
+            <View style={[
+              markerStyles.pinTail,
+              isSearchResult && markerStyles.pinTailSearch,
+            ]} />
+            <View style={[
+              markerStyles.labelContainer,
+              isSearchResult && markerStyles.labelContainerSearch,
+            ]}>
               <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
+              {isSearchResult && dist && (
+                <Text style={markerStyles.labelDistance}>{dist}</Text>
+              )}
             </View>
           </View>
           <Callout
@@ -254,7 +309,8 @@ function NativeMapView({
             </View>
           </Callout>
         </Marker>
-      ))}
+        );
+      })}
     </MapView>
   );
 }
@@ -527,6 +583,7 @@ export default function MapScreen() {
             focusedRestaurant={focusedRestaurant}
             centerTrigger={centerTrigger}
             distanceMap={distanceMap}
+            searchQuery={searchQuery}
           />
         )}
 
@@ -658,6 +715,17 @@ const markerStyles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 8,
   },
+  pinSearchResult: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#2563EB",
+    borderColor: "#93C5FD",
+    borderWidth: 3,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+  },
   pinTail: {
     width: 0,
     height: 0,
@@ -668,6 +736,9 @@ const markerStyles = StyleSheet.create({
     borderRightColor: "transparent",
     borderTopColor: Colors.white,
     marginTop: -1,
+  },
+  pinTailSearch: {
+    borderTopColor: "#93C5FD",
   },
   labelContainer: {
     backgroundColor: "#E63946",
@@ -683,12 +754,28 @@ const markerStyles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
   },
+  labelContainerSearch: {
+    backgroundColor: "#1E40AF",
+    maxWidth: 140,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#60A5FA",
+  },
   labelText: {
     fontSize: 10,
     fontWeight: "800" as const,
     color: "#FFFFFF",
     textAlign: "center" as const,
     letterSpacing: 0.3,
+  },
+  labelDistance: {
+    fontSize: 9,
+    fontWeight: "700" as const,
+    color: "#93C5FD",
+    textAlign: "center" as const,
+    marginTop: 1,
   },
   callout: {
     backgroundColor: Colors.surface,
