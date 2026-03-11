@@ -132,6 +132,13 @@ export default function FriendsScreen() {
     if (!user) return;
     if (activeTab !== "search") return;
 
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setLiveSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
@@ -139,8 +146,8 @@ export default function FriendsScreen() {
     setIsSearching(true);
     searchTimerRef.current = setTimeout(async () => {
       try {
-        console.log("[FriendsSearch] Searching Supabase for:", searchQuery);
-        const results = await searchUsersFromSupabase(searchQuery, user.id);
+        console.log("[FriendsSearch] Searching Supabase for:", trimmed);
+        const results = await searchUsersFromSupabase(trimmed, user.id);
         setLiveSearchResults(results);
         console.log("[FriendsSearch] Got", results.length, "results");
       } catch (err) {
@@ -158,14 +165,11 @@ export default function FriendsScreen() {
   }, [searchQuery, user, activeTab, searchUsersFromSupabase]);
 
   useEffect(() => {
-    if (activeTab === "search" && user) {
-      setIsSearching(true);
-      searchUsersFromSupabase("", user.id).then((results) => {
-        setLiveSearchResults(results);
-        setIsSearching(false);
-      }).catch(() => setIsSearching(false));
+    if (activeTab === "search") {
+      setLiveSearchResults([]);
+      setSearchQuery("");
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const handleAddFriend = useCallback(
     async (toUser: PublicUser) => {
@@ -579,11 +583,17 @@ export default function FriendsScreen() {
                 <ActivityIndicator size="large" color={Colors.primary} />
                 <Text style={styles.emptyTitle}>Searching...</Text>
               </View>
+            ) : searchQuery.trim().length === 0 ? (
+              <View style={styles.emptyCenter}>
+                <Search size={40} color={Colors.textMuted} />
+                <Text style={styles.emptyTitle}>Find People</Text>
+                <Text style={styles.emptySubtitle}>Search by name or email to find friends</Text>
+              </View>
             ) : (
               <View style={styles.emptyCenter}>
                 <Search size={40} color={Colors.textMuted} />
                 <Text style={styles.emptyTitle}>No users found</Text>
-                <Text style={styles.emptySubtitle}>Try searching by name or email</Text>
+                <Text style={styles.emptySubtitle}>Try a different name or email</Text>
               </View>
             )
           }
