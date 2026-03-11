@@ -7,6 +7,7 @@ import {
   FlatList,
   TextInput,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -47,6 +48,8 @@ export default function FriendsScreen() {
     isFriend,
     hasPendingRequest,
     registerUser,
+    refetchUsers,
+    isRefetching,
   } = useFriends();
   const { getOrCreateConversation } = useChat();
 
@@ -381,6 +384,14 @@ export default function FriendsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderSearchItem}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetchUsers}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyCenter}>
               <Search size={40} color={Colors.textMuted} />

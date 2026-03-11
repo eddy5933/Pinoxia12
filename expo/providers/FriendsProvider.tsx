@@ -53,7 +53,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests");
       return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
     },
-    staleTime: Infinity,
+    staleTime: 5000,
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
@@ -224,6 +225,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [requests]
   );
 
+  const refetchUsers = useCallback(async () => {
+    console.log("[FriendsProvider] Refetching users...");
+    await loadQuery.refetch();
+  }, [loadQuery]);
+
+  const isRefetching = loadQuery.isRefetching;
+
   return useMemo(
     () => ({
       friends,
@@ -239,11 +247,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       getSentRequests,
       isFriend,
       hasPendingRequest,
+      refetchUsers,
+      isRefetching,
     }),
     [
       friends, requests, allUsers, registerUser, searchUsers,
       sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
       removeFriend, getPendingRequests, getSentRequests, isFriend, hasPendingRequest,
+      refetchUsers, isRefetching,
     ]
   );
 });
