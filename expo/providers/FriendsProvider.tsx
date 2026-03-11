@@ -251,9 +251,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   const toggleCloseFriend = useCallback(
     async (friendId: string) => {
       const friend = friends.find((f) => f.id === friendId);
-      if (!friend) return;
+      if (!friend) {
+        console.warn("[FriendsProvider] toggleCloseFriend: friend not found for id:", friendId);
+        return;
+      }
       const newValue = !friend.isCloseFriend;
       console.log("[FriendsProvider] Toggling close friend:", friend.name, "=>", newValue);
+
+      await queryClient.cancelQueries({ queryKey: ["friends_load", currentUserId] });
 
       setFriends((prev) =>
         prev.map((f) => (f.id === friendId ? { ...f, isCloseFriend: newValue } : f))
@@ -290,6 +295,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         });
       } else {
         console.log("[FriendsProvider] Close friend saved successfully:", friend.name, "=>", newValue);
+        await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
       }
     },
     [friends, queryClient, currentUserId]
