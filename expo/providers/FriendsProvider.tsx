@@ -486,8 +486,41 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         });
       }
 
+      console.log("[FriendsProvider] Creating conversation between users so they can chat");
+      const { data: existingConvo } = await supabase
+        .from("conversations")
+        .select("id")
+        .contains("participants", [currentUserId])
+        .contains("participants", [otherUserId])
+        .maybeSingle();
+
+      if (!existingConvo) {
+        const participantNames: Record<string, string> = {
+          [currentUserId]: currentUserName,
+          [otherUserId]: otherUserName,
+        };
+        const { data: newConvo, error: convoError } = await supabase
+          .from("conversations")
+          .insert({
+            participants: [currentUserId, otherUserId],
+            participant_names: participantNames,
+            unread_count: 0,
+          })
+          .select()
+          .single();
+
+        if (convoError) {
+          console.warn("[FriendsProvider] Create conversation error:", convoError.message);
+        } else {
+          console.log("[FriendsProvider] Created conversation:", newConvo?.id);
+        }
+      } else {
+        console.log("[FriendsProvider] Conversation already exists:", existingConvo.id);
+      }
+
       console.log("[FriendsProvider] Accepted request from", otherUserName, "- invalidating queries");
       await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+      await queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
     },
     [requests, allUsers, queryClient, currentUserId]
   );
