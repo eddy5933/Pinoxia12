@@ -126,13 +126,12 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
   }, [friend.avatar, onLoad]);
 
   return (
-    <View style={friendMarkerStyles.wrapper}>
-      <View style={friendMarkerStyles.container}>
-        <View style={friendMarkerStyles.label}>
-          <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
-        </View>
-        <View style={friendMarkerStyles.labelArrow} />
-        <View style={friendMarkerStyles.avatarRing}>
+    <View style={friendMarkerStyles.container}>
+      <View style={friendMarkerStyles.label}>
+        <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
+      </View>
+      <View style={friendMarkerStyles.labelArrow} />
+      <View style={friendMarkerStyles.avatarRing}>
         {friend.avatar ? (
           <RNImage
             source={{ uri: friend.avatar }}
@@ -145,8 +144,7 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
             <Text style={friendMarkerStyles.initials}>{initials}</Text>
           </View>
         )}
-          <View style={friendMarkerStyles.onlineDot} />
-        </View>
+        <View style={friendMarkerStyles.onlineDot} />
       </View>
     </View>
   );
@@ -187,8 +185,6 @@ function FriendMarkerWrapper({
     <Marker
       coordinate={{ latitude: friend.latitude, longitude: friend.longitude }}
       tracksViewChanges={trackChanges}
-      anchor={{ x: 0.5, y: 1 }}
-      calloutAnchor={{ x: 0.5, y: 0 }}
       onPress={() => {
         console.log("[MapScreen] Friend marker tapped:", friend.name);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1413,12 +1409,6 @@ const styles = StyleSheet.create({
 });
 
 const friendMarkerStyles = StyleSheet.create({
-  wrapper: {
-    width: 100,
-    height: 70,
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
   container: {
     alignItems: "center",
   },
