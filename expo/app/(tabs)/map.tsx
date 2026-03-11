@@ -24,6 +24,8 @@ import {
   Radio,
   Eye,
   EyeOff,
+  Users,
+  MapPinned,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -757,6 +759,72 @@ export default function MapScreen() {
         )}
       </View>
 
+      {showFriendLocations && visibleFriendLocations.length > 0 && (
+        <View style={friendListStyles.container}>
+          <View style={friendListStyles.header}>
+            <Users size={14} color="#3B82F6" />
+            <Text style={friendListStyles.headerText}>Close Friends Nearby</Text>
+          </View>
+          <FlatList
+            data={visibleFriendLocations}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.userId}
+            contentContainerStyle={friendListStyles.listContent}
+            renderItem={({ item }) => {
+              const dist = userLocation
+                ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
+                : null;
+              const updatedAgo = (() => {
+                const diff = Date.now() - new Date(item.updatedAt).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 1) return "just now";
+                if (mins < 60) return `${mins}m ago`;
+                return `${Math.floor(mins / 60)}h ago`;
+              })();
+              const initials = item.name
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2);
+              return (
+                <View style={friendListStyles.card} testID={`friend-loc-${item.userId}`}>
+                  <View style={friendListStyles.avatarContainer}>
+                    {item.avatar ? (
+                      <Image source={{ uri: item.avatar }} style={friendListStyles.avatar} contentFit="cover" />
+                    ) : (
+                      <View style={friendListStyles.avatarFallback}>
+                        <Text style={friendListStyles.avatarInitials}>{initials}</Text>
+                      </View>
+                    )}
+                    <View style={friendListStyles.onlineBadge} />
+                  </View>
+                  <View style={friendListStyles.info}>
+                    <Text style={friendListStyles.name} numberOfLines={1}>{item.name}</Text>
+                    {item.placeName ? (
+                      <View style={friendListStyles.placeRow}>
+                        <MapPinned size={10} color={Colors.textSecondary} />
+                        <Text style={friendListStyles.place} numberOfLines={1}>{item.placeName}</Text>
+                      </View>
+                    ) : null}
+                    <View style={friendListStyles.metaRow}>
+                      {dist && (
+                        <View style={friendListStyles.distBadge}>
+                          <Navigation size={10} color="#3B82F6" />
+                          <Text style={friendListStyles.distText}>{dist}</Text>
+                        </View>
+                      )}
+                      <Text style={friendListStyles.timeText}>{updatedAgo}</Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        </View>
+      )}
+
       <View style={styles.mapContainer}>
         {Platform.OS === "web" ? (
           <WebMapView restaurants={filteredRestaurants} userLocation={userLocation} onMarkerPress={handleMarkerPress} />
@@ -1323,6 +1391,124 @@ const friendMarkerStyles = StyleSheet.create({
     color: "#93C5FD",
     textAlign: "center" as const,
     marginTop: 1,
+  },
+});
+
+const friendListStyles = StyleSheet.create({
+  container: {
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  headerText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: "#3B82F6",
+    letterSpacing: 0.3,
+  },
+  listContent: {
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  card: {
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#1E3A5F",
+    width: 220,
+    alignItems: "center",
+    gap: 10,
+  },
+  avatarContainer: {
+    position: "relative" as const,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+  },
+  avatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1E40AF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+  },
+  avatarInitials: {
+    fontSize: 14,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  onlineBadge: {
+    position: "absolute" as const,
+    bottom: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  info: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  placeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  place: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  distBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(59,130,246,0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  distText: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#60A5FA",
+  },
+  timeText: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontWeight: "500" as const,
   },
 });
 
