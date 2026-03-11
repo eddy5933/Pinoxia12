@@ -17,6 +17,7 @@ import {
   Plus,
   Mail,
   Eye,
+  Trash2,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -28,7 +29,7 @@ import { OnlineVisibility } from "@/types";
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, isLoading, logout, toggleRole } = useAuth();
+  const { user, isLoading, logout, deleteAccount, toggleRole } = useAuth();
   const { visibility, openStatusPicker } = useOnlineStatus();
 
   const visibilityLabel: Record<OnlineVisibility, string> = {
@@ -56,6 +57,37 @@ export default function ProfileScreen() {
       },
     ]);
   }, [logout]);
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      "Delete Account",
+      "This action is permanent and cannot be undone. All your data, including businesses and reviews, will be deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Are you absolutely sure?",
+              "Type confirms this will permanently delete your account.",
+              [
+                { text: "Go Back", style: "cancel" },
+                {
+                  text: "Yes, Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    await deleteAccount();
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  }, [deleteAccount]);
 
   const handleToggleRole = useCallback(async () => {
     await toggleRole();
@@ -215,6 +247,16 @@ export default function ProfileScreen() {
         >
           <LogOut size={18} color={Colors.error} />
           <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+          testID="delete-account-button"
+        >
+          <Trash2 size={18} color="#FF3B30" />
+          <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -407,5 +449,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: Colors.error,
+  },
+  deleteButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,59,48,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,59,48,0.25)",
+  },
+  deleteText: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: "#FF3B30",
   },
 });

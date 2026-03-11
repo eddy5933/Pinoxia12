@@ -54,6 +54,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    console.log("Deleting account for user:", user?.id);
+    setUser(null);
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+  }, [user]);
+
   const toggleRole = useCallback(async () => {
     if (!user) return;
     const newRole: UserRole = user.role === "customer" ? "owner" : "customer";
@@ -63,7 +69,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [user]);
 
   return useMemo(
-    () => ({ user, isLoading, login, signup, logout, toggleRole }),
-    [user, isLoading, login, signup, logout, toggleRole]
+    () => ({ user, isLoading, login, signup, logout, deleteAccount, toggleRole }),
+    [user, isLoading, login, signup, logout, deleteAccount, toggleRole]
   );
 });
