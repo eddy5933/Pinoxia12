@@ -52,10 +52,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       ]);
 
       let friendsData = friendsRes.data;
-      if (friendsRes.error && friendsRes.error.message?.includes("friend_id_fkey")) {
-        console.log("[FriendsProvider] JOIN failed, falling back to plain friends query");
-        const fallback = await supabase.from("friends").select("*").eq("user_id", currentUserId);
+      if (friendsRes.error) {
+        console.log("[FriendsProvider] Friends JOIN failed:", friendsRes.error.message, "- falling back to plain query");
+        const fallback = await supabase.from("friends").select("*").eq("user_id", currentUserId!);
         friendsData = fallback.data;
+        if (fallback.error) {
+          console.warn("[FriendsProvider] Fallback friends query also failed:", fallback.error.message);
+        }
       }
 
       if (followersRes.error) {
@@ -82,12 +85,12 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       }));
 
       const loadedFriends: Friend[] = (friendsData ?? []).map((f: any) => {
-        const profile = f.profile;
+        const profile = f.profile ?? loadedUsers.find((u: PublicUser) => u.id === f.friend_id);
         return {
           id: f.id,
           userId: f.friend_id,
-          name: profile?.name ?? f.friend_name,
-          email: profile?.email ?? f.friend_email,
+          name: profile?.name ?? f.friend_name ?? "Unknown",
+          email: profile?.email ?? f.friend_email ?? "",
           avatar: profile?.avatar ?? f.friend_avatar ?? undefined,
           isOnline: true,
           isCloseFriend: f.is_close_friend ?? false,
@@ -148,7 +151,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const forceRefetch = useCallback(() => {
     console.log("[FriendsProvider] Force refetch executing");
-    void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+    void queryClient.refetchQueries({ queryKey: ["friends_load", currentUserId] });
     void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
   }, [queryClient, currentUserId]);
 
@@ -544,6 +547,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           isCloseFriend: false,
         };
 
+        await queryClient.cancelQueries({ queryKey: ["friends_load", currentUserId] });
         updateCache((old) => ({
           ...old,
           friends: [newFriend, ...old.friends],
@@ -552,10 +556,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         console.log("[FriendsProvider] Friend added successfully:", toUser.name);
       }
 
-      delayedRefetch(1500);
+      delayedRefetch(2000);
       return true;
     },
-    [friends, updateCache, delayedRefetch]
+    [friends, queryClient, currentUserId, updateCache, delayedRefetch]
   );
 
   const sendFriendRequest = useCallback(
@@ -638,6 +642,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         return;
       }
 
+      await queryClient.cancelQueries({ queryKey: ["friends_load", currentUserId] });
+
       updateCache((old) => ({
         ...old,
         requests: old.requests.map((r) =>
@@ -648,17 +654,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const requesterId = req.fromUserId;
       const acceptorId = req.toUserId;
 
-      const { data: requesterProfile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", requesterId)
-        .maybeSingle();
+      const [requesterProfileRes, acceptorProfileRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", requesterId).maybeSingle(),
+        supabase.from("profiles").select("*").eq("id", acceptorId).maybeSingle(),
+      ]);
 
-      const { data: acceptorProfile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", acceptorId)
-        .maybeSingle();
+      const requesterProfile = requesterProfileRes.data;
+      const acceptorProfile = acceptorProfileRes.data;
 
       const requesterName = requesterProfile?.name ?? req.fromUserName;
       const requesterEmail = requesterProfile?.email ?? req.fromUserEmail;
@@ -690,6 +692,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           console.log("[FriendsProvider] Requester now follows acceptor");
         }
       }
+
+      await queryClient.cancelQueries({ queryKey: ["friends_load", currentUserId] });
 
       if (userId === acceptorId) {
         const newFollower: Friend = {
@@ -724,11 +728,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         });
       }
 
-      console.log("[FriendsProvider] Accepted request - scheduling refetch");
-      forceRefetch();
+      console.log("[FriendsProvider] Accepted request - scheduling delayed refetch");
       delayedRefetch(3000);
+      delayedRefetch(6000);
     },
-    [requests, updateCache, delayedRefetch, forceRefetch]
+    [requests, queryClient, currentUserId, updateCache, delayedRefetch]
   );
 
   const rejectFriendRequest = useCallback(
@@ -851,6 +855,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         isCloseFriend: false,
       };
 
+      await queryClient.cancelQueries({ queryKey: ["friends_load", currentUserId] });
+
       console.log("[FriendsProvider] followBack: optimistically updating cache with friend:", name);
       updateCache((old) => {
         const alreadyInFriends = old.friends.some((f) => f.userId === followerUserId);
@@ -891,14 +897,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         console.log("[FriendsProvider] Created conversation after follow back");
       }
 
-      forceRefetch();
-      delayedRefetch(2000);
-      delayedRefetch(5000);
+      delayedRefetch(3000);
+      delayedRefetch(6000);
 
       console.log("[FriendsProvider] Followed back:", name);
       return true;
     },
-    [currentUserId, followers, allUsers, updateCache, delayedRefetch, forceRefetch]
+    [currentUserId, followers, allUsers, queryClient, updateCache, delayedRefetch]
   );
 
   const closeFriends = useMemo(
