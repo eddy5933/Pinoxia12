@@ -8,6 +8,8 @@ import { RestaurantProvider } from "@/providers/RestaurantProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
 import { FriendsProvider } from "@/providers/FriendsProvider";
 import { ChatProvider } from "@/providers/ChatProvider";
+import { OnlineStatusProvider } from "@/providers/OnlineStatusProvider";
+import StatusPickerModal from "@/components/StatusPickerModal";
 import Colors from "@/constants/colors";
 
 void SplashScreen.preventAutoHideAsync();
@@ -80,7 +82,10 @@ export default function RootLayout() {
             <LocationProvider>
               <FriendsProvider>
                 <ChatProvider>
+                <OnlineStatusProvider>
                   <RootLayoutNav />
+                  <StatusPickerModal />
+                </OnlineStatusProvider>
                 </ChatProvider>
               </FriendsProvider>
             </LocationProvider>

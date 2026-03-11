@@ -16,16 +16,32 @@ import {
   RefreshCw,
   Plus,
   Mail,
+  Eye,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
+import { useOnlineStatus } from "@/providers/OnlineStatusProvider";
+import { OnlineVisibility } from "@/types";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isLoading, logout, toggleRole } = useAuth();
+  const { visibility, openStatusPicker } = useOnlineStatus();
+
+  const visibilityLabel: Record<OnlineVisibility, string> = {
+    hidden: "Invisible",
+    friends_only: "Friends Only",
+    everyone: "Everyone",
+  };
+
+  const visibilityColor: Record<OnlineVisibility, string> = {
+    hidden: "#FF6B6B",
+    friends_only: "#4ECDC4",
+    everyone: "#45B7D1",
+  };
 
   const handleLogout = useCallback(async () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
@@ -112,6 +128,29 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              openStatusPicker();
+            }}
+            activeOpacity={0.7}
+            testID="online-status"
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIcon, { backgroundColor: `${visibilityColor[visibility]}18` }]}>
+                <Eye size={18} color={visibilityColor[visibility]} />
+              </View>
+              <View>
+                <Text style={styles.menuItemText}>Online Status</Text>
+                <Text style={[styles.menuItemSubtext, { color: visibilityColor[visibility] }]}>
+                  {visibilityLabel[visibility]}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}

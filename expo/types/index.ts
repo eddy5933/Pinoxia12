@@ -46,6 +46,8 @@ export interface Review {
   createdAt: string;
 }
 
+export type OnlineVisibility = "hidden" | "friends_only" | "everyone";
+
 export type FriendStatus = "pending" | "accepted" | "rejected";
 
 export interface FriendRequest {
