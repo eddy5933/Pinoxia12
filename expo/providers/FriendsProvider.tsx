@@ -144,55 +144,39 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted via realtime, fetching friends directly from DB");
+            console.log("[FriendsProvider] Friend request accepted via realtime");
 
-            const fetchAndUpdateFriends = async () => {
-              for (let attempt = 0; attempt < 3; attempt++) {
-                if (attempt > 0) {
-                  console.log(`[FriendsProvider] Retry attempt ${attempt + 1} to fetch updated friends`);
-                  await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
-                }
+            const isRequester = r.from_user_id === currentUserId;
+            const otherUserId = isRequester ? r.to_user_id : r.from_user_id;
+            const otherUserName = isRequester ? r.to_user_name : r.from_user_name;
+            const otherUserEmail = isRequester ? r.to_user_email : r.from_user_email;
 
-                const { data: freshFriends, error } = await supabase
-                  .from("friends")
-                  .select("*")
-                  .eq("user_id", currentUserId);
-
-                if (error) {
-                  console.warn("[FriendsProvider] Error fetching friends after accept:", error.message);
-                  continue;
-                }
-
-                const mapped: Friend[] = (freshFriends ?? []).map((f: any) => ({
-                  id: f.id,
-                  userId: f.friend_id,
-                  name: f.friend_name,
-                  email: f.friend_email,
-                  avatar: f.friend_avatar ?? undefined,
-                  isOnline: true,
-                  isCloseFriend: f.is_close_friend ?? false,
-                }));
-
-                console.log("[FriendsProvider] Fetched", mapped.length, "friends from DB (attempt", attempt + 1, ")");
-
-                const otherUserId = r.from_user_id === currentUserId ? r.to_user_id : r.from_user_id;
-                const hasNewFriend = mapped.some((f) => f.userId === otherUserId);
-
-                setFriends(mapped);
-                queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-                  if (!old) return { friends: mapped, requests: [], users: [] };
-                  return { ...old, friends: mapped };
-                });
-
-                if (hasNewFriend) {
-                  console.log("[FriendsProvider] New friend found in DB, update complete");
-                  void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-                  break;
-                }
-              }
+            const newFriend: Friend = {
+              id: `temp_${Date.now()}`,
+              userId: otherUserId,
+              name: otherUserName,
+              email: otherUserEmail,
+              isOnline: true,
+              isCloseFriend: false,
             };
 
-            void fetchAndUpdateFriends();
+            setFriends((prev) => {
+              if (prev.some((fr) => fr.userId === otherUserId)) return prev;
+              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName);
+              return [newFriend, ...prev];
+            });
+
+            queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+              if (!old) return old;
+              if (old.friends.some((f: any) => f.userId === otherUserId)) return old;
+              return { ...old, friends: [newFriend, ...old.friends] };
+            });
+
+            setTimeout(() => {
+              console.log("[FriendsProvider] Force refetching friends after accept");
+              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+              void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+            }, 1500);
           }
         }
       )
@@ -377,7 +361,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         (r) =>
           ((r.fromUserId === fromUser.id && r.toUserId === toUser.id) ||
             (r.fromUserId === toUser.id && r.toUserId === fromUser.id)) &&
-          (r.status === "pending" || r.status === "accepted")
+          r.status === "pending"
       );
       if (existing) {
         console.log("[FriendsProvider] Request already exists");
@@ -389,8 +373,6 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         return false;
       }
 
-      console.log("[FriendsProvider] Auto-accept: creating friend request as accepted for", toUser.name);
-
       const { data, error } = await supabase
         .from("friend_requests")
         .insert({
@@ -400,7 +382,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           to_user_id: toUser.id,
           to_user_name: toUser.name,
           to_user_email: toUser.email,
-          status: "accepted",
+          status: "pending",
         })
         .select()
         .single();
@@ -418,103 +400,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         toUserId: toUser.id,
         toUserName: toUser.name,
         toUserEmail: toUser.email,
-        status: "accepted",
+        status: "pending",
         createdAt: data.created_at,
       };
       setRequests((prev) => [newRequest, ...prev]);
-
-      const { data: f1, error: e1 } = await supabase
-        .from("friends")
-        .insert({
-          user_id: fromUser.id,
-          friend_id: toUser.id,
-          friend_name: toUser.name,
-          friend_email: toUser.email,
-        })
-        .select()
-        .single();
-
-      if (e1) {
-        console.warn("[FriendsProvider] Auto-accept insert my friend row error:", e1.message);
-      } else {
-        console.log("[FriendsProvider] Auto-accept inserted my friend row:", f1?.id);
-      }
-
-      const { error: e2 } = await supabase
-        .from("friends")
-        .insert({
-          user_id: toUser.id,
-          friend_id: fromUser.id,
-          friend_name: fromUser.name,
-          friend_email: fromUser.email,
-        });
-
-      if (e2) {
-        console.warn("[FriendsProvider] Auto-accept insert their friend row error:", e2.message);
-      } else {
-        console.log("[FriendsProvider] Auto-accept inserted their friend row for user:", toUser.id);
-      }
-
-      const newFriend: Friend = {
-        id: f1?.id ?? `temp_${Date.now()}`,
-        userId: toUser.id,
-        name: toUser.name,
-        email: toUser.email,
-        avatar: toUser.avatar,
-        isOnline: true,
-        isCloseFriend: false,
-      };
-      setFriends((prev) => {
-        if (prev.some((fr) => fr.userId === toUser.id)) return prev;
-        return [newFriend, ...prev];
-      });
-
-      queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-        if (!old) return old;
-        const alreadyExists = old.friends.some((f: any) => f.userId === toUser.id);
-        if (alreadyExists) return old;
-        return { ...old, friends: [newFriend, ...old.friends] };
-      });
-
-      console.log("[FriendsProvider] Auto-accept: creating conversation between users");
-      const { data: existingConvo } = await supabase
-        .from("conversations")
-        .select("id")
-        .contains("participants", [fromUser.id])
-        .contains("participants", [toUser.id])
-        .maybeSingle();
-
-      if (!existingConvo) {
-        const participantNames: Record<string, string> = {
-          [fromUser.id]: fromUser.name,
-          [toUser.id]: toUser.name,
-        };
-        const { data: newConvo, error: convoError } = await supabase
-          .from("conversations")
-          .insert({
-            participants: [fromUser.id, toUser.id],
-            participant_names: participantNames,
-            unread_count: 0,
-          })
-          .select()
-          .single();
-
-        if (convoError) {
-          console.warn("[FriendsProvider] Auto-accept create conversation error:", convoError.message);
-        } else {
-          console.log("[FriendsProvider] Auto-accept created conversation:", newConvo?.id);
-        }
-      } else {
-        console.log("[FriendsProvider] Conversation already exists:", existingConvo.id);
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-      await queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-
-      console.log("[FriendsProvider] Auto-accepted friend request to", toUser.name);
+      console.log("[FriendsProvider] Sent friend request to", toUser.name);
       return true;
     },
-    [requests, friends, queryClient, currentUserId]
+    [requests, friends]
   );
 
   const acceptFriendRequest = useCallback(

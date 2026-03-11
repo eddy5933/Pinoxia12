@@ -37,7 +37,7 @@ import { useChat } from "@/providers/ChatProvider";
 import { Friend, FriendRequest } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
-type TabType = "friends" | "followers" | "search";
+type TabType = "friends" | "requests" | "search";
 
 interface ToastState {
   visible: boolean;
@@ -173,10 +173,10 @@ export default function FriendsScreen() {
       const success = await sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Now following!", toUser.name, "success");
+        showToast("Friend request sent!", toUser.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already following", toUser.name, "info");
+        showToast("Request already pending", toUser.name, "info");
       }
     },
     [user, sendFriendRequest, showToast]
@@ -188,7 +188,7 @@ export default function FriendsScreen() {
       const req = pendingRequests.find((r) => r.id === requestId);
       await acceptFriendRequest(requestId, user.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast("Follower accepted!", req?.fromUserName ?? "User", "success");
+      showToast("Friend added!", req?.fromUserName ?? "User", "success");
     },
     [user, acceptFriendRequest, pendingRequests, showToast]
   );
@@ -203,15 +203,15 @@ export default function FriendsScreen() {
 
   const handleCancelRequest = useCallback(
     (requestId: string, userName: string) => {
-      Alert.alert("Unfollow", `Unfollow ${userName}?`, [
+      Alert.alert("Cancel Request", `Cancel friend request to ${userName}?`, [
         { text: "No", style: "cancel" },
         {
-          text: "Unfollow",
+          text: "Cancel Request",
           style: "destructive",
           onPress: async () => {
             await cancelFriendRequest(requestId);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            showToast("Unfollowed", userName, "info");
+            showToast("Request cancelled", userName, "info");
           },
         },
       ]);
@@ -398,7 +398,7 @@ export default function FriendsScreen() {
           ) : pendingReq ? (
             <View style={styles.statusBadge}>
               <Clock size={14} color={Colors.warning} />
-              <Text style={[styles.statusText, { color: Colors.warning }]}>Following</Text>
+              <Text style={[styles.statusText, { color: Colors.warning }]}>Pending</Text>
             </View>
           ) : (
             <TouchableOpacity
@@ -407,7 +407,7 @@ export default function FriendsScreen() {
               activeOpacity={0.7}
             >
               <UserPlus size={16} color={Colors.white} />
-              <Text style={styles.addButtonText}>Follow</Text>
+              <Text style={styles.addButtonText}>Request</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -467,7 +467,7 @@ export default function FriendsScreen() {
       </View>
 
       <View style={styles.tabBar}>
-        {(["friends", "followers", "search"] as TabType[]).map((tab) => (
+        {(["friends", "requests", "search"] as TabType[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -475,7 +475,7 @@ export default function FriendsScreen() {
             activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === "friends" ? `Friends (${friends.length})` : tab === "followers" ? `Followers${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}` : "Find People"}
+              {tab === "friends" ? `Friends (${friends.length})` : tab === "requests" ? `Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}` : "Find People"}
             </Text>
           </TouchableOpacity>
         ))}
@@ -512,7 +512,7 @@ export default function FriendsScreen() {
         />
       )}
 
-      {activeTab === "followers" && (
+      {activeTab === "requests" && (
         <FlatList
           data={pendingRequests}
           keyExtractor={(item) => item.id}
@@ -521,7 +521,7 @@ export default function FriendsScreen() {
           ListHeaderComponent={
             sentRequests.length > 0 ? (
               <View style={styles.sentSection}>
-                <Text style={styles.sentTitle}>Following ({sentRequests.length})</Text>
+                <Text style={styles.sentTitle}>Sent Requests ({sentRequests.length})</Text>
                 {sentRequests.map((req) => (
                   <View key={req.id} style={styles.sentCard}>
                     <View style={[styles.friendAvatar, styles.sentAvatar]}>
@@ -529,7 +529,7 @@ export default function FriendsScreen() {
                     </View>
                     <View style={styles.friendInfo}>
                       <Text style={styles.friendName}>{req.toUserName}</Text>
-                      <Text style={styles.friendEmail}>Following</Text>
+                      <Text style={styles.friendEmail}>Pending...</Text>
                     </View>
                     <TouchableOpacity
                       style={styles.cancelButton}
@@ -537,12 +537,12 @@ export default function FriendsScreen() {
                       activeOpacity={0.7}
                     >
                       <X size={14} color={Colors.error} />
-                      <Text style={styles.cancelButtonText}>Unfollow</Text>
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 ))}
                 {pendingRequests.length > 0 && (
-                  <Text style={styles.sentTitle}>New Followers</Text>
+                  <Text style={styles.sentTitle}>Incoming Requests</Text>
                 )}
               </View>
             ) : null
@@ -551,8 +551,8 @@ export default function FriendsScreen() {
             sentRequests.length === 0 ? (
               <View style={styles.emptyCenter}>
                 <Clock size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No followers yet</Text>
-                <Text style={styles.emptySubtitle}>New followers will appear here</Text>
+                <Text style={styles.emptyTitle}>No requests</Text>
+                <Text style={styles.emptySubtitle}>Friend requests will appear here</Text>
               </View>
             ) : null
           }
