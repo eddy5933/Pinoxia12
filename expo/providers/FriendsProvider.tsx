@@ -52,6 +52,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         email: f.friend_email,
         avatar: f.friend_avatar ?? undefined,
         isOnline: true,
+        isCloseFriend: f.is_close_friend ?? false,
       }));
 
       const loadedRequests: FriendRequest[] = (requestsRes.data ?? []).map((r: any) => ({
@@ -246,6 +247,42 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     []
   );
 
+  const toggleCloseFriend = useCallback(
+    async (friendId: string) => {
+      const friend = friends.find((f) => f.id === friendId);
+      if (!friend) return;
+      const newValue = !friend.isCloseFriend;
+      console.log("[FriendsProvider] Toggling close friend:", friend.name, "=>", newValue);
+
+      setFriends((prev) =>
+        prev.map((f) => (f.id === friendId ? { ...f, isCloseFriend: newValue } : f))
+      );
+
+      const { error } = await supabase
+        .from("friends")
+        .update({ is_close_friend: newValue })
+        .eq("id", friendId);
+
+      if (error) {
+        console.warn("[FriendsProvider] Toggle close friend error:", error.message);
+        setFriends((prev) =>
+          prev.map((f) => (f.id === friendId ? { ...f, isCloseFriend: !newValue } : f))
+        );
+      }
+    },
+    [friends]
+  );
+
+  const closeFriends = useMemo(
+    () => friends.filter((f) => f.isCloseFriend),
+    [friends]
+  );
+
+  const isCloseFriend = useCallback(
+    (userId: string) => friends.some((f) => f.userId === userId && f.isCloseFriend),
+    [friends]
+  );
+
   const removeFriend = useCallback(
     async (friendId: string) => {
       const friend = friends.find((f) => f.id === friendId);
@@ -301,6 +338,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   return useMemo(
     () => ({
       friends,
+      closeFriends,
       requests,
       allUsers,
       registerUser,
@@ -310,6 +348,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       rejectFriendRequest,
       removeFriend,
       cancelFriendRequest,
+      toggleCloseFriend,
+      isCloseFriend,
       getPendingRequests,
       getSentRequests,
       isFriend,
@@ -318,9 +358,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       isRefetching,
     }),
     [
-      friends, requests, allUsers, registerUser, searchUsers,
+      friends, closeFriends, requests, allUsers, registerUser, searchUsers,
       sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
-      removeFriend, cancelFriendRequest, getPendingRequests, getSentRequests,
+      removeFriend, cancelFriendRequest, toggleCloseFriend, isCloseFriend,
+      getPendingRequests, getSentRequests,
       isFriend, hasPendingRequest, refetchUsers, isRefetching,
     ]
   );

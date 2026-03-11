@@ -32,6 +32,7 @@ import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
 import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
 import { useFriends } from "@/providers/FriendsProvider";
+
 import { Restaurant } from "@/types";
 
 const DEFAULT_REGION = {
@@ -434,7 +435,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
-  const { friends } = useFriends();
+  const { friends, closeFriends } = useFriends();
 
   const [showFriendLocations, setShowFriendLocations] = useState(false);
   const sharingPulse = useRef(new Animated.Value(0)).current;
@@ -559,10 +560,15 @@ export default function MapScreen() {
     console.log("[MapScreen] Toggle friend locations visibility");
   }, []);
 
+  const closeFriendIds = useMemo(
+    () => new Set(closeFriends.map((f) => f.userId)),
+    [closeFriends]
+  );
+
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) return [];
-    return friendLocations;
-  }, [showFriendLocations, friendLocations]);
+    return friendLocations.filter((fl) => closeFriendIds.has(fl.userId));
+  }, [showFriendLocations, friendLocations, closeFriendIds]);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
@@ -742,13 +748,16 @@ export default function MapScreen() {
               styles.viewFriendsText,
               showFriendLocations && styles.viewFriendsTextActive,
             ]}>
-              Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
+              Close Friends{closeFriends.length > 0 ? ` (${closeFriends.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
 
-        {showFriendLocations && friendLocations.length === 0 && friends.length > 0 && (
-          <Text style={styles.noFriendsText}>No friends online</Text>
+        {showFriendLocations && visibleFriendLocations.length === 0 && closeFriends.length > 0 && (
+          <Text style={styles.noFriendsText}>No close friends online</Text>
+        )}
+        {showFriendLocations && closeFriends.length === 0 && friends.length > 0 && (
+          <Text style={styles.noFriendsText}>Star friends to see them here</Text>
         )}
       </View>
 

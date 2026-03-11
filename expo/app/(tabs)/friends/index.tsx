@@ -24,6 +24,7 @@ import {
   Store,
   Bell,
   Send,
+  Star,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -55,6 +56,7 @@ export default function FriendsScreen() {
     rejectFriendRequest,
     removeFriend,
     cancelFriendRequest,
+    toggleCloseFriend,
     getPendingRequests,
     getSentRequests,
     isFriend,
@@ -182,6 +184,20 @@ export default function FriendsScreen() {
     [cancelFriendRequest, showToast]
   );
 
+  const handleToggleCloseFriend = useCallback(
+    async (friend: Friend) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await toggleCloseFriend(friend.id);
+      const wasClose = friend.isCloseFriend;
+      showToast(
+        wasClose ? "Removed from close friends" : "Added to close friends",
+        friend.name,
+        wasClose ? "info" : "success"
+      );
+    },
+    [toggleCloseFriend, showToast]
+  );
+
   const handleRemoveFriend = useCallback(
     (friend: Friend) => {
       Alert.alert("Remove Friend", `Remove ${friend.name} from friends?`, [
@@ -210,17 +226,49 @@ export default function FriendsScreen() {
 
   const renderFriendItem = useCallback(
     ({ item }: { item: Friend }) => (
-      <View style={styles.friendCard}>
-        <View style={styles.friendAvatar}>
+      <View style={[styles.friendCard, item.isCloseFriend && styles.friendCardClose]}>
+        <TouchableOpacity
+          style={[styles.friendAvatar, item.isCloseFriend && styles.friendAvatarClose]}
+          onPress={() => void handleToggleCloseFriend(item)}
+          activeOpacity={0.7}
+          testID={`close-friend-toggle-${item.userId}`}
+        >
           <Text style={styles.friendAvatarText}>
             {item.name.charAt(0).toUpperCase()}
           </Text>
-        </View>
+          {item.isCloseFriend && (
+            <View style={styles.closeBadge}>
+              <Star size={10} color="#FFB800" fill="#FFB800" />
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={styles.friendInfo}>
-          <Text style={styles.friendName}>{item.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.friendName}>{item.name}</Text>
+            {item.isCloseFriend && (
+              <View style={styles.closeTag}>
+                <Star size={9} color="#FFB800" fill="#FFB800" />
+                <Text style={styles.closeTagText}>Close</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.friendEmail}>{item.email}</Text>
         </View>
         <View style={styles.friendActions}>
+          <TouchableOpacity
+            style={[
+              styles.starButton,
+              item.isCloseFriend && styles.starButtonActive,
+            ]}
+            onPress={() => void handleToggleCloseFriend(item)}
+            activeOpacity={0.7}
+          >
+            <Star
+              size={16}
+              color={item.isCloseFriend ? "#FFB800" : Colors.textMuted}
+              fill={item.isCloseFriend ? "#FFB800" : "transparent"}
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.chatButton}
             onPress={() => void handleStartChat(item)}
@@ -238,7 +286,7 @@ export default function FriendsScreen() {
         </View>
       </View>
     ),
-    [handleStartChat, handleRemoveFriend]
+    [handleStartChat, handleRemoveFriend, handleToggleCloseFriend]
   );
 
   const renderRequestItem = useCallback(
@@ -659,6 +707,50 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceHighlight,
     justifyContent: "center",
     alignItems: "center",
+  },
+  starButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  starButtonActive: {
+    backgroundColor: "rgba(255,184,0,0.15)",
+  },
+  friendCardClose: {
+    borderColor: "rgba(255,184,0,0.25)",
+  },
+  friendAvatarClose: {
+    backgroundColor: "#B8860B",
+  },
+  closeBadge: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.surface,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 1,
+    borderColor: "rgba(255,184,0,0.4)",
+  },
+  closeTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,184,0,0.12)",
+  },
+  closeTagText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: "#FFB800",
   },
   requestCard: {
     flexDirection: "row",

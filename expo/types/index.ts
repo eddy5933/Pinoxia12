@@ -69,6 +69,7 @@ export interface Friend {
   email: string;
   avatar?: string;
   isOnline?: boolean;
+  isCloseFriend?: boolean;
 }
 
 export interface ChatMessage {
