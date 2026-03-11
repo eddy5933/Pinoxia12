@@ -275,8 +275,11 @@ function NativeMapView({
               isSearchResult && markerStyles.labelContainerSearch,
             ]}>
               <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
-              {isSearchResult && dist && (
-                <Text style={markerStyles.labelDistance}>{dist}</Text>
+              {dist && (
+                <Text style={[
+                  markerStyles.labelDistance,
+                  !isSearchResult && markerStyles.labelDistanceDefault,
+                ]}>{dist}</Text>
               )}
             </View>
           </View>
@@ -776,6 +779,9 @@ const markerStyles = StyleSheet.create({
     color: "#93C5FD",
     textAlign: "center" as const,
     marginTop: 1,
+  },
+  labelDistanceDefault: {
+    color: "#FFB4B4",
   },
   callout: {
     backgroundColor: Colors.surface,
