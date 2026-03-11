@@ -10,6 +10,7 @@ import { FriendsProvider } from "@/providers/FriendsProvider";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { OnlineStatusProvider } from "@/providers/OnlineStatusProvider";
 import StatusPickerModal from "@/components/StatusPickerModal";
+import UserSync from "@/components/UserSync";
 import Colors from "@/constants/colors";
 
 void SplashScreen.preventAutoHideAsync();
@@ -83,6 +84,7 @@ export default function RootLayout() {
               <FriendsProvider>
                 <ChatProvider>
                 <OnlineStatusProvider>
+                  <UserSync />
                   <RootLayoutNav />
                   <StatusPickerModal />
                 </OnlineStatusProvider>

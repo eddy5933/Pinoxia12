@@ -18,6 +18,7 @@ import {
   UserMinus,
   Users,
   Clock,
+  Store,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -25,7 +26,8 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useChat } from "@/providers/ChatProvider";
-import { Friend, FriendRequest, User } from "@/types";
+import { Friend, FriendRequest } from "@/types";
+import { PublicUser } from "@/providers/FriendsProvider";
 
 type TabType = "friends" | "requests" | "search";
 
@@ -73,7 +75,7 @@ export default function FriendsScreen() {
   );
 
   const handleSendRequest = useCallback(
-    (toUser: Omit<User, "role">) => {
+    (toUser: PublicUser) => {
       if (!user) return;
       const success = sendFriendRequest(user, toUser);
       if (success) {
@@ -199,9 +201,10 @@ export default function FriendsScreen() {
   );
 
   const renderSearchItem = useCallback(
-    ({ item }: { item: Omit<User, "role"> }) => {
+    ({ item }: { item: PublicUser }) => {
       const alreadyFriend = isFriend(item.id);
       const pendingReq = user ? hasPendingRequest(user.id, item.id) : false;
+      const isOwnerUser = item.role === "owner";
 
       return (
         <View style={styles.friendCard}>
@@ -211,7 +214,15 @@ export default function FriendsScreen() {
             </Text>
           </View>
           <View style={styles.friendInfo}>
-            <Text style={styles.friendName}>{item.name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.friendName}>{item.name}</Text>
+              {isOwnerUser && (
+                <View style={styles.ownerBadge}>
+                  <Store size={10} color={Colors.star} />
+                  <Text style={styles.ownerBadgeText}>Business</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.friendEmail}>{item.email}</Text>
           </View>
           {alreadyFriend ? (
@@ -586,6 +597,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.success,
+  },
+  nameRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  ownerBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,184,0,0.12)",
+  },
+  ownerBadgeText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.star,
   },
   sentSection: {
     marginBottom: 16,
