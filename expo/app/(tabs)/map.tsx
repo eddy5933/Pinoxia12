@@ -21,7 +21,9 @@ import {
   Crosshair,
   Search,
   X,
-  Users,
+  Radio,
+  Eye,
+  EyeOff,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -431,9 +433,12 @@ function WebMapView({
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
   const { friends } = useFriends();
-  const [showFriendsOnly, setShowFriendsOnly] = useState(false);
+
+  const [showFriendLocations, setShowFriendLocations] = useState(false);
+  const sharingPulse = useRef(new Animated.Value(0)).current;
+  const shareButtonScale = useRef(new Animated.Value(1)).current;
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -502,6 +507,62 @@ export default function MapScreen() {
       ])
     ).start();
   }, [pulseAnim]);
+
+  useEffect(() => {
+    if (sharingEnabled) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sharingPulse, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(sharingPulse, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      sharingPulse.setValue(0);
+    }
+  }, [sharingEnabled, sharingPulse]);
+
+  const handleToggleSharing = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Animated.sequence([
+      Animated.timing(shareButtonScale, {
+        toValue: 0.9,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(shareButtonScale, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    const newVal = !sharingEnabled;
+    setSharingEnabled(newVal);
+    if (newVal) {
+      setShowFriendLocations(true);
+      console.log("[MapScreen] Live location sharing enabled, showing friend locations");
+    } else {
+      console.log("[MapScreen] Live location sharing disabled");
+    }
+  }, [sharingEnabled, setSharingEnabled, shareButtonScale]);
+
+  const handleToggleFriendLocations = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowFriendLocations((prev) => !prev);
+    console.log("[MapScreen] Toggle friend locations visibility");
+  }, []);
+
+  const visibleFriendLocations = useMemo(() => {
+    if (!showFriendLocations) return [];
+    return friendLocations;
+  }, [showFriendLocations, friendLocations]);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
@@ -621,37 +682,79 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      {friends.length > 0 && (
-        <View style={styles.friendsFilterRow}>
+      <View style={styles.liveLocationRow}>
+        <Animated.View style={{ transform: [{ scale: shareButtonScale }] }}>
           <TouchableOpacity
             style={[
-              styles.friendsFilterButton,
-              showFriendsOnly && styles.friendsFilterButtonActive,
+              styles.shareLocationButton,
+              sharingEnabled && styles.shareLocationButtonActive,
             ]}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowFriendsOnly((prev) => !prev);
-            }}
+            onPress={handleToggleSharing}
             activeOpacity={0.7}
-            testID="friends-filter-button"
+            testID="share-location-button"
           >
-            <Users size={14} color={showFriendsOnly ? Colors.white : Colors.textSecondary} />
+            {sharingEnabled && (
+              <Animated.View
+                style={[
+                  styles.sharingPulseRing,
+                  {
+                    opacity: sharingPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.6, 0],
+                    }),
+                    transform: [{
+                      scale: sharingPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.8],
+                      }),
+                    }],
+                  },
+                ]}
+              />
+            )}
+            <Radio size={16} color={sharingEnabled ? Colors.white : Colors.textSecondary} />
             <Text style={[
-              styles.friendsFilterText,
-              showFriendsOnly && styles.friendsFilterTextActive,
+              styles.shareLocationText,
+              sharingEnabled && styles.shareLocationTextActive,
+            ]}>
+              {sharingEnabled ? "Sharing Live" : "Share Location"}
+            </Text>
+            {sharingEnabled && <View style={styles.liveDot} />}
+          </TouchableOpacity>
+        </Animated.View>
+
+        {friends.length > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.viewFriendsButton,
+              showFriendLocations && styles.viewFriendsButtonActive,
+            ]}
+            onPress={handleToggleFriendLocations}
+            activeOpacity={0.7}
+            testID="view-friends-location-button"
+          >
+            {showFriendLocations ? (
+              <Eye size={14} color={Colors.white} />
+            ) : (
+              <EyeOff size={14} color={Colors.textSecondary} />
+            )}
+            <Text style={[
+              styles.viewFriendsText,
+              showFriendLocations && styles.viewFriendsTextActive,
             ]}>
               Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
             </Text>
           </TouchableOpacity>
-          {showFriendsOnly && friendLocations.length === 0 && (
-            <Text style={styles.noFriendsText}>No friends sharing location</Text>
-          )}
-        </View>
-      )}
+        )}
+
+        {showFriendLocations && friendLocations.length === 0 && friends.length > 0 && (
+          <Text style={styles.noFriendsText}>No friends online</Text>
+        )}
+      </View>
 
       <View style={styles.mapContainer}>
         {Platform.OS === "web" ? (
-          <WebMapView restaurants={showFriendsOnly ? [] : filteredRestaurants} userLocation={userLocation} onMarkerPress={handleMarkerPress} />
+          <WebMapView restaurants={filteredRestaurants} userLocation={userLocation} onMarkerPress={handleMarkerPress} />
         ) : (
           <NativeMapView
             restaurants={filteredRestaurants}
@@ -660,7 +763,7 @@ export default function MapScreen() {
             centerTrigger={centerTrigger}
             distanceMap={distanceMap}
             searchQuery={searchQuery}
-            friendLocations={showFriendsOnly ? friendLocations : friendLocations}
+            friendLocations={visibleFriendLocations}
           />
         )}
 
@@ -1064,35 +1167,77 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 10,
   },
-  friendsFilterRow: {
+  liveLocationRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: Colors.background,
-    gap: 10,
+    gap: 8,
   },
-  friendsFilterButton: {
+  shareLocationButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 9,
+    borderRadius: 22,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: "visible" as const,
+    position: "relative" as const,
   },
-  friendsFilterButtonActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#3B82F6",
+  shareLocationButtonActive: {
+    backgroundColor: "#16A34A",
+    borderColor: "#22C55E",
   },
-  friendsFilterText: {
+  shareLocationText: {
     fontSize: 13,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
-  friendsFilterTextActive: {
+  shareLocationTextActive: {
+    color: Colors.white,
+  },
+  sharingPulseRing: {
+    position: "absolute" as const,
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: "#22C55E",
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#86EFAC",
+    marginLeft: 2,
+  },
+  viewFriendsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  viewFriendsButtonActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#3B82F6",
+  },
+  viewFriendsText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  viewFriendsTextActive: {
     color: Colors.white,
   },
   noFriendsText: {
