@@ -25,7 +25,6 @@ import {
   Eye,
   EyeOff,
   Users,
-  MapPinned,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -43,6 +42,8 @@ const DEFAULT_REGION = {
   latitudeDelta: 0.08,
   longitudeDelta: 0.08,
 };
+
+
 
 function MapRestaurantCard({ restaurant, distance }: { restaurant: Restaurant; distance: string | null }) {
   const router = useRouter();
@@ -144,6 +145,8 @@ function NativeMapView({
   distanceMap,
   searchQuery,
   friendLocations,
+  focusFriendLocation,
+  focusFriendTrigger,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -152,6 +155,8 @@ function NativeMapView({
   distanceMap: Map<string, string>;
   searchQuery: string;
   friendLocations: FriendLocation[];
+  focusFriendLocation: FriendLocation | null;
+  focusFriendTrigger: number;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -230,6 +235,21 @@ function NativeMapView({
       );
     }
   }, [centerTrigger, userLocation]);
+
+  useEffect(() => {
+    if (focusFriendLocation && mapRef.current) {
+      console.log("[MapScreen] Animating to friend location:", focusFriendLocation.name);
+      mapRef.current.animateToRegion(
+        {
+          latitude: focusFriendLocation.latitude,
+          longitude: focusFriendLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        800
+      );
+    }
+  }, [focusFriendLocation, focusFriendTrigger]);
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && restaurants.length > 0 && mapRef.current && prevSearchRef.current !== searchQuery) {
@@ -421,15 +441,24 @@ function WebMapView({
   );
 }
 
-export default function MapScreen() {
+export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
   const { friends, closeFriends } = useFriends();
 
   const [showFriendLocations, setShowFriendLocations] = useState(true);
+  const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
+  const [focusFriendTrigger, setFocusFriendTrigger] = useState(0);
   const sharingPulse = useRef(new Animated.Value(0)).current;
   const shareButtonScale = useRef(new Animated.Value(1)).current;
+
+  const handleFocusFriend = useCallback((friend: FriendLocation) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setFocusFriendLocation(friend);
+    setFocusFriendTrigger((prev) => prev + 1);
+    console.log("[MapScreen] Focusing on friend:", friend.name, friend.latitude, friend.longitude);
+  }, []);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -766,13 +795,7 @@ export default function MapScreen() {
               const dist = userLocation
                 ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
                 : null;
-              const updatedAgo = (() => {
-                const diff = Date.now() - new Date(item.updatedAt).getTime();
-                const mins = Math.floor(diff / 60000);
-                if (mins < 1) return "just now";
-                if (mins < 60) return `${mins}m ago`;
-                return `${Math.floor(mins / 60)}h ago`;
-              })();
+
               const initials = item.name
                 .split(" ")
                 .map((w) => w[0])
@@ -780,36 +803,34 @@ export default function MapScreen() {
                 .toUpperCase()
                 .slice(0, 2);
               return (
-                <View style={friendListStyles.card} testID={`friend-loc-${item.userId}`}>
-                  <View style={friendListStyles.avatarContainer}>
+                <TouchableOpacity
+                  style={[
+                    friendListStyles.card,
+                    focusFriendLocation?.userId === item.userId && friendListStyles.cardActive,
+                  ]}
+                  testID={`friend-loc-${item.userId}`}
+                  onPress={() => handleFocusFriend(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={friendListStyles.avatarContainerSmall}>
                     {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={friendListStyles.avatar} contentFit="cover" />
+                      <Image source={{ uri: item.avatar }} style={friendListStyles.avatarSmall} contentFit="cover" />
                     ) : (
-                      <View style={friendListStyles.avatarFallback}>
-                        <Text style={friendListStyles.avatarInitials}>{initials}</Text>
+                      <View style={friendListStyles.avatarFallbackSmall}>
+                        <Text style={friendListStyles.avatarInitialsSmall}>{initials}</Text>
                       </View>
                     )}
-                    <View style={friendListStyles.onlineBadge} />
+                    <View style={friendListStyles.onlineBadgeSmall} />
                   </View>
-                  <View style={friendListStyles.info}>
-                    <Text style={friendListStyles.name} numberOfLines={1}>{item.name}</Text>
-                    {item.placeName ? (
-                      <View style={friendListStyles.placeRow}>
-                        <MapPinned size={10} color={Colors.textSecondary} />
-                        <Text style={friendListStyles.place} numberOfLines={1}>{item.placeName}</Text>
-                      </View>
-                    ) : null}
-                    <View style={friendListStyles.metaRow}>
+                  <View style={friendListStyles.infoSmall}>
+                    <Text style={friendListStyles.nameSmall} numberOfLines={1}>{item.name}</Text>
+                    <View style={friendListStyles.metaRowSmall}>
                       {dist && (
-                        <View style={friendListStyles.distBadge}>
-                          <Navigation size={10} color="#3B82F6" />
-                          <Text style={friendListStyles.distText}>{dist}</Text>
-                        </View>
+                        <Text style={friendListStyles.distTextSmall}>{dist}</Text>
                       )}
-                      <Text style={friendListStyles.timeText}>{updatedAgo}</Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             }}
           />
@@ -828,6 +849,8 @@ export default function MapScreen() {
             distanceMap={distanceMap}
             searchQuery={searchQuery}
             friendLocations={visibleFriendLocations}
+            focusFriendLocation={focusFriendLocation}
+            focusFriendTrigger={focusFriendTrigger}
           />
         )}
 
@@ -1407,99 +1430,77 @@ const friendListStyles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   listContent: {
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingHorizontal: 8,
+    gap: 6,
   },
   card: {
-    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 10,
+    borderRadius: 10,
+    padding: 6,
     borderWidth: 1,
     borderColor: "#1E3A5F",
-    width: 220,
-    alignItems: "center",
-    gap: 10,
+    width: 72,
+    gap: 3,
   },
-  avatarContainer: {
+  cardActive: {
+    borderColor: "#3B82F6",
+    backgroundColor: "rgba(59,130,246,0.15)",
+  },
+  avatarContainerSmall: {
     position: "relative" as const,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  avatarSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: "#3B82F6",
   },
-  avatarFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  avatarFallbackSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#1E40AF",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#3B82F6",
   },
-  avatarInitials: {
-    fontSize: 14,
+  avatarInitialsSmall: {
+    fontSize: 11,
     fontWeight: "800" as const,
     color: Colors.white,
   },
-  onlineBadge: {
+  onlineBadgeSmall: {
     position: "absolute" as const,
     bottom: -1,
     right: -1,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: Colors.success,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: Colors.surface,
   },
-  info: {
-    flex: 1,
+  infoSmall: {
+    alignItems: "center",
+    width: "100%" as const,
   },
-  name: {
-    fontSize: 13,
+  nameSmall: {
+    fontSize: 10,
     fontWeight: "700" as const,
     color: Colors.white,
+    textAlign: "center" as const,
   },
-  placeRow: {
-    flexDirection: "row",
+  metaRowSmall: {
     alignItems: "center",
-    gap: 4,
-    marginTop: 2,
+    marginTop: 1,
   },
-  place: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-  },
-  distBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(59,130,246,0.15)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  distText: {
-    fontSize: 11,
+  distTextSmall: {
+    fontSize: 9,
     fontWeight: "700" as const,
     color: "#60A5FA",
-  },
-  timeText: {
-    fontSize: 10,
-    color: Colors.textMuted,
-    fontWeight: "500" as const,
   },
 });
 
