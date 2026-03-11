@@ -141,7 +141,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       .on(
         "postgres_changes" as any,
         { event: "UPDATE", schema: "public", table: "friend_requests" },
-        (payload: any) => {
+        async (payload: any) => {
           console.log("[FriendsProvider] Realtime updated friend_request:", payload.new?.id, "status:", payload.new?.status);
           const r = payload.new;
           if (!r) return;
