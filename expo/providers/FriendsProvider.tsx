@@ -7,6 +7,7 @@ import { Friend, FriendRequest, User } from "@/types";
 const FRIENDS_KEY = "foodspot_friends";
 const REQUESTS_KEY = "foodspot_friend_requests";
 const USERS_KEY = "foodspot_all_users";
+const ALL_ACCOUNTS_KEY = "foodspot_all_accounts";
 
 export interface PublicUser {
   id: string;
@@ -43,20 +44,24 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     queryKey: ["friends_load"],
     queryFn: async () => {
       console.log("[FriendsProvider] Loading data...");
-      const [storedFriends, storedRequests, storedUsers] = await Promise.all([
+      const [storedFriends, storedRequests, storedUsers, storedAccounts] = await Promise.all([
         AsyncStorage.getItem(FRIENDS_KEY),
         AsyncStorage.getItem(REQUESTS_KEY),
         AsyncStorage.getItem(USERS_KEY),
+        AsyncStorage.getItem(ALL_ACCOUNTS_KEY),
       ]);
 
       const loadedFriends: Friend[] = storedFriends ? JSON.parse(storedFriends) : [];
       const loadedRequests: FriendRequest[] = storedRequests ? JSON.parse(storedRequests) : [];
       const parsedUsers: PublicUser[] = storedUsers ? JSON.parse(storedUsers) : [];
-      const loadedUsers = mergeUsers(parsedUsers, MOCK_USERS);
+      const accounts: PublicUser[] = storedAccounts
+        ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
+        : [];
+      const loadedUsers = mergeUsers([...parsedUsers, ...accounts], MOCK_USERS);
 
       await AsyncStorage.setItem(USERS_KEY, JSON.stringify(loadedUsers));
 
-      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests,", loadedUsers.length, "users");
+      console.log("[FriendsProvider] Loaded", loadedFriends.length, "friends,", loadedRequests.length, "requests,", loadedUsers.length, "users (incl", accounts.length, "accounts)");
       return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
     },
     staleTime: 5000,
@@ -244,10 +249,17 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const refetchUsers = useCallback(async () => {
     console.log("[FriendsProvider] Refetching users...");
-    const storedRaw = await AsyncStorage.getItem(USERS_KEY);
+    const [storedRaw, storedAccounts] = await Promise.all([
+      AsyncStorage.getItem(USERS_KEY),
+      AsyncStorage.getItem(ALL_ACCOUNTS_KEY),
+    ]);
     const storedUsers: PublicUser[] = storedRaw ? JSON.parse(storedRaw) : [];
-    const merged = mergeUsers(storedUsers, MOCK_USERS);
+    const accounts: PublicUser[] = storedAccounts
+      ? JSON.parse(storedAccounts).map((a: any) => ({ id: a.id, email: a.email, name: a.name, role: a.role || "customer" }))
+      : [];
+    const merged = mergeUsers([...storedUsers, ...accounts], MOCK_USERS);
     setAllUsers(merged);
+    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(merged));
     console.log("[FriendsProvider] Refreshed users count:", merged.length);
     await loadQuery.refetch();
   }, [loadQuery]);

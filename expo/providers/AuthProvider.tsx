@@ -4,6 +4,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { User, UserRole } from "@/types";
 
 const AUTH_STORAGE_KEY = "foodspot_auth";
+const ALL_ACCOUNTS_KEY = "foodspot_all_accounts";
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [user, setUser] = useState<User | null>(null);
@@ -26,26 +27,54 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, []);
 
   const login = useCallback(async (email: string, _password: string) => {
+    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
+    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
+    const existing = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+
+    if (existing) {
+      console.log("[Auth] Found existing account for", email, "id:", existing.id);
+      setUser(existing);
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
+      return existing;
+    }
+
     const newUser: User = {
       id: `user_${Date.now()}`,
       email,
       name: email.split("@")[0],
       role: "customer",
     };
+    const updatedAccounts = [...accounts, newUser];
     setUser(newUser);
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
+    console.log("[Auth] Created new account for", email, "id:", newUser.id);
     return newUser;
   }, []);
 
   const signup = useCallback(async (email: string, _password: string, name: string) => {
+    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
+    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
+    const existing = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+
+    if (existing) {
+      console.log("[Auth] Account already exists for", email, "- logging in");
+      setUser(existing);
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
+      return existing;
+    }
+
     const newUser: User = {
       id: `user_${Date.now()}`,
       email,
       name,
       role: "customer",
     };
+    const updatedAccounts = [...accounts, newUser];
     setUser(newUser);
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
+    console.log("[Auth] Signed up new account for", email, "id:", newUser.id);
     return newUser;
   }, []);
 
@@ -55,7 +84,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, []);
 
   const deleteAccount = useCallback(async () => {
-    console.log("Deleting account for user:", user?.id);
+    console.log("[Auth] Deleting account for user:", user?.id);
+    if (user) {
+      const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
+      const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
+      const filtered = accounts.filter((a) => a.id !== user.id);
+      await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(filtered));
+    }
     setUser(null);
     await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
   }, [user]);
@@ -66,6 +101,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const updated = { ...user, role: newRole };
     setUser(updated);
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated));
+
+    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
+    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
+    const updatedAccounts = accounts.map((a) => (a.id === user.id ? updated : a));
+    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
+    console.log("[Auth] Updated role to", newRole, "for", user.name);
   }, [user]);
 
   return useMemo(
