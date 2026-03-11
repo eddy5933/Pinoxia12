@@ -1,6 +1,18 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Platform } from "react-native";
 import createContextHook from "@nkzw/create-context-hook";
+import { supabase } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";
+
+export interface FriendLocation {
+  userId: string;
+  name: string;
+  avatar?: string;
+  latitude: number;
+  longitude: number;
+  placeName?: string;
+  updatedAt: string;
+}
 
 export interface UserLocation {
   latitude: number;
@@ -48,6 +60,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [sharingEnabled, setSharingEnabled] = useState(true);
+  const shareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const requestLocation = useCallback(async () => {
     console.log("[LocationProvider] Requesting user location...");
@@ -175,14 +190,124 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     void requestLocation();
   }, [requestLocation]);
 
+  const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string) => {
+    try {
+      console.log("[LocationProvider] Sharing location to Supabase for user:", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          location_place_name: loc.placeName ?? null,
+          location_updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+      if (error) {
+        console.warn("[LocationProvider] Failed to share location:", error.message);
+      } else {
+        console.log("[LocationProvider] Location shared successfully");
+      }
+    } catch (err) {
+      console.warn("[LocationProvider] Share location error:", err);
+    }
+  }, []);
+
+  const setLocationUser = useCallback((userId: string) => {
+    console.log("[LocationProvider] Setting current user for location sharing:", userId);
+    setCurrentUserId(userId);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId || !userLocation || !sharingEnabled) return;
+
+    void shareLocationToSupabase(userLocation, currentUserId);
+
+    if (shareIntervalRef.current) {
+      clearInterval(shareIntervalRef.current);
+    }
+    shareIntervalRef.current = setInterval(() => {
+      if (userLocation && currentUserId && sharingEnabled) {
+        void shareLocationToSupabase(userLocation, currentUserId);
+      }
+    }, 30000);
+
+    return () => {
+      if (shareIntervalRef.current) {
+        clearInterval(shareIntervalRef.current);
+      }
+    };
+  }, [currentUserId, userLocation, sharingEnabled, shareLocationToSupabase]);
+
+  const friendLocationsQuery = useQuery({
+    queryKey: ["friend_locations", currentUserId],
+    queryFn: async (): Promise<FriendLocation[]> => {
+      if (!currentUserId) return [];
+      console.log("[LocationProvider] Fetching friends locations...");
+
+      const { data: friendRows, error: fErr } = await supabase
+        .from("friends")
+        .select("friend_id")
+        .eq("user_id", currentUserId);
+
+      if (fErr || !friendRows || friendRows.length === 0) {
+        console.log("[LocationProvider] No friends found or error:", fErr?.message);
+        return [];
+      }
+
+      const friendIds = friendRows.map((f: any) => f.friend_id);
+      console.log("[LocationProvider] Fetching locations for friend IDs:", friendIds);
+
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at")
+        .in("id", friendIds)
+        .not("latitude", "is", null)
+        .not("longitude", "is", null);
+
+      if (pErr) {
+        console.warn("[LocationProvider] Error fetching friend locations:", pErr.message);
+        return [];
+      }
+
+      const now = Date.now();
+      const STALE_MS = 10 * 60 * 1000;
+      const locations: FriendLocation[] = (profiles ?? []).filter((p: any) => {
+        if (!p.location_updated_at) return false;
+        const age = now - new Date(p.location_updated_at).getTime();
+        return age < STALE_MS;
+      }).map((p: any) => ({
+        userId: p.id,
+        name: p.name ?? "Friend",
+        avatar: p.avatar ?? undefined,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        placeName: p.location_place_name ?? undefined,
+        updatedAt: p.location_updated_at,
+      }));
+
+      console.log("[LocationProvider] Found", locations.length, "friends with active locations");
+      return locations;
+    },
+    enabled: !!currentUserId,
+    staleTime: 10000,
+    refetchInterval: 15000,
+  });
+
+  const friendLocations = useMemo(() => friendLocationsQuery.data ?? [], [friendLocationsQuery.data]);
+
   return useMemo(
     () => ({
       userLocation,
       locationLoading,
       locationError,
       requestLocation,
+      setLocationUser,
+      sharingEnabled,
+      setSharingEnabled,
+      friendLocations,
+      friendLocationsLoading: friendLocationsQuery.isLoading,
     }),
-    [userLocation, locationLoading, locationError, requestLocation]
+    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, friendLocations, friendLocationsQuery.isLoading]
   );
 });
 

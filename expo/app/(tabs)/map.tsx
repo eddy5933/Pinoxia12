@@ -21,13 +21,15 @@ import {
   Crosshair,
   Search,
   X,
+  Users,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
-import type { UserLocation } from "@/providers/LocationProvider";
+import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
+import { useFriends } from "@/providers/FriendsProvider";
 import { Restaurant } from "@/types";
 
 const DEFAULT_REGION = {
@@ -102,6 +104,42 @@ function MapRestaurantCard({ restaurant, distance }: { restaurant: Restaurant; d
   );
 }
 
+function FriendMarkerView({ friend }: { friend: FriendLocation }) {
+  const initials = friend.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const updatedAgo = useMemo(() => {
+    const diff = Date.now() - new Date(friend.updatedAt).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m ago`;
+    return `${Math.floor(mins / 60)}h ago`;
+  }, [friend.updatedAt]);
+
+  return (
+    <View style={friendMarkerStyles.container}>
+      <View style={friendMarkerStyles.avatarRing}>
+        {friend.avatar ? (
+          <Image source={{ uri: friend.avatar }} style={friendMarkerStyles.avatar} contentFit="cover" />
+        ) : (
+          <View style={friendMarkerStyles.avatarFallback}>
+            <Text style={friendMarkerStyles.initials}>{initials}</Text>
+          </View>
+        )}
+        <View style={friendMarkerStyles.onlineDot} />
+      </View>
+      <View style={friendMarkerStyles.label}>
+        <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
+        <Text style={friendMarkerStyles.labelTime}>{updatedAgo}</Text>
+      </View>
+    </View>
+  );
+}
+
 function NativeMapView({
   restaurants,
   userLocation,
@@ -109,6 +147,7 @@ function NativeMapView({
   centerTrigger,
   distanceMap,
   searchQuery,
+  friendLocations,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -116,6 +155,7 @@ function NativeMapView({
   centerTrigger: number;
   distanceMap: Map<string, string>;
   searchQuery: string;
+  friendLocations: FriendLocation[];
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -299,6 +339,24 @@ function NativeMapView({
         </Marker>
         );
       })}
+      {friendLocations.map((fl) => (
+        <Marker
+          key={`friend-${fl.userId}`}
+          coordinate={{ latitude: fl.latitude, longitude: fl.longitude }}
+          tracksViewChanges={false}
+        >
+          <FriendMarkerView friend={fl} />
+          <Callout tooltip>
+            <View style={markerStyles.calloutSimple}>
+              <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{fl.name}</Text>
+              {fl.placeName && (
+                <Text style={{ fontSize: 11, color: Colors.textSecondary, textAlign: "center" as const, marginTop: 2 }}>{fl.placeName}</Text>
+              )}
+            </View>
+            <View style={markerStyles.calloutArrow} />
+          </Callout>
+        </Marker>
+      ))}
     </MapView>
   );
 }
@@ -373,7 +431,9 @@ function WebMapView({
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations } = useLocation();
+  const { friends } = useFriends();
+  const [showFriendsOnly, setShowFriendsOnly] = useState(false);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -561,9 +621,37 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
+      {friends.length > 0 && (
+        <View style={styles.friendsFilterRow}>
+          <TouchableOpacity
+            style={[
+              styles.friendsFilterButton,
+              showFriendsOnly && styles.friendsFilterButtonActive,
+            ]}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowFriendsOnly((prev) => !prev);
+            }}
+            activeOpacity={0.7}
+            testID="friends-filter-button"
+          >
+            <Users size={14} color={showFriendsOnly ? Colors.white : Colors.textSecondary} />
+            <Text style={[
+              styles.friendsFilterText,
+              showFriendsOnly && styles.friendsFilterTextActive,
+            ]}>
+              Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
+            </Text>
+          </TouchableOpacity>
+          {showFriendsOnly && friendLocations.length === 0 && (
+            <Text style={styles.noFriendsText}>No friends sharing location</Text>
+          )}
+        </View>
+      )}
+
       <View style={styles.mapContainer}>
         {Platform.OS === "web" ? (
-          <WebMapView restaurants={filteredRestaurants} userLocation={userLocation} onMarkerPress={handleMarkerPress} />
+          <WebMapView restaurants={showFriendsOnly ? [] : filteredRestaurants} userLocation={userLocation} onMarkerPress={handleMarkerPress} />
         ) : (
           <NativeMapView
             restaurants={filteredRestaurants}
@@ -572,6 +660,7 @@ export default function MapScreen() {
             centerTrigger={centerTrigger}
             distanceMap={distanceMap}
             searchQuery={searchQuery}
+            friendLocations={showFriendsOnly ? friendLocations : friendLocations}
           />
         )}
 
@@ -974,6 +1063,116 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
     gap: 10,
+  },
+  friendsFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.background,
+    gap: 10,
+  },
+  friendsFilterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  friendsFilterButtonActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#3B82F6",
+  },
+  friendsFilterText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  friendsFilterTextActive: {
+    color: Colors.white,
+  },
+  noFriendsText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: "italic" as const,
+  },
+});
+
+const friendMarkerStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+  },
+  avatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  avatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#1E40AF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initials: {
+    fontSize: 12,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: 0,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  label: {
+    backgroundColor: "#1E3A5F",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+    maxWidth: 100,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#3B82F6",
+  },
+  labelName: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    textAlign: "center" as const,
+  },
+  labelTime: {
+    fontSize: 8,
+    fontWeight: "600" as const,
+    color: "#93C5FD",
+    textAlign: "center" as const,
+    marginTop: 1,
   },
 });
 
