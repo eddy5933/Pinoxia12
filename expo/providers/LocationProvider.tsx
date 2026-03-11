@@ -192,8 +192,8 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
   const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
     try {
-      console.log("[LocationProvider] Sharing location to Supabase for user:", userId, "enabled:", sharing);
-      const { error } = await supabase
+      console.log("[LocationProvider] Sharing location to Supabase for user:", userId, "enabled:", sharing, "coords:", loc.latitude, loc.longitude);
+      const { data, error } = await supabase
         .from("profiles")
         .update({
           latitude: loc.latitude,
@@ -202,11 +202,12 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           location_updated_at: new Date().toISOString(),
           location_sharing_enabled: sharing,
         })
-        .eq("id", userId);
+        .eq("id", userId)
+        .select();
       if (error) {
-        console.warn("[LocationProvider] Failed to share location:", error.message);
+        console.warn("[LocationProvider] Failed to share location:", error.message, error.details, error.hint, error.code);
       } else {
-        console.log("[LocationProvider] Location shared successfully");
+        console.log("[LocationProvider] Location shared successfully, updated rows:", data?.length ?? 0);
       }
     } catch (err) {
       console.warn("[LocationProvider] Share location error:", err);
@@ -255,60 +256,102 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const friendLocationsQuery = useQuery({
     queryKey: ["friend_locations", currentUserId],
     queryFn: async (): Promise<FriendLocation[]> => {
-      if (!currentUserId) return [];
-      console.log("[LocationProvider] Fetching friends locations...");
+      if (!currentUserId) {
+        console.log("[LocationProvider] No currentUserId, skipping friend locations");
+        return [];
+      }
+      console.log("[LocationProvider] Fetching friends locations for user:", currentUserId);
 
       const { data: friendRows, error: fErr } = await supabase
         .from("friends")
         .select("friend_id, is_close_friend")
         .eq("user_id", currentUserId);
 
-      if (fErr || !friendRows || friendRows.length === 0) {
-        console.log("[LocationProvider] No friends found or error:", fErr?.message);
+      console.log("[LocationProvider] Friends query result:", {
+        count: friendRows?.length ?? 0,
+        error: fErr?.message ?? null,
+        rows: friendRows?.map((f: any) => ({ friend_id: f.friend_id, is_close_friend: f.is_close_friend })),
+      });
+
+      if (fErr) {
+        console.warn("[LocationProvider] Friends query error:", fErr.message, fErr.details, fErr.hint);
+        return [];
+      }
+      if (!friendRows || friendRows.length === 0) {
+        console.log("[LocationProvider] No friends found");
         return [];
       }
 
       const closeFriendIds = friendRows
-        .filter((f: any) => f.is_close_friend === true)
+        .filter((f: any) => f.is_close_friend === true || f.is_close_friend === "true")
         .map((f: any) => f.friend_id);
+
+      console.log("[LocationProvider] Close friend IDs:", closeFriendIds, "out of", friendRows.length, "total friends");
 
       if (closeFriendIds.length === 0) {
         console.log("[LocationProvider] No close friends set, skipping location fetch");
         return [];
       }
 
-      console.log("[LocationProvider] Fetching locations for close friend IDs:", closeFriendIds);
-
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
         .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled")
-        .in("id", closeFriendIds)
-        .eq("location_sharing_enabled", true)
-        .not("latitude", "is", null)
-        .not("longitude", "is", null);
+        .in("id", closeFriendIds);
+
+      console.log("[LocationProvider] Profiles query result:", {
+        count: profiles?.length ?? 0,
+        error: pErr?.message ?? null,
+        profiles: profiles?.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          lat: p.latitude,
+          lng: p.longitude,
+          sharing: p.location_sharing_enabled,
+          updatedAt: p.location_updated_at,
+        })),
+      });
 
       if (pErr) {
-        console.warn("[LocationProvider] Error fetching friend locations:", pErr.message);
+        console.warn("[LocationProvider] Error fetching friend profiles:", pErr.message, pErr.details, pErr.hint);
+        return [];
+      }
+
+      if (!profiles || profiles.length === 0) {
+        console.log("[LocationProvider] No profiles found for close friend IDs. This may be an RLS issue.");
         return [];
       }
 
       const now = Date.now();
-      const STALE_MS = 60 * 60 * 1000;
-      const locations: FriendLocation[] = (profiles ?? []).filter((p: any) => {
-        if (!p.location_updated_at) return false;
-        const age = now - new Date(p.location_updated_at).getTime();
-        return age < STALE_MS;
-      }).map((p: any) => ({
-        userId: p.id,
-        name: p.name ?? "Friend",
-        avatar: p.avatar ?? undefined,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        placeName: p.location_place_name ?? undefined,
-        updatedAt: p.location_updated_at,
-      }));
+      const STALE_MS = 24 * 60 * 60 * 1000;
+      const locations: FriendLocation[] = (profiles ?? [])
+        .filter((p: any) => {
+          const hasCoords = p.latitude != null && p.longitude != null;
+          const sharingOn = p.location_sharing_enabled !== false;
+          const isRecent = !p.location_updated_at || (now - new Date(p.location_updated_at).getTime()) < STALE_MS;
 
-      console.log("[LocationProvider] Found", locations.length, "close friends with sharing enabled");
+          console.log("[LocationProvider] Filter check for", p.name, ":", {
+            hasCoords,
+            sharingOn,
+            isRecent,
+            lat: p.latitude,
+            lng: p.longitude,
+            sharing: p.location_sharing_enabled,
+            updatedAt: p.location_updated_at,
+          });
+
+          return hasCoords && sharingOn && isRecent;
+        })
+        .map((p: any) => ({
+          userId: p.id,
+          name: p.name ?? "Friend",
+          avatar: p.avatar ?? undefined,
+          latitude: Number(p.latitude),
+          longitude: Number(p.longitude),
+          placeName: p.location_place_name ?? undefined,
+          updatedAt: p.location_updated_at ?? new Date().toISOString(),
+        }));
+
+      console.log("[LocationProvider] Final friend locations:", locations.length, "out of", profiles.length, "profiles");
       return locations;
     },
     enabled: !!currentUserId,

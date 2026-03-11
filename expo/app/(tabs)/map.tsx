@@ -563,8 +563,11 @@ export default function MapScreen() {
   }, []);
 
   const visibleFriendLocations = useMemo(() => {
-    if (!showFriendLocations) return [];
-    console.log("[MapScreen] Visible friend locations:", friendLocations.length, "(only close friends with sharing enabled)");
+    if (!showFriendLocations) {
+      console.log("[MapScreen] Friend locations hidden by user toggle");
+      return [];
+    }
+    console.log("[MapScreen] Friend locations to display:", friendLocations.length, friendLocations.map(f => ({ name: f.name, lat: f.latitude, lng: f.longitude })));
     return friendLocations;
   }, [showFriendLocations, friendLocations]);
 
