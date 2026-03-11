@@ -201,7 +201,7 @@ function NativeMapView({
       showsUserLocation={true}
       showsMyLocationButton={false}
       showsCompass={false}
-      customMapStyle={darkMapStyle}
+      customMapStyle={brightMapStyle}
     >
       {restaurants.map((r) => (
         <Marker
@@ -372,7 +372,7 @@ export default function MapScreen() {
     return restaurants.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
-        r.cuisine.toLowerCase().includes(q) ||
+        (r.cuisine ?? '').toLowerCase().includes(q) ||
         r.address.toLowerCase().includes(q)
     );
   }, [restaurants, searchQuery]);
@@ -568,34 +568,64 @@ export default function MapScreen() {
   );
 }
 
-const darkMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#1d1d1d" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8e8e8e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a1a" }] },
+const brightMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#333333" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#2c2c2c" }],
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#e0e0e0" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#f8d86e" }],
   },
   {
     featureType: "road",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#7a7a7a" }],
+    stylers: [{ color: "#666666" }],
   },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#0e0e0e" }],
+    stylers: [{ color: "#aadaff" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#4a90d9" }],
   },
   {
     featureType: "poi",
     elementType: "geometry",
-    stylers: [{ color: "#252525" }],
+    stylers: [{ color: "#e8e8e8" }],
   },
   {
     featureType: "poi.park",
     elementType: "geometry",
-    stylers: [{ color: "#1a2e1a" }],
+    stylers: [{ color: "#c8e6c9" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#4caf50" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#e0e0e0" }],
+  },
+  {
+    featureType: "administrative",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#c9c9c9" }],
   },
 ];
 
