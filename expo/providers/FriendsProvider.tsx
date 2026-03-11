@@ -174,6 +174,64 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [allUsers, searchUsers]
   );
 
+  const addFriendDirectly = useCallback(
+    async (fromUser: User, toUser: PublicUser) => {
+      const alreadyFriend = friends.find((f) => f.userId === toUser.id);
+      if (alreadyFriend) {
+        console.log("[FriendsProvider] Already friends with", toUser.name);
+        return false;
+      }
+
+      console.log("[FriendsProvider] Adding friend directly:", toUser.name);
+
+      const { data: f1, error: e1 } = await supabase
+        .from("friends")
+        .insert({
+          user_id: fromUser.id,
+          friend_id: toUser.id,
+          friend_name: toUser.name,
+          friend_email: toUser.email,
+        })
+        .select()
+        .single();
+
+      if (e1) {
+        console.warn("[FriendsProvider] Add friend (my side) error:", e1.message);
+        return false;
+      }
+
+      const { error: e2 } = await supabase
+        .from("friends")
+        .insert({
+          user_id: toUser.id,
+          friend_id: fromUser.id,
+          friend_name: fromUser.name,
+          friend_email: fromUser.email,
+        });
+
+      if (e2) {
+        console.warn("[FriendsProvider] Add friend (other side) error:", e2.message);
+      }
+
+      if (f1) {
+        const newFriend: Friend = {
+          id: f1.id,
+          userId: toUser.id,
+          name: toUser.name,
+          email: toUser.email,
+          isOnline: true,
+          isCloseFriend: false,
+        };
+        setFriends((prev) => [newFriend, ...prev]);
+        console.log("[FriendsProvider] Friend added successfully:", toUser.name);
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+      return true;
+    },
+    [friends, queryClient, currentUserId]
+  );
+
   const sendFriendRequest = useCallback(
     async (fromUser: User, toUser: PublicUser) => {
       const existing = requests.find(
@@ -432,6 +490,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       searchUsers,
       searchUsersFromSupabase,
       sendFriendRequest,
+      addFriendDirectly,
       acceptFriendRequest,
       rejectFriendRequest,
       removeFriend,
@@ -447,7 +506,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     }),
     [
       friends, closeFriends, requests, allUsers, registerUser, searchUsers,
-      searchUsersFromSupabase, sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
+      searchUsersFromSupabase, sendFriendRequest, addFriendDirectly, acceptFriendRequest, rejectFriendRequest,
       removeFriend, cancelFriendRequest, toggleCloseFriend, isCloseFriend,
       getPendingRequests, getSentRequests,
       isFriend, hasPendingRequest, refetchUsers, isRefetching,

@@ -54,7 +54,7 @@ export default function FriendsScreen() {
   const {
     friends,
     searchUsersFromSupabase,
-    sendFriendRequest,
+    addFriendDirectly,
     acceptFriendRequest,
     rejectFriendRequest,
     removeFriend,
@@ -167,19 +167,19 @@ export default function FriendsScreen() {
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSendRequest = useCallback(
+  const handleAddFriend = useCallback(
     async (toUser: PublicUser) => {
       if (!user) return;
-      const success = await sendFriendRequest(user, toUser);
+      const success = await addFriendDirectly(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Friend request sent!", toUser.name, "success");
+        showToast("Friend added!", toUser.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already connected", toUser.name, "info");
+        showToast("Already friends", toUser.name, "info");
       }
     },
-    [user, sendFriendRequest, showToast]
+    [user, addFriendDirectly, showToast]
   );
 
   const handleAccept = useCallback(
@@ -398,7 +398,7 @@ export default function FriendsScreen() {
           ) : (
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => void handleSendRequest(item)}
+              onPress={() => void handleAddFriend(item)}
               activeOpacity={0.7}
             >
               <UserPlus size={16} color={Colors.white} />
@@ -408,7 +408,7 @@ export default function FriendsScreen() {
         </View>
       );
     },
-    [isFriend, hasPendingRequest, user, handleSendRequest]
+    [isFriend, hasPendingRequest, user, handleAddFriend]
   );
 
   if (!user) {
