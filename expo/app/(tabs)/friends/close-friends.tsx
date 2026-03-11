@@ -37,7 +37,7 @@ export default function CloseFriendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const { closeFriends, toggleCloseFriend, removeFriend } = useFriends();
+  const { closeFriends, toggleCloseFriend, unfollowUser } = useFriends();
   const { getOrCreateConversation } = useChat();
 
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "", type: "success" });
@@ -78,21 +78,21 @@ export default function CloseFriendsScreen() {
     [user, getOrCreateConversation, router]
   );
 
-  const handleRemoveFriend = useCallback(
+  const handleUnfollow = useCallback(
     (friend: Friend) => {
-      Alert.alert("Remove Friend", `Remove ${friend.name} from friends?`, [
+      Alert.alert("Unfollow", `Unfollow ${friend.name}?`, [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Remove",
+          text: "Unfollow",
           style: "destructive",
           onPress: async () => {
-            await removeFriend(friend.id);
+            await unfollowUser(friend.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           },
         },
       ]);
     },
-    [removeFriend]
+    [unfollowUser]
   );
 
   const renderItem = useCallback(
@@ -133,7 +133,7 @@ export default function CloseFriendsScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
-            onPress={() => handleRemoveFriend(item)}
+            onPress={() => handleUnfollow(item)}
             activeOpacity={0.7}
             testID={`close-friend-remove-${item.userId}`}
           >
@@ -142,7 +142,7 @@ export default function CloseFriendsScreen() {
         </View>
       </View>
     ),
-    [handleStartChat, handleRemoveCloseFriend, handleRemoveFriend]
+    [handleStartChat, handleRemoveCloseFriend, handleUnfollow]
   );
 
   return (
