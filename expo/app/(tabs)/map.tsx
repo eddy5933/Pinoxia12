@@ -381,6 +381,7 @@ function NativeMapView({
           onPress={() => {
             console.log("[MapScreen] Marker tapped:", r.name);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push(`/restaurant/${r.id}`);
           }}
         >
           <View style={markerStyles.container}>
