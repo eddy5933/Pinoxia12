@@ -144,69 +144,13 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted, current user is:", currentUserId);
-            const isRequester = r.from_user_id === currentUserId;
-            console.log("[FriendsProvider] Is requester (sent the request):", isRequester);
-
-            if (isRequester) {
-              const otherUserId = r.to_user_id;
-              const otherUserName = r.to_user_name;
-              const otherUserEmail = r.to_user_email;
-
-              const alreadyFriend = friends.some((f) => f.userId === otherUserId);
-              if (!alreadyFriend) {
-                console.log("[FriendsProvider] Requester creating own friend row for:", otherUserName);
-                const { data: myRow, error: myErr } = await supabase
-                  .from("friends")
-                  .upsert(
-                    {
-                      user_id: currentUserId,
-                      friend_id: otherUserId,
-                      friend_name: otherUserName,
-                      friend_email: otherUserEmail,
-                    },
-                    { onConflict: "user_id,friend_id" }
-                  )
-                  .select()
-                  .single();
-
-                if (myErr) {
-                  console.warn("[FriendsProvider] Requester friend row insert error:", myErr.message);
-                } else if (myRow) {
-                  console.log("[FriendsProvider] Requester friend row created:", myRow.id);
-                  const newFriend: Friend = {
-                    id: myRow.id,
-                    userId: otherUserId,
-                    name: otherUserName,
-                    email: otherUserEmail,
-                    isOnline: true,
-                    isCloseFriend: false,
-                  };
-                  setFriends((prev) => {
-                    if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-                    return [newFriend, ...prev];
-                  });
-                }
-              }
-            }
-
-            const refetchFriends = async () => {
-              console.log("[FriendsProvider] Refetching friends after acceptance...");
-              await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-              const freshData = await queryClient.fetchQuery({
-                queryKey: ["friends_load", currentUserId],
-                staleTime: 0,
-              });
-              if (freshData) {
-                const typedData = freshData as { friends: Friend[]; requests: FriendRequest[]; users: PublicUser[] };
-                setFriends(typedData.friends);
-                setRequests(typedData.requests);
-                setAllUsers(typedData.users);
-                console.log("[FriendsProvider] Force refreshed friends count:", typedData.friends.length);
-              }
-            };
-            setTimeout(() => void refetchFriends(), 1000);
-            setTimeout(() => void refetchFriends(), 3000);
+            console.log("[FriendsProvider] Friend request accepted, refetching friends list immediately");
+            setTimeout(() => {
+              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+            }, 500);
+            setTimeout(() => {
+              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+            }, 2000);
           }
         }
       )
@@ -246,7 +190,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Cleaning up realtime subscription");
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId, queryClient, friends]);
+  }, [currentUserId, queryClient]);
 
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
