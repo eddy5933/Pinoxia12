@@ -135,6 +135,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           console.log("[FriendsProvider] Realtime updated friend_request:", payload.new?.id, "status:", payload.new?.status);
           const r = payload.new;
           if (!r) return;
+          if (r.from_user_id !== currentUserId && r.to_user_id !== currentUserId) return;
 
           setRequests((prev) =>
             prev.map((req) =>
@@ -142,19 +143,25 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             )
           );
 
-          if (r.status === "accepted" && (r.from_user_id === currentUserId || r.to_user_id === currentUserId)) {
-            console.log("[FriendsProvider] Friend request accepted, refetching friends list");
-            void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+          if (r.status === "accepted") {
+            console.log("[FriendsProvider] Friend request accepted, refetching friends list immediately");
+            setTimeout(() => {
+              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+            }, 500);
+            setTimeout(() => {
+              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+            }, 2000);
           }
         }
       )
       .on(
         "postgres_changes" as any,
-        { event: "INSERT", schema: "public", table: "friends", filter: `user_id=eq.${currentUserId}` },
+        { event: "INSERT", schema: "public", table: "friends" },
         (payload: any) => {
-          console.log("[FriendsProvider] Realtime new friend for current user:", payload.new?.id);
+          console.log("[FriendsProvider] Realtime new friend row:", payload.new?.id, "user_id:", payload.new?.user_id);
           const f = payload.new;
           if (!f) return;
+          if (f.user_id !== currentUserId) return;
 
           const newFriend: Friend = {
             id: f.id,
@@ -171,6 +178,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             console.log("[FriendsProvider] Adding new friend to local state:", newFriend.name);
             return [newFriend, ...prev];
           });
+
+          void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
         }
       )
       .subscribe((status: string) => {
