@@ -38,22 +38,26 @@ export const [ChatProvider, useChat] = createContextHook(() => {
 
       const { data, error } = await supabase
         .from("conversations")
-        .select("*")
-        .contains("participants", [user.id]);
+        .select("*");
 
       if (error) {
         console.warn("[Chat] Conversations error:", error.message);
         return [];
       }
 
-      const convos: Conversation[] = (data ?? []).map((c: any) => ({
-        id: c.id,
-        participants: c.participants ?? [],
-        participantNames: c.participant_names ?? {},
-        lastMessage: c.last_message ?? undefined,
-        lastMessageAt: c.last_message_at ?? undefined,
-        unreadCount: c.unread_count ?? 0,
-      }));
+      const convos: Conversation[] = (data ?? [])
+        .filter((c: any) => {
+          const parts: string[] = c.participants ?? [];
+          return parts.includes(user.id);
+        })
+        .map((c: any) => ({
+          id: c.id,
+          participants: c.participants ?? [],
+          participantNames: c.participant_names ?? {},
+          lastMessage: c.last_message ?? undefined,
+          lastMessageAt: c.last_message_at ?? undefined,
+          unreadCount: c.unread_count ?? 0,
+        }));
 
       console.log("[Chat] Loaded", convos.length, "conversations");
       return convos;

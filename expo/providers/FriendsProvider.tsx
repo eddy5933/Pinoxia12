@@ -180,12 +180,14 @@ async function ensureConversation(
 ) {
   console.log("[Friends] Ensuring conversation between", userAName, "and", userBName);
 
-  const { data: existing } = await supabase
+  const { data: allConvos } = await supabase
     .from("conversations")
-    .select("id")
-    .contains("participants", [userAId])
-    .contains("participants", [userBId])
-    .maybeSingle();
+    .select("id, participants");
+
+  const existing = (allConvos ?? []).find((c: any) => {
+    const parts: string[] = c.participants ?? [];
+    return parts.includes(userAId) && parts.includes(userBId);
+  });
 
   if (existing) {
     console.log("[Friends] Conversation already exists:", existing.id);
