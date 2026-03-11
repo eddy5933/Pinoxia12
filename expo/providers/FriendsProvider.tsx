@@ -30,12 +30,19 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const [profilesRes, friendsRes, requestsRes] = await Promise.all([
         supabase.from("profiles").select("*"),
         currentUserId
-          ? supabase.from("friends").select("*").eq("user_id", currentUserId)
+          ? supabase.from("friends").select("*, profile:profiles!friends_friend_id_fkey(*)").eq("user_id", currentUserId)
           : Promise.resolve({ data: [] as any[], error: null }),
         currentUserId
           ? supabase.from("friend_requests").select("*").or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
           : Promise.resolve({ data: [] as any[], error: null }),
       ]);
+
+      let friendsData = friendsRes.data;
+      if (friendsRes.error && friendsRes.error.message?.includes("friend_id_fkey")) {
+        console.log("[FriendsProvider] JOIN failed, falling back to plain friends query");
+        const fallback = await supabase.from("friends").select("*").eq("user_id", currentUserId);
+        friendsData = fallback.data;
+      }
 
       if (profilesRes.error) {
         console.warn("[FriendsProvider] Profiles query error:", profilesRes.error.message, profilesRes.error.details, profilesRes.error.hint);
@@ -57,15 +64,18 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         avatar: p.avatar ?? undefined,
       }));
 
-      const loadedFriends: Friend[] = (friendsRes.data ?? []).map((f: any) => ({
-        id: f.id,
-        userId: f.friend_id,
-        name: f.friend_name,
-        email: f.friend_email,
-        avatar: f.friend_avatar ?? undefined,
-        isOnline: true,
-        isCloseFriend: f.is_close_friend ?? false,
-      }));
+      const loadedFriends: Friend[] = (friendsData ?? []).map((f: any) => {
+        const profile = f.profile;
+        return {
+          id: f.id,
+          userId: f.friend_id,
+          name: profile?.name ?? f.friend_name,
+          email: profile?.email ?? f.friend_email,
+          avatar: profile?.avatar ?? f.friend_avatar ?? undefined,
+          isOnline: true,
+          isCloseFriend: f.is_close_friend ?? false,
+        };
+      });
 
       const loadedRequests: FriendRequest[] = (requestsRes.data ?? []).map((r: any) => ({
         id: r.id,
@@ -100,7 +110,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     console.log("[FriendsProvider] Setting up realtime subscriptions");
 
     const channel = supabase
-      .channel("friends_realtime")
+      .channel(`friends_realtime_${currentUserId}`)
       .on(
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "friend_requests" },
@@ -151,18 +161,25 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             const otherUserName = isRequester ? r.to_user_name : r.from_user_name;
             const otherUserEmail = isRequester ? r.to_user_email : r.from_user_email;
 
+            const { data: freshProfile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", otherUserId)
+              .maybeSingle();
+
             const newFriend: Friend = {
               id: `temp_${Date.now()}`,
               userId: otherUserId,
-              name: otherUserName,
-              email: otherUserEmail,
+              name: freshProfile?.name ?? otherUserName,
+              email: freshProfile?.email ?? otherUserEmail,
+              avatar: freshProfile?.avatar ?? undefined,
               isOnline: true,
               isCloseFriend: false,
             };
 
             setFriends((prev) => {
               if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName);
+              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", newFriend.name);
               return [newFriend, ...prev];
             });
 
@@ -179,8 +196,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             };
 
             refetchAll();
-            setTimeout(refetchAll, 1000);
-            setTimeout(refetchAll, 3000);
+            setTimeout(refetchAll, 1500);
+            setTimeout(refetchAll, 4000);
           }
         }
       )
@@ -217,6 +234,29 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
           void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
           void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+        }
+      )
+      .on(
+        "postgres_changes" as any,
+        { event: "UPDATE", schema: "public", table: "profiles" },
+        (payload: any) => {
+          const p = payload.new;
+          if (!p) return;
+          console.log("[FriendsProvider] Realtime profile update:", p.id, p.name);
+          setFriends((prev) =>
+            prev.map((f) =>
+              f.userId === p.id
+                ? { ...f, name: p.name, email: p.email, avatar: p.avatar ?? undefined }
+                : f
+            )
+          );
+          setAllUsers((prev) =>
+            prev.map((u) =>
+              u.id === p.id
+                ? { ...u, name: p.name, email: p.email, role: p.role ?? u.role, avatar: p.avatar ?? undefined }
+                : u
+            )
+          );
         }
       )
       .subscribe((status: string) => {
@@ -446,12 +486,28 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       );
 
       const otherUserId = req.fromUserId === currentUserId ? req.toUserId : req.fromUserId;
-      const otherUserName = req.fromUserId === currentUserId ? req.toUserName : req.fromUserName;
-      const otherUserEmail = req.fromUserId === currentUserId ? req.toUserEmail : req.fromUserEmail;
 
-      const currentUser = allUsers.find((u) => u.id === currentUserId);
-      const currentUserName = currentUser?.name ?? req.toUserName ?? "";
-      const currentUserEmail = currentUser?.email ?? req.toUserEmail ?? "";
+      const { data: otherProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", otherUserId)
+        .maybeSingle();
+
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUserId)
+        .maybeSingle();
+
+      const otherUserName = otherProfile?.name ?? (req.fromUserId === currentUserId ? req.toUserName : req.fromUserName);
+      const otherUserEmail = otherProfile?.email ?? (req.fromUserId === currentUserId ? req.toUserEmail : req.fromUserEmail);
+      const otherUserAvatar = otherProfile?.avatar ?? undefined;
+
+      const currentUserName = myProfile?.name ?? req.toUserName ?? "";
+      const currentUserEmail = myProfile?.email ?? req.toUserEmail ?? "";
+      const currentUserAvatar = myProfile?.avatar ?? undefined;
+
+      console.log("[FriendsProvider] Accept: other user:", otherUserName, "(", otherUserId, ") current user:", currentUserName, "(", currentUserId, ")");
 
       const { data: existingMyFriend } = await supabase
         .from("friends")
@@ -469,6 +525,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             friend_id: otherUserId,
             friend_name: otherUserName,
             friend_email: otherUserEmail,
+            friend_avatar: otherUserAvatar ?? null,
           })
           .select()
           .single();
@@ -490,18 +547,21 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         .maybeSingle();
 
       if (!existingTheirFriend) {
-        const { error: e2 } = await supabase
+        const { data: theirRow, error: e2 } = await supabase
           .from("friends")
           .insert({
             user_id: otherUserId,
             friend_id: currentUserId,
             friend_name: currentUserName,
             friend_email: currentUserEmail,
-          });
+            friend_avatar: currentUserAvatar ?? null,
+          })
+          .select()
+          .single();
         if (e2) {
           console.warn("[FriendsProvider] Insert their friend row error:", e2.message);
         } else {
-          console.log("[FriendsProvider] Inserted their friend row for user:", otherUserId);
+          console.log("[FriendsProvider] Inserted their friend row:", theirRow?.id, "for user:", otherUserId);
         }
       } else {
         console.log("[FriendsProvider] Their friend row already exists:", existingTheirFriend.id);
@@ -512,6 +572,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         userId: otherUserId,
         name: otherUserName,
         email: otherUserEmail,
+        avatar: otherUserAvatar,
         isOnline: true,
         isCloseFriend: false,
       };
@@ -569,8 +630,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Accepted request from", otherUserName, "- invalidating queries");
       await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
       await queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+
+      setTimeout(() => {
+        console.log("[FriendsProvider] Delayed refetch after accept");
+        void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+        void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+      }, 2000);
     },
-    [requests, allUsers, queryClient, currentUserId]
+    [requests, queryClient, currentUserId]
   );
 
   const rejectFriendRequest = useCallback(
