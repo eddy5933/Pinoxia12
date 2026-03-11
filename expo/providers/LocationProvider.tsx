@@ -5,6 +5,43 @@ import createContextHook from "@nkzw/create-context-hook";
 export interface UserLocation {
   latitude: number;
   longitude: number;
+  placeName?: string;
+}
+
+async function reverseGeocode(latitude: number, longitude: number): Promise<string> {
+  try {
+    if (Platform.OS !== "web") {
+      const Location = require("expo-location") as typeof import("expo-location");
+      const results = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (results && results.length > 0) {
+        const addr = results[0];
+        const parts: string[] = [];
+        if (addr.name && addr.name !== addr.street) parts.push(addr.name);
+        if (addr.street) parts.push(addr.street);
+        if (addr.city) parts.push(addr.city);
+        if (addr.region && addr.region !== addr.city) parts.push(addr.region);
+        const placeName = parts.length > 0 ? parts.join(", ") : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        console.log("[LocationProvider] Reverse geocoded:", placeName);
+        return placeName;
+      }
+    } else {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
+        { headers: { "User-Agent": "FoodSpotApp/1.0" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.display_name) {
+          const short = data.display_name.split(",").slice(0, 3).join(",").trim();
+          console.log("[LocationProvider] Web reverse geocoded:", short);
+          return short;
+        }
+      }
+    }
+  } catch (err) {
+    console.log("[LocationProvider] Reverse geocoding failed:", err);
+  }
+  return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 }
 
 export const [LocationProvider, useLocation] = createContextHook(() => {
@@ -32,18 +69,22 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           try {
             const position = await getWebLocation(true);
             console.log("[LocationProvider] Web high-accuracy location obtained:", position.coords);
+            const placeName = await reverseGeocode(position.coords.latitude, position.coords.longitude);
             setUserLocation({
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
+              placeName,
             });
           } catch (highAccError) {
             console.log("[LocationProvider] High-accuracy failed, trying low accuracy...", highAccError);
             try {
               const position = await getWebLocation(false);
               console.log("[LocationProvider] Web low-accuracy location obtained:", position.coords);
+              const placeNameLow = await reverseGeocode(position.coords.latitude, position.coords.longitude);
               setUserLocation({
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
+                placeName: placeNameLow,
               });
             } catch (lowAccError) {
               console.log("[LocationProvider] Web geolocation error:", lowAccError);
@@ -80,9 +121,11 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           const lastKnown = await Location.getLastKnownPositionAsync();
           if (lastKnown) {
             console.log("[LocationProvider] Using last known position:", lastKnown.coords);
+            const lastPlaceName = await reverseGeocode(lastKnown.coords.latitude, lastKnown.coords.longitude);
             setUserLocation({
               latitude: lastKnown.coords.latitude,
               longitude: lastKnown.coords.longitude,
+              placeName: lastPlaceName,
             });
           }
         } catch (lastErr) {
@@ -112,9 +155,11 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         }
 
         if (loc) {
+          const nativePlaceName = await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
           setUserLocation({
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
+            placeName: nativePlaceName,
           });
         }
         setLocationLoading(false);

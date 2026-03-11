@@ -18,7 +18,7 @@ import {
   ChevronUp,
   ChevronDown,
   Navigation,
-  Locate,
+  Crosshair,
   Search,
   X,
 } from "lucide-react-native";
@@ -406,6 +406,7 @@ export default function MapScreen() {
           style={[
             styles.locateButton,
             locationLoading && styles.locateButtonLoading,
+            userLocation && styles.locateButtonActive,
           ]}
           onPress={() => {
             if (userLocation) {
@@ -421,12 +422,12 @@ export default function MapScreen() {
           testID="locate-button"
         >
           {locationLoading ? (
-            <ActivityIndicator size="small" color={Colors.white} />
+            <ActivityIndicator size="small" color={Colors.primary} />
           ) : (
             <Animated.View style={{ transform: [{ scale: userLocation ? pulseAnim : 1 }] }}>
-              <Locate
+              <Crosshair
                 size={20}
-                color={userLocation ? Colors.primary : Colors.textSecondary}
+                color={userLocation ? Colors.white : Colors.textSecondary}
               />
             </Animated.View>
           )}
@@ -473,8 +474,8 @@ export default function MapScreen() {
       {userLocation && (
         <View style={styles.locationBanner}>
           <View style={styles.locationDot} />
-          <Text style={styles.locationText}>
-            Location active · {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
+          <Text style={styles.locationText} numberOfLines={1}>
+            {userLocation.placeName ?? `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
           </Text>
         </View>
       )}
@@ -733,6 +734,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   locateButtonLoading: {
+    borderColor: Colors.primary,
+  },
+  locateButtonActive: {
+    backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   locationBanner: {
