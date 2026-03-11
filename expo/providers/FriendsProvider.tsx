@@ -151,7 +151,20 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             const otherUserName = isRequester ? r.to_user_name : r.from_user_name;
             const otherUserEmail = isRequester ? r.to_user_email : r.from_user_email;
 
-            const newFriend: Friend = {
+            const addFriendLocally = (friendData: Friend) => {
+              setFriends((prev) => {
+                if (prev.some((fr) => fr.userId === otherUserId)) return prev;
+                console.log("[FriendsProvider] Realtime: adding friend to local state:", friendData.name);
+                return [friendData, ...prev];
+              });
+              queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                if (!old) return old;
+                if (old.friends.some((f: any) => f.userId === otherUserId)) return old;
+                return { ...old, friends: [friendData, ...old.friends] };
+              });
+            };
+
+            const tempFriend: Friend = {
               id: `temp_${Date.now()}`,
               userId: otherUserId,
               name: otherUserName,
@@ -159,18 +172,43 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               isOnline: true,
               isCloseFriend: false,
             };
+            addFriendLocally(tempFriend);
 
-            setFriends((prev) => {
-              if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName);
-              return [newFriend, ...prev];
-            });
-
-            queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-              if (!old) return old;
-              if (old.friends.some((f: any) => f.userId === otherUserId)) return old;
-              return { ...old, friends: [newFriend, ...old.friends] };
-            });
+            const fetchFriendRow = async () => {
+              console.log("[FriendsProvider] Fetching friend row from Supabase for requester:", currentUserId);
+              const { data, error } = await supabase
+                .from("friends")
+                .select("*")
+                .eq("user_id", currentUserId)
+                .eq("friend_id", otherUserId)
+                .maybeSingle();
+              if (data && !error) {
+                const realFriend: Friend = {
+                  id: data.id,
+                  userId: data.friend_id,
+                  name: data.friend_name,
+                  email: data.friend_email,
+                  avatar: data.friend_avatar ?? undefined,
+                  isOnline: true,
+                  isCloseFriend: data.is_close_friend ?? false,
+                };
+                setFriends((prev) =>
+                  prev.map((f) => (f.userId === otherUserId ? realFriend : f))
+                );
+                queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                  if (!old) return old;
+                  return {
+                    ...old,
+                    friends: old.friends.map((f: any) =>
+                      f.userId === otherUserId ? realFriend : f
+                    ),
+                  };
+                });
+                console.log("[FriendsProvider] Updated with real friend row:", realFriend.id);
+              } else {
+                console.log("[FriendsProvider] Friend row not found yet, will refetch");
+              }
+            };
 
             const refetchAll = () => {
               console.log("[FriendsProvider] Force refetching friends after accept");
@@ -178,9 +216,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
             };
 
+            void fetchFriendRow();
             refetchAll();
-            setTimeout(refetchAll, 1000);
-            setTimeout(refetchAll, 3000);
+            setTimeout(() => { void fetchFriendRow(); refetchAll(); }, 1500);
+            setTimeout(refetchAll, 4000);
           }
         }
       )
