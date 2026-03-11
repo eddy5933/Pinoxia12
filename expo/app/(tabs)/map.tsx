@@ -117,14 +117,6 @@ function FriendMarkerView({ friend }: { friend: FriendLocation }) {
     .toUpperCase()
     .slice(0, 2);
 
-  const updatedAgo = useMemo(() => {
-    const diff = Date.now() - new Date(friend.updatedAt).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "now";
-    if (mins < 60) return `${mins}m ago`;
-    return `${Math.floor(mins / 60)}h ago`;
-  }, [friend.updatedAt]);
-
   return (
     <View style={friendMarkerStyles.container}>
       <View style={friendMarkerStyles.avatarRing}>
@@ -139,7 +131,6 @@ function FriendMarkerView({ friend }: { friend: FriendLocation }) {
       </View>
       <View style={friendMarkerStyles.label}>
         <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
-        <Text style={friendMarkerStyles.labelTime}>{updatedAgo}</Text>
       </View>
     </View>
   );
@@ -354,9 +345,6 @@ function NativeMapView({
           <Callout tooltip>
             <View style={markerStyles.calloutSimple}>
               <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{fl.name}</Text>
-              {fl.placeName && (
-                <Text style={{ fontSize: 11, color: Colors.textSecondary, textAlign: "center" as const, marginTop: 2 }}>{fl.placeName}</Text>
-              )}
             </View>
             <View style={markerStyles.calloutArrow} />
           </Callout>
