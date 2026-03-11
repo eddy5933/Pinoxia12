@@ -144,13 +144,57 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted, refetching friends list immediately");
-            setTimeout(() => {
-              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-            }, 500);
-            setTimeout(() => {
-              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-            }, 2000);
+            console.log("[FriendsProvider] Friend request accepted, fetching new friend for requester");
+
+            const isRequester = r.from_user_id === currentUserId;
+            const otherUserId = isRequester ? r.to_user_id : r.from_user_id;
+            const otherUserName = isRequester ? r.to_user_name : r.from_user_name;
+            const otherUserEmail = isRequester ? r.to_user_email : r.from_user_email;
+
+            const addFriendToLocalState = (friendRow: any) => {
+              const newFriend: Friend = {
+                id: friendRow?.id ?? `temp_${Date.now()}`,
+                userId: otherUserId,
+                name: otherUserName,
+                email: otherUserEmail,
+                isOnline: true,
+                isCloseFriend: false,
+              };
+              setFriends((prev) => {
+                if (prev.some((fr) => fr.userId === otherUserId)) return prev;
+                console.log("[FriendsProvider] Realtime: adding friend to local state:", otherUserName);
+                return [newFriend, ...prev];
+              });
+              queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                if (!old) return old;
+                if (old.friends.some((f: any) => f.userId === otherUserId)) return old;
+                return { ...old, friends: [newFriend, ...old.friends] };
+              });
+            };
+
+            const pollForFriendRow = async (attempt: number) => {
+              console.log(`[FriendsProvider] Polling for friend row, attempt ${attempt}`);
+              const { data: friendRow } = await supabase
+                .from("friends")
+                .select("*")
+                .eq("user_id", currentUserId)
+                .eq("friend_id", otherUserId)
+                .maybeSingle();
+
+              if (friendRow) {
+                console.log("[FriendsProvider] Found friend row on attempt", attempt);
+                addFriendToLocalState(friendRow);
+                void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+                void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+              } else if (attempt < 5) {
+                setTimeout(() => void pollForFriendRow(attempt + 1), 1000);
+              } else {
+                console.log("[FriendsProvider] Friend row not found after 5 attempts, forcing refetch");
+                void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+              }
+            };
+
+            setTimeout(() => void pollForFriendRow(1), 500);
           }
         }
       )
