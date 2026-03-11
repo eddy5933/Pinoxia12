@@ -270,7 +270,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       }
 
       const now = Date.now();
-      const STALE_MS = 10 * 60 * 1000;
+      const STALE_MS = 60 * 60 * 1000;
       const locations: FriendLocation[] = (profiles ?? []).filter((p: any) => {
         if (!p.location_updated_at) return false;
         const age = now - new Date(p.location_updated_at).getTime();

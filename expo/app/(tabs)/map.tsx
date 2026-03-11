@@ -437,7 +437,7 @@ export default function MapScreen() {
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
   const { friends, closeFriends } = useFriends();
 
-  const [showFriendLocations, setShowFriendLocations] = useState(false);
+  const [showFriendLocations, setShowFriendLocations] = useState(true);
   const sharingPulse = useRef(new Animated.Value(0)).current;
   const shareButtonScale = useRef(new Animated.Value(1)).current;
 
@@ -567,8 +567,14 @@ export default function MapScreen() {
 
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) return [];
-    return friendLocations.filter((fl) => closeFriendIds.has(fl.userId));
-  }, [showFriendLocations, friendLocations, closeFriendIds]);
+    if (closeFriends.length === 0) {
+      console.log("[MapScreen] No close friends set, showing all friend locations:", friendLocations.length);
+      return friendLocations;
+    }
+    const filtered = friendLocations.filter((fl) => closeFriendIds.has(fl.userId));
+    console.log("[MapScreen] Visible friend locations:", filtered.length, "of", friendLocations.length, "(close friends:", closeFriends.length, ")");
+    return filtered;
+  }, [showFriendLocations, friendLocations, closeFriendIds, closeFriends.length]);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
@@ -753,11 +759,11 @@ export default function MapScreen() {
           </TouchableOpacity>
         )}
 
-        {showFriendLocations && visibleFriendLocations.length === 0 && closeFriends.length > 0 && (
-          <Text style={styles.noFriendsText}>No close friends online</Text>
+        {showFriendLocations && visibleFriendLocations.length === 0 && friendLocations.length === 0 && friends.length > 0 && (
+          <Text style={styles.noFriendsText}>No friends sharing location</Text>
         )}
-        {showFriendLocations && closeFriends.length === 0 && friends.length > 0 && (
-          <Text style={styles.noFriendsText}>Star friends to see them here</Text>
+        {showFriendLocations && visibleFriendLocations.length > 0 && (
+          <Text style={styles.noFriendsText}>{visibleFriendLocations.length} friend{visibleFriendLocations.length !== 1 ? 's' : ''} on map</Text>
         )}
       </View>
 
