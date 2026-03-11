@@ -69,6 +69,11 @@ export default function FriendsScreen() {
     [user, getSentRequests]
   );
 
+  const allAvailableUsers = useMemo(
+    () => (user ? searchUsers("", user.id) : []),
+    [user, searchUsers]
+  );
+
   const searchResults = useMemo(
     () => (user ? searchUsers(searchQuery, user.id) : []),
     [user, searchQuery, searchUsers]
@@ -372,24 +377,16 @@ export default function FriendsScreen() {
 
       {activeTab === "search" && (
         <FlatList
-          data={searchResults}
+          data={searchQuery.trim().length > 0 ? searchResults : allAvailableUsers}
           keyExtractor={(item) => item.id}
           renderItem={renderSearchItem}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            searchQuery.length > 0 ? (
-              <View style={styles.emptyCenter}>
-                <Search size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>No results</Text>
-                <Text style={styles.emptySubtitle}>Try a different name or email</Text>
-              </View>
-            ) : (
-              <View style={styles.emptyCenter}>
-                <UserPlus size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyTitle}>Find people</Text>
-                <Text style={styles.emptySubtitle}>Type a name or email to search</Text>
-              </View>
-            )
+            <View style={styles.emptyCenter}>
+              <Search size={40} color={Colors.textMuted} />
+              <Text style={styles.emptyTitle}>No users found</Text>
+              <Text style={styles.emptySubtitle}>No users or owners available yet</Text>
+            </View>
           }
         />
       )}
