@@ -24,19 +24,30 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     queryFn: async () => {
       console.log("[FriendsProvider] Loading data from Supabase for user:", currentUserId);
 
-      const friendsQuery = currentUserId
-        ? supabase.from("friends").select("*").eq("user_id", currentUserId)
-        : supabase.from("friends").select("*").limit(0);
-
-      const requestsQuery = currentUserId
-        ? supabase.from("friend_requests").select("*").or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
-        : supabase.from("friend_requests").select("*").limit(0);
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[FriendsProvider] Current session:", session ? session.user.id : "none");
 
       const [profilesRes, friendsRes, requestsRes] = await Promise.all([
         supabase.from("profiles").select("*"),
-        friendsQuery,
-        requestsQuery,
+        currentUserId
+          ? supabase.from("friends").select("*").eq("user_id", currentUserId)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        currentUserId
+          ? supabase.from("friend_requests").select("*").or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+          : Promise.resolve({ data: [] as any[], error: null }),
       ]);
+
+      if (profilesRes.error) {
+        console.warn("[FriendsProvider] Profiles query error:", profilesRes.error.message, profilesRes.error.details, profilesRes.error.hint);
+      }
+      if (friendsRes.error) {
+        console.warn("[FriendsProvider] Friends query error:", friendsRes.error.message);
+      }
+      if (requestsRes.error) {
+        console.warn("[FriendsProvider] Requests query error:", requestsRes.error.message);
+      }
+
+      console.log("[FriendsProvider] Raw profiles count:", profilesRes.data?.length ?? 0);
 
       const loadedUsers: PublicUser[] = (profilesRes.data ?? []).map((p: any) => ({
         id: p.id,
@@ -71,6 +82,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Loaded", loadedUsers.length, "users,", loadedFriends.length, "friends,", loadedRequests.length, "requests");
       return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
     },
+    enabled: !!currentUserId,
     staleTime: 5000,
     refetchInterval: 10000,
   });
@@ -84,8 +96,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   }, [loadQuery.data]);
 
   const registerUser = useCallback(async (user: User) => {
-    console.log("[FriendsProvider] Registering user in Supabase:", user.name);
-    setCurrentUserId(user.id);
+    console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
     const { error } = await supabase
       .from("profiles")
       .upsert({
@@ -97,7 +108,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       });
     if (error) {
       console.warn("[FriendsProvider] Upsert profile error:", error.message);
+    } else {
+      console.log("[FriendsProvider] Profile upserted successfully for:", user.name);
     }
+    setCurrentUserId(user.id);
   }, []);
 
   const searchUsers = useCallback(
