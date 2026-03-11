@@ -54,7 +54,7 @@ export default function FriendsScreen() {
   const {
     friends,
     searchUsersFromSupabase,
-    addFriendDirectly,
+    sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
     removeFriend,
@@ -170,16 +170,16 @@ export default function FriendsScreen() {
   const handleAddFriend = useCallback(
     async (toUser: PublicUser) => {
       if (!user) return;
-      const success = await addFriendDirectly(user, toUser);
+      const success = await sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Friend added!", toUser.name, "success");
+        showToast("Friend request sent!", toUser.name, "success");
       } else {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already friends", toUser.name, "info");
+        showToast("Request already pending", toUser.name, "info");
       }
     },
-    [user, addFriendDirectly, showToast]
+    [user, sendFriendRequest, showToast]
   );
 
   const handleAccept = useCallback(
@@ -407,7 +407,7 @@ export default function FriendsScreen() {
               activeOpacity={0.7}
             >
               <UserPlus size={16} color={Colors.white} />
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={styles.addButtonText}>Request</Text>
             </TouchableOpacity>
           )}
         </View>
