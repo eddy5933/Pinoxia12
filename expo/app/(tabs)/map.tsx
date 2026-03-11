@@ -119,8 +119,6 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
     .toUpperCase()
     .slice(0, 2);
 
-  const firstName = friend.name.split(" ")[0] || friend.name;
-
   useEffect(() => {
     if (!friend.avatar && onLoad) {
       onLoad();
@@ -145,7 +143,7 @@ function FriendMarkerView({ friend, onLoad }: { friend: FriendLocation; onLoad?:
         <View style={friendMarkerStyles.onlineDot} />
       </View>
       <View style={friendMarkerStyles.label}>
-        <Text style={friendMarkerStyles.labelName}>{firstName}</Text>
+        <Text style={friendMarkerStyles.labelName} numberOfLines={1}>{friend.name}</Text>
       </View>
     </View>
   );
@@ -162,25 +160,19 @@ function FriendMarkerWrapper({
 }) {
   const [trackChanges, setTrackChanges] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [renderKey, setRenderKey] = useState(0);
 
   const handleLoad = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setRenderKey((k) => k + 1);
-      setTimeout(() => setTrackChanges(false), 300);
+      setTrackChanges(false);
     }, 500);
   }, []);
 
   useEffect(() => {
-    const initialRender = setTimeout(() => {
-      setRenderKey((k) => k + 1);
-    }, 200);
     const fallback = setTimeout(() => {
       setTrackChanges(false);
-    }, 4000);
+    }, 3000);
     return () => {
-      clearTimeout(initialRender);
       clearTimeout(fallback);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
@@ -188,11 +180,8 @@ function FriendMarkerWrapper({
 
   return (
     <Marker
-      key={`friend-marker-${friend.userId}-${renderKey}`}
       coordinate={{ latitude: friend.latitude, longitude: friend.longitude }}
       tracksViewChanges={trackChanges}
-      anchor={{ x: 0.5, y: 1 }}
-      calloutAnchor={{ x: 0.5, y: 0 }}
     >
       <FriendMarkerView friend={friend} onLoad={handleLoad} />
       <Callout tooltip>
@@ -1440,30 +1429,20 @@ const friendMarkerStyles = StyleSheet.create({
   },
   label: {
     backgroundColor: "#1E3A5F",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     marginTop: 4,
-    minWidth: 40,
-    maxWidth: 110,
+    maxWidth: 100,
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#3B82F6",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
   },
   labelName: {
-    fontSize: 12,
-    fontWeight: "800" as const,
-    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.white,
     textAlign: "center" as const,
-    includeFontPadding: false,
-    textAlignVertical: "center" as const,
-    lineHeight: 16,
   },
   labelTime: {
     fontSize: 8,
