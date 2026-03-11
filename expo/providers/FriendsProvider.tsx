@@ -96,12 +96,12 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const searchUsers = useCallback(
     (query: string, currentUserId: string) => {
-      if (!query.trim()) return [];
+      const filtered = allUsers.filter((u) => u.id !== currentUserId);
+      if (!query.trim()) return filtered;
       const q = query.toLowerCase();
-      return allUsers.filter(
+      return filtered.filter(
         (u) =>
-          u.id !== currentUserId &&
-          (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.role === "owner" && "business".includes(q)))
+          u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.role === "owner" && "business".includes(q))
       );
     },
     [allUsers]
