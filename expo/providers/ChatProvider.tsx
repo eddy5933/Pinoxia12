@@ -3,7 +3,6 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useQuery } from "@tanstack/react-query";
 import { ChatMessage, Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { sendPushToUser } from "@/lib/pushNotifications";
 
 export interface LiveLocation {
   userId: string;
@@ -171,21 +170,6 @@ export const [ChatProvider, useChat] = createContextHook(() => {
             : c
         )
       );
-
-      const convo = conversations.find((c) => c.id === conversationId);
-      if (convo) {
-        const recipientIds = convo.participants.filter((p) => p !== senderId);
-        const bodyPreview = type === "location"
-          ? `${senderName} shared their location`
-          : text.length > 80 ? `${text.slice(0, 80)}...` : text;
-
-        for (const recipientId of recipientIds) {
-          void sendPushToUser(recipientId, senderName, bodyPreview, {
-            type: "message",
-            conversationId,
-          });
-        }
-      }
 
       console.log("[ChatProvider] Sent message in", conversationId);
       return newMessage;
