@@ -94,11 +94,11 @@ export default function AddRestaurantScreen() {
 
   const handleSubmit = useCallback(() => {
     if (!user) {
-      Alert.alert("Error", "You must be logged in to register a restaurant.");
+      Alert.alert("Error", "You must be logged in to register a business.");
       return;
     }
     if (!name.trim()) {
-      Alert.alert("Required", "Please enter a restaurant name.");
+      Alert.alert("Required", "Please enter a business name.");
       return;
     }
     if (!cuisine) {
@@ -119,7 +119,7 @@ export default function AddRestaurantScreen() {
     addRestaurant({
       ownerId: user.id,
       name: name.trim(),
-      description: description.trim() || "A wonderful restaurant.",
+      description: description.trim() || "A wonderful place.",
       cuisine,
       photos: photos.length > 0 ? photos : [defaultPhoto],
       address: address.trim(),
@@ -133,7 +133,7 @@ export default function AddRestaurantScreen() {
     console.log("[AddRestaurant] Registered at:", finalLat, finalLng);
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Success!", "Your restaurant has been registered.", [
+    Alert.alert("Success!", "Your business has been registered.", [
       { text: "OK", onPress: () => router.back() },
     ]);
   }, [user, name, description, cuisine, address, phone, photos, openingHours, priceRange, addRestaurant, router, latitude, longitude, userLocation]);
@@ -156,7 +156,7 @@ export default function AddRestaurantScreen() {
           <View style={styles.feeTextContainer}>
             <Text style={styles.feeTitle}>Registration Fee: $5.00</Text>
             <Text style={styles.feeSubtitle}>
-              One-time fee to list your restaurant. Payment will be available soon.
+              One-time fee to list your business. Payment will be available soon.
             </Text>
           </View>
         </View>
@@ -165,10 +165,10 @@ export default function AddRestaurantScreen() {
           <Text style={styles.sectionTitle}>Basic Info</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Restaurant Name *</Text>
+            <Text style={styles.label}>Business Name *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter restaurant name"
+              placeholder="Enter business name"
               placeholderTextColor={Colors.textMuted}
               value={name}
               onChangeText={setName}
@@ -180,7 +180,7 @@ export default function AddRestaurantScreen() {
             <Text style={styles.label}>Description</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Describe your restaurant..."
+              placeholder="Describe your business..."
               placeholderTextColor={Colors.textMuted}
               value={description}
               onChangeText={setDescription}
@@ -352,7 +352,7 @@ export default function AddRestaurantScreen() {
           testID="submit-restaurant"
         >
           <Plus size={18} color={Colors.white} />
-          <Text style={styles.submitText}>Register Restaurant — $5.00</Text>
+          <Text style={styles.submitText}>Register Business — $5.00</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

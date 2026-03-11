@@ -66,7 +66,7 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.guestTitle}>Welcome to FoodSpot</Text>
           <Text style={styles.guestSubtitle}>
-            Sign in to leave reviews, register restaurants, and more
+            Sign in to leave reviews, register your business, and more
           </Text>
           <TouchableOpacity
             style={styles.signInButton}
@@ -104,7 +104,7 @@ export default function ProfileScreen() {
             </View>
             <View style={[styles.roleBadge, isOwner && styles.roleBadgeOwner]}>
               <Text style={[styles.roleBadgeText, isOwner && styles.roleBadgeTextOwner]}>
-                {isOwner ? "Restaurant Owner" : "Customer"}
+                {isOwner ? "Business Owner" : "Customer"}
               </Text>
             </View>
           </View>
@@ -145,7 +145,7 @@ export default function ProfileScreen() {
                   <View style={[styles.menuIcon, { backgroundColor: "rgba(255,184,0,0.12)" }]}>
                     <Store size={18} color={Colors.star} />
                   </View>
-                  <Text style={styles.menuItemText}>My Restaurants</Text>
+                  <Text style={styles.menuItemText}>My Businesses</Text>
                 </View>
                 <ChevronRight size={18} color={Colors.textMuted} />
               </TouchableOpacity>
@@ -160,7 +160,7 @@ export default function ProfileScreen() {
                   <View style={[styles.menuIcon, { backgroundColor: "rgba(76,175,80,0.12)" }]}>
                     <Plus size={18} color={Colors.success} />
                   </View>
-                  <Text style={styles.menuItemText}>Register Restaurant</Text>
+                  <Text style={styles.menuItemText}>Register Business</Text>
                 </View>
                 <ChevronRight size={18} color={Colors.textMuted} />
               </TouchableOpacity>

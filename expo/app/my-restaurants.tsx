@@ -88,9 +88,9 @@ export default function MyRestaurantsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Store size={52} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>No Restaurants Yet</Text>
+            <Text style={styles.emptyTitle}>No Businesses Yet</Text>
             <Text style={styles.emptySubtitle}>
-              Register your first restaurant to start getting customers and
+              Register your first shop, restaurant or service to start getting customers and
               reviews
             </Text>
             <TouchableOpacity
@@ -98,7 +98,7 @@ export default function MyRestaurantsScreen() {
               onPress={() => router.push("/add-restaurant")}
             >
               <Plus size={18} color={Colors.white} />
-              <Text style={styles.addButtonText}>Register Restaurant</Text>
+              <Text style={styles.addButtonText}>Register Business</Text>
             </TouchableOpacity>
           </View>
         }

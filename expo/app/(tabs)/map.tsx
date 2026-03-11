@@ -282,7 +282,7 @@ function WebMapView({
           border: "none",
           borderRadius: 0,
         }}
-        title="Restaurant Map"
+        title="Map"
       />
       <View style={webListStyles.overlay}>
         <FlatList
@@ -428,7 +428,7 @@ export default function MapScreen() {
           <View>
             <Text style={styles.headerTitle}>Explore Map</Text>
             <Text style={styles.headerSubtitle}>
-              {restaurants.length} restaurants nearby
+              {restaurants.length} places nearby
             </Text>
           </View>
         </View>
@@ -473,7 +473,7 @@ export default function MapScreen() {
           <TextInput
             ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Search restaurants, cuisine, area..."
+            placeholder="Search shops, restaurants, services..."
             placeholderTextColor={Colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -543,7 +543,7 @@ export default function MapScreen() {
           <View style={styles.toggleHandle} />
           <View style={styles.toggleContent}>
             <Text style={styles.toggleText}>
-              {filteredRestaurants.length} Restaurant{filteredRestaurants.length !== 1 ? "s" : ""}
+              {filteredRestaurants.length} Place{filteredRestaurants.length !== 1 ? "s" : ""}
             </Text>
             {listExpanded ? (
               <ChevronDown size={18} color={Colors.textSecondary} />

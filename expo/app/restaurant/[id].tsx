@@ -126,7 +126,7 @@ export default function RestaurantDetailScreen() {
   if (!restaurant) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>Restaurant not found</Text>
+        <Text style={styles.errorText}>Business not found</Text>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => router.back()}

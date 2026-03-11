@@ -31,7 +31,7 @@ function RootLayoutNav() {
       <Stack.Screen
         name="add-restaurant"
         options={{
-          title: "Register Restaurant",
+          title: "Register Business",
           presentation: "modal",
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.white,
@@ -40,7 +40,7 @@ function RootLayoutNav() {
       <Stack.Screen
         name="my-restaurants"
         options={{
-          title: "My Restaurants",
+          title: "My Businesses",
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.white,
         }}

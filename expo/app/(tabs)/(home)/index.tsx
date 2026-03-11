@@ -157,7 +157,7 @@ export default function ExploreScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>FoodSpot</Text>
-            <Text style={styles.subtitle}>Discover amazing restaurants</Text>
+            <Text style={styles.subtitle}>Discover shops, restaurants & services</Text>
           </View>
           <TouchableOpacity
             style={[
@@ -199,7 +199,7 @@ export default function ExploreScreen() {
         <Search size={18} color={Colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search restaurants, cuisines..."
+          placeholder="Search shops, restaurants, services..."
           placeholderTextColor={Colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -245,7 +245,7 @@ export default function ExploreScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Search size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>No restaurants found</Text>
+            <Text style={styles.emptyTitle}>No results found</Text>
             <Text style={styles.emptySubtitle}>Try a different search or filter</Text>
           </View>
         }
