@@ -26,7 +26,6 @@ import {
   Heart,
   UserCheck,
   ChevronRight,
-  MessagesSquare,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -67,7 +66,7 @@ export default function FriendsScreen() {
     refetchUsers,
     isRefetching,
   } = useFriends();
-  const { getOrCreateConversation, conversations, totalUnreadCount } = useChat();
+  const { getOrCreateConversation } = useChat();
 
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
@@ -251,10 +250,6 @@ export default function FriendsScreen() {
   );
 
   const closeFriendsCount = useMemo(() => friends.filter((f) => f.isCloseFriend).length, [friends]);
-  const conversationCount = useMemo(() => {
-    if (!user) return 0;
-    return conversations.filter((c) => c.participants.includes(user.id)).length;
-  }, [conversations, user]);
 
   const renderFollowerItem = useCallback(
     ({ item }: { item: Friend }) => (
@@ -464,33 +459,6 @@ export default function FriendsScreen() {
           </View>
         )}
       </View>
-
-      <TouchableOpacity
-        style={styles.chatsRow}
-        onPress={() => router.push("/(tabs)/friends/chats" as any)}
-        activeOpacity={0.7}
-        testID="chats-list-btn"
-      >
-        <View style={styles.chatsRowLeft}>
-          <View style={styles.chatsRowIcon}>
-            <MessagesSquare size={16} color="#1E88E5" />
-          </View>
-          <View>
-            <Text style={styles.chatsRowTitle}>Chats</Text>
-            <Text style={styles.closeFriendsSubtitle}>
-              {conversationCount} {conversationCount === 1 ? "conversation" : "conversations"}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.chatsRowRight}>
-          {totalUnreadCount > 0 && (
-            <View style={styles.chatsBadge}>
-              <Text style={styles.chatsBadgeText}>{totalUnreadCount > 99 ? "99+" : totalUnreadCount}</Text>
-            </View>
-          )}
-          <ChevronRight size={18} color={Colors.textMuted} />
-        </View>
-      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.closeFriendsRow}
@@ -757,57 +725,6 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     fontSize: 12,
-    fontWeight: "700" as const,
-    color: Colors.white,
-  },
-  chatsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: "rgba(30,136,229,0.15)",
-  },
-  chatsRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  chatsRowIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(30,136,229,0.12)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  chatsRowTitle: {
-    fontSize: 14,
-    fontWeight: "700" as const,
-    color: Colors.white,
-  },
-  chatsRowRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chatsBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#1E88E5",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 6,
-  },
-  chatsBadgeText: {
-    fontSize: 11,
     fontWeight: "700" as const,
     color: Colors.white,
   },
