@@ -38,7 +38,7 @@ import { useChat } from "@/providers/ChatProvider";
 import { Friend, FriendRequest } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
-type TabType = "friends" | "requests" | "discover";
+type TabType = "friends" | "followers" | "requests" | "discover";
 
 interface ToastState {
   visible: boolean;
@@ -54,6 +54,7 @@ export default function FriendsScreen() {
   const { user } = useAuth();
   const {
     friends,
+    followers,
     searchUsersFromSupabase,
     sendFriendRequest,
     acceptFriendRequest,
@@ -61,6 +62,7 @@ export default function FriendsScreen() {
     removeFriend,
     cancelFriendRequest,
     toggleCloseFriend,
+    followBack,
     getPendingRequests,
     getSentRequests,
     isFriend,
@@ -121,7 +123,7 @@ export default function FriendsScreen() {
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tabs: TabType[] = ["friends", "requests", "discover"];
+  const tabs: TabType[] = ["friends", "followers", "requests", "discover"];
   const tabIndex = tabs.indexOf(activeTab);
 
   useEffect(() => {
@@ -185,6 +187,21 @@ export default function FriendsScreen() {
       setSearchQuery("");
     }
   }, [activeTab]);
+
+  const handleFollowBack = useCallback(
+    async (follower: Friend) => {
+      if (!user) return;
+      const success = await followBack(follower.userId);
+      if (success) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast("Followed back!", follower.name, "success");
+      } else {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        showToast("Already following", follower.name, "info");
+      }
+    },
+    [user, followBack, showToast]
+  );
 
   const handleFollow = useCallback(
     async (toUser: PublicUser) => {
@@ -284,6 +301,32 @@ export default function FriendsScreen() {
   );
 
   const closeFriendsCount = useMemo(() => friends.filter((f) => f.isCloseFriend).length, [friends]);
+
+  const renderFollowerItem = useCallback(
+    ({ item }: { item: Friend }) => (
+      <View style={styles.card}>
+        <View style={[styles.avatar, styles.followerAvatar]}>
+          <Text style={styles.avatarText}>
+            {item.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.cardEmail} numberOfLines={1}>{item.email}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.followBackBtn}
+          onPress={() => void handleFollowBack(item)}
+          activeOpacity={0.7}
+          testID={`follow-back-${item.userId}`}
+        >
+          <UserPlus size={14} color={Colors.white} />
+          <Text style={styles.followBackBtnText}>Follow Back</Text>
+        </TouchableOpacity>
+      </View>
+    ),
+    [handleFollowBack]
+  );
 
   const renderFriendItem = useCallback(
     ({ item }: { item: Friend }) => (
@@ -462,19 +505,21 @@ export default function FriendsScreen() {
     );
   }
 
-  const tabWidth = (SCREEN_WIDTH - 40) / 3;
+  const tabWidth = (SCREEN_WIDTH - 40) / 4;
 
   const getTabLabel = (tab: TabType) => {
     switch (tab) {
-      case "friends": return `Friends`;
-      case "requests": return `Requests`;
-      case "discover": return `Discover`;
+      case "friends": return "Friends";
+      case "followers": return "Followers";
+      case "requests": return "Requests";
+      case "discover": return "Discover";
     }
   };
 
   const getTabCount = (tab: TabType) => {
     switch (tab) {
       case "friends": return friends.length;
+      case "followers": return followers.length;
       case "requests": return pendingRequests.length + sentRequests.length;
       case "discover": return 0;
     }
@@ -520,8 +565,8 @@ export default function FriendsScreen() {
               transform: [
                 {
                   translateX: tabIndicatorAnim.interpolate({
-                    inputRange: [0, 1, 2],
-                    outputRange: [2, tabWidth + 2, tabWidth * 2 + 2],
+                    inputRange: [0, 1, 2, 3],
+                    outputRange: [2, tabWidth + 2, tabWidth * 2 + 2, tabWidth * 3 + 2],
                   }),
                 },
               ],
@@ -551,6 +596,34 @@ export default function FriendsScreen() {
           );
         })}
       </View>
+
+      {activeTab === "followers" && (
+        <FlatList
+          data={followers}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFollowerItem}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetchUsers}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyCenter}>
+              <View style={styles.emptyIconWrap}>
+                <Users size={32} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No followers yet</Text>
+              <Text style={styles.emptySubtitle}>
+                When people follow you, they{"\n"}will appear here
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {activeTab === "discover" && (
         <View style={styles.searchContainer}>
@@ -924,6 +997,9 @@ const styles = StyleSheet.create({
   searchAvatar: {
     backgroundColor: Colors.surfaceHighlight,
   },
+  followerAvatar: {
+    backgroundColor: "#1565C0",
+  },
   sentAvatar: {
     backgroundColor: Colors.surfaceLight,
     width: 36,
@@ -1100,6 +1176,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   followBtnText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  followBackBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#1565C0",
+  },
+  followBackBtnText: {
     fontSize: 13,
     fontWeight: "700" as const,
     color: Colors.white,

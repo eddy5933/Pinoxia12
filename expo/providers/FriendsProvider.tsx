@@ -15,6 +15,7 @@ export interface PublicUser {
 export const [FriendsProvider, useFriends] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [followers, setFollowers] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [allUsers, setAllUsers] = useState<PublicUser[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -27,13 +28,16 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const { data: { session } } = await supabase.auth.getSession();
       console.log("[FriendsProvider] Current session:", session ? session.user.id : "none");
 
-      const [profilesRes, friendsRes, requestsRes] = await Promise.all([
+      const [profilesRes, friendsRes, requestsRes, followersRes] = await Promise.all([
         supabase.from("profiles").select("*"),
         currentUserId
           ? supabase.from("friends").select("*, profile:profiles!friends_friend_id_fkey(*)").eq("user_id", currentUserId)
           : Promise.resolve({ data: [] as any[], error: null }),
         currentUserId
           ? supabase.from("friend_requests").select("*").or(`from_user_id.eq.${currentUserId},to_user_id.eq.${currentUserId}`)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        currentUserId
+          ? supabase.from("friends").select("*").eq("friend_id", currentUserId)
           : Promise.resolve({ data: [] as any[], error: null }),
       ]);
 
@@ -42,6 +46,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         console.log("[FriendsProvider] JOIN failed, falling back to plain friends query");
         const fallback = await supabase.from("friends").select("*").eq("user_id", currentUserId);
         friendsData = fallback.data;
+      }
+
+      if (followersRes.error) {
+        console.warn("[FriendsProvider] Followers query error:", followersRes.error.message);
       }
 
       if (profilesRes.error) {
@@ -89,8 +97,24 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         createdAt: r.created_at,
       }));
 
-      console.log("[FriendsProvider] Loaded", loadedUsers.length, "users,", loadedFriends.length, "friends,", loadedRequests.length, "requests");
-      return { friends: loadedFriends, requests: loadedRequests, users: loadedUsers };
+      const myFollowingIds = new Set((friendsData ?? []).map((f: any) => f.friend_id));
+      const loadedFollowers: Friend[] = (followersRes.data ?? [])
+        .filter((f: any) => !myFollowingIds.has(f.user_id))
+        .map((f: any) => {
+          const profile = loadedUsers.find((u) => u.id === f.user_id);
+          return {
+            id: f.id,
+            userId: f.user_id,
+            name: profile?.name ?? f.friend_name ?? "Unknown",
+            email: profile?.email ?? f.friend_email ?? "",
+            avatar: profile?.avatar ?? undefined,
+            isOnline: true,
+            isCloseFriend: false,
+          };
+        });
+
+      console.log("[FriendsProvider] Loaded", loadedUsers.length, "users,", loadedFriends.length, "friends,", loadedFollowers.length, "followers,", loadedRequests.length, "requests");
+      return { friends: loadedFriends, followers: loadedFollowers, requests: loadedRequests, users: loadedUsers };
     },
     enabled: !!currentUserId,
     staleTime: 5000,
@@ -100,6 +124,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   useEffect(() => {
     if (loadQuery.data) {
       setFriends(loadQuery.data.friends);
+      setFollowers(loadQuery.data.followers);
       setRequests(loadQuery.data.requests);
       setAllUsers(loadQuery.data.users);
     }
@@ -485,149 +510,84 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         prev.map((r) => (r.id === requestId ? { ...r, status: "accepted" as const } : r))
       );
 
-      const otherUserId = req.fromUserId === currentUserId ? req.toUserId : req.fromUserId;
+      const requesterId = req.fromUserId;
+      const acceptorId = req.toUserId;
 
-      const { data: otherProfile } = await supabase
+      const { data: requesterProfile } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", otherUserId)
+        .eq("id", requesterId)
         .maybeSingle();
 
-      const { data: myProfile } = await supabase
+      const { data: acceptorProfile } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", currentUserId)
+        .eq("id", acceptorId)
         .maybeSingle();
 
-      const otherUserName = otherProfile?.name ?? (req.fromUserId === currentUserId ? req.toUserName : req.fromUserName);
-      const otherUserEmail = otherProfile?.email ?? (req.fromUserId === currentUserId ? req.toUserEmail : req.fromUserEmail);
-      const otherUserAvatar = otherProfile?.avatar ?? undefined;
+      const requesterName = requesterProfile?.name ?? req.fromUserName;
+      const requesterEmail = requesterProfile?.email ?? req.fromUserEmail;
+      const acceptorName = acceptorProfile?.name ?? req.toUserName;
+      const acceptorEmail = acceptorProfile?.email ?? req.toUserEmail;
 
-      const currentUserName = myProfile?.name ?? req.toUserName ?? "";
-      const currentUserEmail = myProfile?.email ?? req.toUserEmail ?? "";
-      const currentUserAvatar = myProfile?.avatar ?? undefined;
+      console.log("[FriendsProvider] Accept: requester:", requesterName, "(", requesterId, ") acceptor:", acceptorName, "(", acceptorId, ")");
 
-      console.log("[FriendsProvider] Accept: other user:", otherUserName, "(", otherUserId, ") current user:", currentUserName, "(", currentUserId, ")");
-
-      const { data: existingMyFriend } = await supabase
+      const { data: existingFollow } = await supabase
         .from("friends")
         .select("*")
-        .eq("user_id", currentUserId)
-        .eq("friend_id", otherUserId)
+        .eq("user_id", requesterId)
+        .eq("friend_id", acceptorId)
         .maybeSingle();
 
-      let f1: any = existingMyFriend;
-      if (!existingMyFriend) {
-        const { data, error: e1 } = await supabase
+      if (!existingFollow) {
+        const { error: e1 } = await supabase
           .from("friends")
           .insert({
-            user_id: currentUserId,
-            friend_id: otherUserId,
-            friend_name: otherUserName,
-            friend_email: otherUserEmail,
-            friend_avatar: otherUserAvatar ?? null,
-          })
-          .select()
-          .single();
+            user_id: requesterId,
+            friend_id: acceptorId,
+            friend_name: acceptorName,
+            friend_email: acceptorEmail,
+            friend_avatar: acceptorProfile?.avatar ?? null,
+          });
         if (e1) {
-          console.warn("[FriendsProvider] Insert my friend row error:", e1.message);
+          console.warn("[FriendsProvider] Insert requester follow row error:", e1.message);
         } else {
-          f1 = data;
-          console.log("[FriendsProvider] Inserted my friend row:", data?.id);
+          console.log("[FriendsProvider] Requester now follows acceptor");
         }
-      } else {
-        console.log("[FriendsProvider] My friend row already exists:", existingMyFriend.id);
       }
 
-      const { data: existingTheirFriend } = await supabase
-        .from("friends")
-        .select("id")
-        .eq("user_id", otherUserId)
-        .eq("friend_id", currentUserId)
-        .maybeSingle();
-
-      if (!existingTheirFriend) {
-        const { data: theirRow, error: e2 } = await supabase
-          .from("friends")
-          .insert({
-            user_id: otherUserId,
-            friend_id: currentUserId,
-            friend_name: currentUserName,
-            friend_email: currentUserEmail,
-            friend_avatar: currentUserAvatar ?? null,
-          })
-          .select()
-          .single();
-        if (e2) {
-          console.warn("[FriendsProvider] Insert their friend row error:", e2.message);
-        } else {
-          console.log("[FriendsProvider] Inserted their friend row:", theirRow?.id, "for user:", otherUserId);
-        }
-      } else {
-        console.log("[FriendsProvider] Their friend row already exists:", existingTheirFriend.id);
-      }
-
-      const newFriend: Friend = {
-        id: f1?.id ?? `temp_${Date.now()}`,
-        userId: otherUserId,
-        name: otherUserName,
-        email: otherUserEmail,
-        avatar: otherUserAvatar,
-        isOnline: true,
-        isCloseFriend: false,
-      };
-      setFriends((prev) => {
-        if (prev.some((fr) => fr.userId === otherUserId)) {
-          console.log("[FriendsProvider] Friend already in local state, skipping add");
-          return prev;
-        }
-        console.log("[FriendsProvider] Adding accepted friend to acceptor local state:", otherUserName);
-        return [newFriend, ...prev];
-      });
-
-      queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-        if (!old) return old;
-        const alreadyExists = old.friends.some((f: any) => f.userId === otherUserId);
-        if (alreadyExists) return old;
-        return {
-          ...old,
-          friends: [newFriend, ...old.friends],
+      if (currentUserId === acceptorId) {
+        const newFollower: Friend = {
+          id: `follower_${Date.now()}`,
+          userId: requesterId,
+          name: requesterName,
+          email: requesterEmail,
+          avatar: requesterProfile?.avatar ?? undefined,
+          isOnline: true,
+          isCloseFriend: false,
         };
-      });
-
-      console.log("[FriendsProvider] Creating conversation between users so they can chat");
-      const { data: existingConvo } = await supabase
-        .from("conversations")
-        .select("id")
-        .contains("participants", [currentUserId])
-        .contains("participants", [otherUserId])
-        .maybeSingle();
-
-      if (!existingConvo) {
-        const participantNames: Record<string, string> = {
-          [currentUserId]: currentUserName,
-          [otherUserId]: otherUserName,
+        setFollowers((prev) => {
+          if (prev.some((f) => f.userId === requesterId)) return prev;
+          console.log("[FriendsProvider] Adding new follower to local state:", requesterName);
+          return [newFollower, ...prev];
+        });
+      } else if (currentUserId === requesterId) {
+        const newFriend: Friend = {
+          id: `friend_${Date.now()}`,
+          userId: acceptorId,
+          name: acceptorName,
+          email: acceptorEmail,
+          avatar: acceptorProfile?.avatar ?? undefined,
+          isOnline: true,
+          isCloseFriend: false,
         };
-        const { data: newConvo, error: convoError } = await supabase
-          .from("conversations")
-          .insert({
-            participants: [currentUserId, otherUserId],
-            participant_names: participantNames,
-            unread_count: 0,
-          })
-          .select()
-          .single();
-
-        if (convoError) {
-          console.warn("[FriendsProvider] Create conversation error:", convoError.message);
-        } else {
-          console.log("[FriendsProvider] Created conversation:", newConvo?.id);
-        }
-      } else {
-        console.log("[FriendsProvider] Conversation already exists:", existingConvo.id);
+        setFriends((prev) => {
+          if (prev.some((f) => f.userId === acceptorId)) return prev;
+          return [newFriend, ...prev];
+        });
       }
 
-      console.log("[FriendsProvider] Accepted request from", otherUserName, "- invalidating queries");
+      console.log("[FriendsProvider] Accepted request - invalidating queries");
       await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
       await queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
 
@@ -717,6 +677,101 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [friends, queryClient, currentUserId]
   );
 
+  const followBack = useCallback(
+    async (followerUserId: string) => {
+      if (!currentUserId) return false;
+      console.log("[FriendsProvider] Following back user:", followerUserId);
+
+      const { data: existing } = await supabase
+        .from("friends")
+        .select("id")
+        .eq("user_id", currentUserId)
+        .eq("friend_id", followerUserId)
+        .maybeSingle();
+
+      if (existing) {
+        console.log("[FriendsProvider] Already following this user");
+        return false;
+      }
+
+      const follower = followers.find((f) => f.userId === followerUserId);
+      const profile = allUsers.find((u) => u.id === followerUserId);
+      const name = profile?.name ?? follower?.name ?? "Unknown";
+      const email = profile?.email ?? follower?.email ?? "";
+      const avatar = profile?.avatar ?? follower?.avatar ?? undefined;
+
+      const { data: row, error } = await supabase
+        .from("friends")
+        .insert({
+          user_id: currentUserId,
+          friend_id: followerUserId,
+          friend_name: name,
+          friend_email: email,
+          friend_avatar: avatar ?? null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.warn("[FriendsProvider] Follow back error:", error.message);
+        return false;
+      }
+
+      const newFriend: Friend = {
+        id: row?.id ?? `fb_${Date.now()}`,
+        userId: followerUserId,
+        name,
+        email,
+        avatar,
+        isOnline: true,
+        isCloseFriend: false,
+      };
+
+      setFriends((prev) => {
+        if (prev.some((f) => f.userId === followerUserId)) return prev;
+        return [newFriend, ...prev];
+      });
+
+      setFollowers((prev) => prev.filter((f) => f.userId !== followerUserId));
+
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUserId)
+        .maybeSingle();
+
+      const myName = myProfile?.name ?? "";
+
+      const { data: existingConvo } = await supabase
+        .from("conversations")
+        .select("id")
+        .contains("participants", [currentUserId])
+        .contains("participants", [followerUserId])
+        .maybeSingle();
+
+      if (!existingConvo) {
+        const participantNames: Record<string, string> = {
+          [currentUserId]: myName,
+          [followerUserId]: name,
+        };
+        await supabase
+          .from("conversations")
+          .insert({
+            participants: [currentUserId, followerUserId],
+            participant_names: participantNames,
+            unread_count: 0,
+          });
+        console.log("[FriendsProvider] Created conversation after follow back");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+      await queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+      console.log("[FriendsProvider] Followed back:", name);
+      return true;
+    },
+    [currentUserId, followers, allUsers, queryClient]
+  );
+
   const closeFriends = useMemo(
     () => friends.filter((f) => f.isCloseFriend),
     [friends]
@@ -782,6 +837,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   return useMemo(
     () => ({
       friends,
+      followers,
       closeFriends,
       requests,
       allUsers,
@@ -795,6 +851,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       removeFriend,
       cancelFriendRequest,
       toggleCloseFriend,
+      followBack,
       isCloseFriend,
       getPendingRequests,
       getSentRequests,
@@ -804,9 +861,9 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       isRefetching,
     }),
     [
-      friends, closeFriends, requests, allUsers, registerUser, searchUsers,
+      friends, followers, closeFriends, requests, allUsers, registerUser, searchUsers,
       searchUsersFromSupabase, sendFriendRequest, addFriendDirectly, acceptFriendRequest, rejectFriendRequest,
-      removeFriend, cancelFriendRequest, toggleCloseFriend, isCloseFriend,
+      removeFriend, cancelFriendRequest, toggleCloseFriend, followBack, isCloseFriend,
       getPendingRequests, getSentRequests,
       isFriend, hasPendingRequest, refetchUsers, isRefetching,
     ]
