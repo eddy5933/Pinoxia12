@@ -387,12 +387,22 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   const acceptFriendRequest = useCallback(
     async (requestId: string, currentUserId: string) => {
       const req = requests.find((r) => r.id === requestId);
-      if (!req) return;
+      if (!req) {
+        console.warn("[FriendsProvider] acceptFriendRequest: request not found", requestId);
+        return;
+      }
 
-      await supabase
+      console.log("[FriendsProvider] Accepting friend request:", requestId, "from", req.fromUserName, "to", req.toUserName);
+
+      const { error: updateError } = await supabase
         .from("friend_requests")
         .update({ status: "accepted" })
         .eq("id", requestId);
+
+      if (updateError) {
+        console.warn("[FriendsProvider] Failed to update request status:", updateError.message);
+        return;
+      }
 
       setRequests((prev) =>
         prev.map((r) => (r.id === requestId ? { ...r, status: "accepted" as const } : r))
@@ -402,26 +412,63 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const otherUserName = req.fromUserId === currentUserId ? req.toUserName : req.fromUserName;
       const otherUserEmail = req.fromUserId === currentUserId ? req.toUserEmail : req.fromUserEmail;
 
-      const { data: f1 } = await supabase
-        .from("friends")
-        .insert({
-          user_id: currentUserId,
-          friend_id: otherUserId,
-          friend_name: otherUserName,
-          friend_email: otherUserEmail,
-        })
-        .select()
-        .single();
-
       const currentUser = allUsers.find((u) => u.id === currentUserId);
-      await supabase
+      const currentUserName = currentUser?.name ?? req.toUserName ?? "";
+      const currentUserEmail = currentUser?.email ?? req.toUserEmail ?? "";
+
+      const { data: existingMyFriend } = await supabase
         .from("friends")
-        .insert({
-          user_id: otherUserId,
-          friend_id: currentUserId,
-          friend_name: currentUser?.name ?? "",
-          friend_email: currentUser?.email ?? "",
-        });
+        .select("id")
+        .eq("user_id", currentUserId)
+        .eq("friend_id", otherUserId)
+        .maybeSingle();
+
+      let f1: any = existingMyFriend;
+      if (!existingMyFriend) {
+        const { data, error: e1 } = await supabase
+          .from("friends")
+          .insert({
+            user_id: currentUserId,
+            friend_id: otherUserId,
+            friend_name: otherUserName,
+            friend_email: otherUserEmail,
+          })
+          .select()
+          .single();
+        if (e1) {
+          console.warn("[FriendsProvider] Insert my friend row error:", e1.message);
+        } else {
+          f1 = data;
+          console.log("[FriendsProvider] Inserted my friend row:", data?.id);
+        }
+      } else {
+        console.log("[FriendsProvider] My friend row already exists:", existingMyFriend.id);
+      }
+
+      const { data: existingTheirFriend } = await supabase
+        .from("friends")
+        .select("id")
+        .eq("user_id", otherUserId)
+        .eq("friend_id", currentUserId)
+        .maybeSingle();
+
+      if (!existingTheirFriend) {
+        const { error: e2 } = await supabase
+          .from("friends")
+          .insert({
+            user_id: otherUserId,
+            friend_id: currentUserId,
+            friend_name: currentUserName,
+            friend_email: currentUserEmail,
+          });
+        if (e2) {
+          console.warn("[FriendsProvider] Insert their friend row error:", e2.message);
+        } else {
+          console.log("[FriendsProvider] Inserted their friend row for user:", otherUserId);
+        }
+      } else {
+        console.log("[FriendsProvider] Their friend row already exists:", existingTheirFriend.id);
+      }
 
       if (f1) {
         const newFriend: Friend = {
@@ -430,13 +477,16 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           name: otherUserName,
           email: otherUserEmail,
           isOnline: true,
+          isCloseFriend: false,
         };
         setFriends((prev) => {
           if (prev.some((fr) => fr.userId === otherUserId)) return prev;
+          console.log("[FriendsProvider] Adding accepted friend to local state:", otherUserName);
           return [newFriend, ...prev];
         });
       }
-      console.log("[FriendsProvider] Accepted request from", otherUserName);
+
+      console.log("[FriendsProvider] Accepted request from", otherUserName, "- invalidating queries");
       await queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
     },
     [requests, allUsers, queryClient, currentUserId]
