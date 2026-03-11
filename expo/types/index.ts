@@ -48,7 +48,19 @@ export interface Review {
 
 export type OnlineVisibility = "hidden" | "friends_only" | "everyone";
 
+export type FriendStatus = "pending" | "accepted" | "rejected";
 
+export interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  fromUserEmail: string;
+  toUserId: string;
+  toUserName: string;
+  toUserEmail: string;
+  status: FriendStatus;
+  createdAt: string;
+}
 
 export interface Friend {
   id: string;

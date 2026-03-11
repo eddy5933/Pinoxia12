@@ -3,6 +3,8 @@ import { Search, MapPin, User, Users } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/providers/AuthProvider";
+import { useFriends } from "@/providers/FriendsProvider";
 import { useChat } from "@/providers/ChatProvider";
 
 
@@ -51,10 +53,13 @@ const tabIconStyles = StyleSheet.create({
 });
 
 export default function TabLayout() {
+  const { user } = useAuth();
+  const { getPendingRequests } = useFriends();
   const { totalUnreadCount } = useChat();
   const friendBadgeCount = useMemo(() => {
-    return totalUnreadCount;
-  }, [totalUnreadCount]);
+    if (!user) return 0;
+    return getPendingRequests(user.id).length + totalUnreadCount;
+  }, [user, getPendingRequests, totalUnreadCount]);
 
   return (
     <Tabs
