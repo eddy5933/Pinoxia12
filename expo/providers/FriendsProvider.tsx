@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import createContextHook from "@nkzw/create-context-hook";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Friend, FriendRequest, User } from "@/types";
@@ -29,7 +29,6 @@ const emptyData: FriendsQueryData = {
 export const [FriendsProvider, useFriends] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const optimisticLockRef = useRef<number>(0);
 
   const loadQuery = useQuery({
     queryKey: ["friends_load", currentUserId],
@@ -127,8 +126,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       return { friends: loadedFriends, followers: loadedFollowers, requests: loadedRequests, users: loadedUsers };
     },
     enabled: !!currentUserId,
-    staleTime: 5000,
-    refetchInterval: 15000,
+    staleTime: 1000,
+    refetchInterval: 10000,
   });
 
   const queryData = loadQuery.data ?? emptyData;
@@ -147,15 +146,18 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [queryClient, currentUserId]
   );
 
+  const forceRefetch = useCallback(() => {
+    console.log("[FriendsProvider] Force refetch executing");
+    void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+    void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+  }, [queryClient, currentUserId]);
+
   const delayedRefetch = useCallback(
     (delayMs: number = 1500) => {
-      const lockId = ++optimisticLockRef.current;
       setTimeout(() => {
-        if (optimisticLockRef.current === lockId) {
-          console.log("[FriendsProvider] Delayed refetch executing");
-          void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-          void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-        }
+        console.log("[FriendsProvider] Delayed refetch executing after", delayMs, "ms");
+        void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+        void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
       }, delayMs);
     },
     [queryClient, currentUserId]
@@ -244,8 +246,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               };
             });
 
-            delayedRefetch(1500);
-            delayedRefetch(4000);
+            forceRefetch();
+            delayedRefetch(3000);
           }
         }
       )
@@ -258,12 +260,18 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           if (!f) return;
 
           if (f.user_id === currentUserId) {
+            const { data: friendProfile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", f.friend_id)
+              .maybeSingle();
+
             const newFriend: Friend = {
               id: f.id,
               userId: f.friend_id,
-              name: f.friend_name,
-              email: f.friend_email,
-              avatar: f.friend_avatar ?? undefined,
+              name: friendProfile?.name ?? f.friend_name,
+              email: friendProfile?.email ?? f.friend_email,
+              avatar: friendProfile?.avatar ?? f.friend_avatar ?? undefined,
               isOnline: true,
               isCloseFriend: f.is_close_friend ?? false,
             };
@@ -278,6 +286,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
                 followers: old.followers.filter((fl) => fl.userId !== f.friend_id),
               };
             });
+
+            forceRefetch();
           }
 
           if (f.friend_id === currentUserId && f.user_id !== currentUserId) {
@@ -344,15 +354,20 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               }
 
               void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+              forceRefetch();
             } else {
-              const currentAllUsers = queryClient.getQueryData<FriendsQueryData>(["friends_load", currentUserId])?.users ?? [];
-              const profile = currentAllUsers.find((u) => u.id === f.user_id);
+              const { data: followerProfile } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", f.user_id)
+                .maybeSingle();
+
               const newFollower: Friend = {
                 id: f.id,
                 userId: f.user_id,
-                name: profile?.name ?? f.friend_name ?? "Unknown",
-                email: profile?.email ?? f.friend_email ?? "",
-                avatar: profile?.avatar ?? undefined,
+                name: followerProfile?.name ?? f.friend_name ?? "Unknown",
+                email: followerProfile?.email ?? f.friend_email ?? "",
+                avatar: followerProfile?.avatar ?? undefined,
                 isOnline: true,
                 isCloseFriend: false,
               };
@@ -365,7 +380,8 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             }
           }
 
-          delayedRefetch(2000);
+          forceRefetch();
+          delayedRefetch(3000);
         }
       )
       .on(
@@ -398,7 +414,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       console.log("[FriendsProvider] Cleaning up realtime subscription");
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId, queryClient, updateCache, delayedRefetch]);
+  }, [currentUserId, queryClient, updateCache, delayedRefetch, forceRefetch]);
 
   const registerUser = useCallback(async (user: User) => {
     console.log("[FriendsProvider] Registering user in Supabase:", user.name, user.id);
@@ -709,10 +725,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       }
 
       console.log("[FriendsProvider] Accepted request - scheduling refetch");
-      delayedRefetch(1500);
-      delayedRefetch(4000);
+      forceRefetch();
+      delayedRefetch(3000);
     },
-    [requests, updateCache, delayedRefetch]
+    [requests, updateCache, delayedRefetch, forceRefetch]
   );
 
   const rejectFriendRequest = useCallback(
@@ -875,13 +891,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         console.log("[FriendsProvider] Created conversation after follow back");
       }
 
+      forceRefetch();
       delayedRefetch(2000);
       delayedRefetch(5000);
 
       console.log("[FriendsProvider] Followed back:", name);
       return true;
     },
-    [currentUserId, followers, allUsers, updateCache, delayedRefetch]
+    [currentUserId, followers, allUsers, updateCache, delayedRefetch, forceRefetch]
   );
 
   const closeFriends = useMemo(
