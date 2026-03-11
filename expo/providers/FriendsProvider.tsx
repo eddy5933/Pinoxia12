@@ -144,39 +144,55 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted via realtime");
+            console.log("[FriendsProvider] Friend request accepted via realtime, fetching friends directly from DB");
 
-            const isRequester = r.from_user_id === currentUserId;
-            const otherUserId = isRequester ? r.to_user_id : r.from_user_id;
-            const otherUserName = isRequester ? r.to_user_name : r.from_user_name;
-            const otherUserEmail = isRequester ? r.to_user_email : r.from_user_email;
+            const fetchAndUpdateFriends = async () => {
+              for (let attempt = 0; attempt < 3; attempt++) {
+                if (attempt > 0) {
+                  console.log(`[FriendsProvider] Retry attempt ${attempt + 1} to fetch updated friends`);
+                  await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
+                }
 
-            const newFriend: Friend = {
-              id: `temp_${Date.now()}`,
-              userId: otherUserId,
-              name: otherUserName,
-              email: otherUserEmail,
-              isOnline: true,
-              isCloseFriend: false,
+                const { data: freshFriends, error } = await supabase
+                  .from("friends")
+                  .select("*")
+                  .eq("user_id", currentUserId);
+
+                if (error) {
+                  console.warn("[FriendsProvider] Error fetching friends after accept:", error.message);
+                  continue;
+                }
+
+                const mapped: Friend[] = (freshFriends ?? []).map((f: any) => ({
+                  id: f.id,
+                  userId: f.friend_id,
+                  name: f.friend_name,
+                  email: f.friend_email,
+                  avatar: f.friend_avatar ?? undefined,
+                  isOnline: true,
+                  isCloseFriend: f.is_close_friend ?? false,
+                }));
+
+                console.log("[FriendsProvider] Fetched", mapped.length, "friends from DB (attempt", attempt + 1, ")");
+
+                const otherUserId = r.from_user_id === currentUserId ? r.to_user_id : r.from_user_id;
+                const hasNewFriend = mapped.some((f) => f.userId === otherUserId);
+
+                setFriends(mapped);
+                queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+                  if (!old) return { friends: mapped, requests: [], users: [] };
+                  return { ...old, friends: mapped };
+                });
+
+                if (hasNewFriend) {
+                  console.log("[FriendsProvider] New friend found in DB, update complete");
+                  void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
+                  break;
+                }
+              }
             };
 
-            setFriends((prev) => {
-              if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName);
-              return [newFriend, ...prev];
-            });
-
-            queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-              if (!old) return old;
-              if (old.friends.some((f: any) => f.userId === otherUserId)) return old;
-              return { ...old, friends: [newFriend, ...old.friends] };
-            });
-
-            setTimeout(() => {
-              console.log("[FriendsProvider] Force refetching friends after accept");
-              void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-              void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-            }, 1500);
+            void fetchAndUpdateFriends();
           }
         }
       )
