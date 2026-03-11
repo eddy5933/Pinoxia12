@@ -13,7 +13,7 @@ export interface Restaurant {
   ownerId: string;
   name: string;
   description: string;
-  cuisine: string;
+  cuisine?: string;
   photos: string[];
   address: string;
   latitude: number;

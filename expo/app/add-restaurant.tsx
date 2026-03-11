@@ -101,10 +101,6 @@ export default function AddRestaurantScreen() {
       Alert.alert("Required", "Please enter a business name.");
       return;
     }
-    if (!cuisine) {
-      Alert.alert("Required", "Please select a cuisine type.");
-      return;
-    }
     if (!address.trim()) {
       Alert.alert("Required", "Please enter an address.");
       return;
@@ -120,7 +116,7 @@ export default function AddRestaurantScreen() {
       ownerId: user.id,
       name: name.trim(),
       description: description.trim() || "A wonderful place.",
-      cuisine,
+      cuisine: cuisine || undefined,
       photos: photos.length > 0 ? photos : [defaultPhoto],
       address: address.trim(),
       latitude: finalLat,
@@ -191,7 +187,7 @@ export default function AddRestaurantScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cuisine Type *</Text>
+            <Text style={styles.label}>Cuisine Type</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
