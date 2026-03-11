@@ -144,7 +144,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted via realtime");
+            console.log("[FriendsProvider] Friend request accepted via realtime, current user:", currentUserId);
 
             const isRequester = r.from_user_id === currentUserId;
             const otherUserId = isRequester ? r.to_user_id : r.from_user_id;
@@ -172,11 +172,15 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               return { ...old, friends: [newFriend, ...old.friends] };
             });
 
-            setTimeout(() => {
+            const refetchAll = () => {
               console.log("[FriendsProvider] Force refetching friends after accept");
               void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
               void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-            }, 1500);
+            };
+
+            refetchAll();
+            setTimeout(refetchAll, 1000);
+            setTimeout(refetchAll, 3000);
           }
         }
       )
@@ -205,7 +209,14 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
             return [newFriend, ...prev];
           });
 
+          queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
+            if (!old) return old;
+            if (old.friends.some((fr: any) => fr.id === newFriend.id || fr.userId === newFriend.userId)) return old;
+            return { ...old, friends: [newFriend, ...old.friends] };
+          });
+
           void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
+          void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
         }
       )
       .subscribe((status: string) => {
