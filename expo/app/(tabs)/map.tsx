@@ -291,58 +291,10 @@ function NativeMapView({
               router.push(`/restaurant/${r.id}`);
             }}
           >
-            <View style={markerStyles.callout}>
-              <View style={markerStyles.calloutHeader}>
-                {r.photos[0] && (
-                  <Image
-                    source={{ uri: r.photos[0] }}
-                    style={markerStyles.calloutImage}
-                    contentFit="cover"
-                  />
-                )}
-                <View style={markerStyles.calloutHeaderInfo}>
-                  <Text style={markerStyles.calloutName} numberOfLines={1}>{r.name}</Text>
-                  <View style={markerStyles.calloutRow}>
-                    <Star size={11} color={Colors.star} fill={Colors.star} />
-                    <Text style={markerStyles.calloutRating}>{r.rating}</Text>
-                    <Text style={markerStyles.calloutReviews}>({r.reviewCount})</Text>
-                    <View style={markerStyles.calloutDot} />
-                    <Text style={markerStyles.calloutPrice}>{r.priceRange}</Text>
-                  </View>
-                  {r.cuisine ? (
-                    <View style={markerStyles.calloutCuisineBadge}>
-                      <Text style={markerStyles.calloutCuisineText}>{r.cuisine}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-              {r.description ? (
-                <Text style={markerStyles.calloutDescription} numberOfLines={2}>{r.description}</Text>
-              ) : null}
-              <View style={markerStyles.calloutDivider} />
-              <View style={markerStyles.calloutAddressRow}>
-                <MapPin size={11} color={Colors.textSecondary} />
-                <Text style={markerStyles.calloutAddress} numberOfLines={1}>{r.address}</Text>
-              </View>
-              {dist && (
-                <View style={markerStyles.calloutDistanceRow}>
-                  <Navigation size={11} color={Colors.primary} />
-                  <Text style={markerStyles.calloutDistance}>{dist}</Text>
-                </View>
-              )}
-              {r.phone ? (
-                <View style={markerStyles.calloutPhoneRow}>
-                  <Text style={markerStyles.calloutPhone}>{r.phone}</Text>
-                </View>
-              ) : null}
-              <TouchableOpacity
-                style={markerStyles.calloutButton}
-                activeOpacity={0.8}
-              >
-                <Navigation size={12} color={Colors.white} />
-                <Text style={markerStyles.calloutButtonText}>View Full Details</Text>
-              </TouchableOpacity>
+            <View style={markerStyles.calloutSimple}>
+              <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{r.name}</Text>
             </View>
+            <View style={markerStyles.calloutArrow} />
           </Callout>
         </Marker>
         );
@@ -816,134 +768,36 @@ const markerStyles = StyleSheet.create({
   labelDistanceDefault: {
     color: "#FFB4B4",
   },
-  callout: {
+  calloutSimple: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    width: 260,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: Colors.border,
+    maxWidth: 180,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
   },
-  calloutHeader: {
-    flexDirection: "row" as const,
-    gap: 10,
-    marginBottom: 8,
-  },
-  calloutImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-  },
-  calloutHeaderInfo: {
-    flex: 1,
-    justifyContent: "center" as const,
-  },
-  calloutName: {
-    fontSize: 15,
+  calloutSimpleName: {
+    fontSize: 14,
     fontWeight: "700" as const,
     color: Colors.white,
-    marginBottom: 3,
+    textAlign: "center" as const,
   },
-  calloutRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    marginBottom: 4,
-  },
-  calloutRating: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-    color: Colors.star,
-  },
-  calloutReviews: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  calloutDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.textMuted,
-  },
-  calloutPrice: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-    color: Colors.textSecondary,
-  },
-  calloutCuisineBadge: {
-    backgroundColor: "rgba(230, 57, 70, 0.15)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: "flex-start" as const,
-  },
-  calloutCuisineText: {
-    fontSize: 10,
-    fontWeight: "600" as const,
-    color: Colors.primary,
-  },
-  calloutDescription: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  calloutDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginBottom: 8,
-  },
-  calloutAddressRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginBottom: 4,
-  },
-  calloutDistanceRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginBottom: 4,
-  },
-  calloutDistance: {
-    fontSize: 12,
-    fontWeight: "700" as const,
-    color: Colors.primary,
-  },
-  calloutAddress: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    flex: 1,
-  },
-  calloutPhoneRow: {
-    marginBottom: 6,
-    paddingLeft: 17,
-  },
-  calloutPhone: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontWeight: "500" as const,
-  },
-  calloutButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginTop: 4,
-  },
-  calloutButtonText: {
-    fontSize: 13,
-    fontWeight: "700" as const,
-    color: Colors.white,
+  calloutArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: Colors.surface,
+    alignSelf: "center" as const,
   },
 });
 
