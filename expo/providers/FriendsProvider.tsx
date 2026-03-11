@@ -125,12 +125,13 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
     );
     if (!followerRow) continue;
     const profile = profilesMap.get(followerId);
+    console.log("[Friends] Follower:", followerId, "profile:", profile?.name, "row user_id:", followerRow.user_id);
     followers.push({
       id: followerRow.id,
       userId: followerId,
-      name: profile?.name ?? followerRow.friend_name ?? "Unknown",
-      email: profile?.email ?? followerRow.friend_email ?? "",
-      avatar: profile?.avatar ?? followerRow.friend_avatar ?? undefined,
+      name: profile?.name ?? "Unknown",
+      email: profile?.email ?? "",
+      avatar: profile?.avatar ?? undefined,
       isOnline: true,
       isCloseFriend: false,
     });
