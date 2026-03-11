@@ -66,9 +66,10 @@ export default function LoginScreen() {
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-    } catch (e) {
+    } catch (e: any) {
       console.log("Auth error:", e);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      const msg = e?.message ?? "Something went wrong. Please try again.";
+      Alert.alert("Error", msg);
     } finally {
       setIsSubmitting(false);
     }

@@ -1,141 +1,173 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
+import { supabase } from "@/lib/supabase";
 import { User, UserRole } from "@/types";
-import { cloudUsersApi } from "@/lib/api";
-
-const AUTH_STORAGE_KEY = "foodspot_auth";
-const ALL_ACCOUNTS_KEY = "foodspot_all_accounts";
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
+    const loadSession = async () => {
       try {
-        const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored) as User;
-          setUser(parsed);
-          cloudUsersApi.upsert({
-            id: parsed.id,
-            email: parsed.email,
-            name: parsed.name,
-            role: parsed.role,
-          }).catch((e) => console.warn("[Auth] Cloud sync on load failed:", e));
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("[Auth] Session check:", session ? "found" : "none");
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              name: profile.name,
+              role: profile.role ?? "customer",
+              avatar: profile.avatar ?? undefined,
+            });
+            console.log("[Auth] Loaded profile:", profile.name);
+          }
         }
       } catch (e) {
-        console.log("Failed to load auth state:", e);
+        console.warn("[Auth] Session load error:", e);
       } finally {
         setIsLoading(false);
       }
     };
-    void loadUser();
+    void loadSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("[Auth] Auth state changed:", event);
+        if (event === "SIGNED_OUT" || !session?.user) {
+          setUser(null);
+          return;
+        }
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              email: profile.email,
+              name: profile.name,
+              role: profile.role ?? "customer",
+              avatar: profile.avatar ?? undefined,
+            });
+          }
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const syncToCloud = useCallback(async (u: User) => {
-    try {
-      await cloudUsersApi.upsert({
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-      });
-      console.log("[Auth] Synced user to cloud:", u.name);
-    } catch (e) {
-      console.warn("[Auth] Cloud sync failed:", e);
+  const login = useCallback(async (email: string, password: string) => {
+    console.log("[Auth] Logging in:", email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      console.warn("[Auth] Login error:", error.message);
+      throw new Error(error.message);
     }
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profile) {
+        const u: User = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role ?? "customer",
+          avatar: profile.avatar ?? undefined,
+        };
+        setUser(u);
+        console.log("[Auth] Login success:", u.name);
+        return u;
+      }
+    }
+    return null;
   }, []);
 
-  const login = useCallback(async (email: string, _password: string) => {
-    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
-    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
-    const existing = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
-
-    if (existing) {
-      console.log("[Auth] Found existing account for", email, "id:", existing.id);
-      setUser(existing);
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
-      void syncToCloud(existing);
-      return existing;
-    }
-
-    const newUser: User = {
-      id: `user_${Date.now()}`,
+  const signup = useCallback(async (email: string, password: string, name: string) => {
+    console.log("[Auth] Signing up:", email);
+    const { data, error } = await supabase.auth.signUp({
       email,
-      name: email.split("@")[0],
-      role: "customer",
-    };
-    const updatedAccounts = [...accounts, newUser];
-    setUser(newUser);
-    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
-    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-    console.log("[Auth] Created new account for", email, "id:", newUser.id);
-    void syncToCloud(newUser);
-    return newUser;
-  }, [syncToCloud]);
-
-  const signup = useCallback(async (email: string, _password: string, name: string) => {
-    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
-    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
-    const existing = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
-
-    if (existing) {
-      console.log("[Auth] Account already exists for", email, "- logging in");
-      setUser(existing);
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(existing));
-      void syncToCloud(existing);
-      return existing;
+      password,
+    });
+    if (error) {
+      console.warn("[Auth] Signup error:", error.message);
+      throw new Error(error.message);
     }
-
-    const newUser: User = {
-      id: `user_${Date.now()}`,
-      email,
-      name,
-      role: "customer",
-    };
-    const updatedAccounts = [...accounts, newUser];
-    setUser(newUser);
-    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
-    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-    console.log("[Auth] Signed up new account for", email, "id:", newUser.id);
-    void syncToCloud(newUser);
-    return newUser;
-  }, [syncToCloud]);
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: data.user.id,
+          email,
+          name,
+          role: "customer",
+        });
+      if (profileError) {
+        console.warn("[Auth] Profile upsert error:", profileError.message);
+      }
+      const u: User = {
+        id: data.user.id,
+        email,
+        name,
+        role: "customer",
+      };
+      setUser(u);
+      console.log("[Auth] Signup success:", u.name);
+      return u;
+    }
+    return null;
+  }, []);
 
   const logout = useCallback(async () => {
+    console.log("[Auth] Logging out");
+    await supabase.auth.signOut();
     setUser(null);
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
   }, []);
 
   const deleteAccount = useCallback(async () => {
-    console.log("[Auth] Deleting account for user:", user?.id);
-    if (user) {
-      const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
-      const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
-      const filtered = accounts.filter((a) => a.id !== user.id);
-      await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(filtered));
-      cloudUsersApi.remove(user.id).catch((e) => console.warn("[Auth] Cloud delete failed:", e));
-    }
+    if (!user) return;
+    console.log("[Auth] Deleting account:", user.id);
+    await supabase.from("profiles").delete().eq("id", user.id);
+    await supabase.from("friends").delete().or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+    await supabase.from("friend_requests").delete().or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
+    await supabase.auth.signOut();
     setUser(null);
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
   }, [user]);
 
   const toggleRole = useCallback(async () => {
     if (!user) return;
     const newRole: UserRole = user.role === "customer" ? "owner" : "customer";
-    const updated = { ...user, role: newRole };
-    setUser(updated);
-    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updated));
-
-    const storedAccounts = await AsyncStorage.getItem(ALL_ACCOUNTS_KEY);
-    const accounts: User[] = storedAccounts ? JSON.parse(storedAccounts) : [];
-    const updatedAccounts = accounts.map((a) => (a.id === user.id ? updated : a));
-    await AsyncStorage.setItem(ALL_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
-    console.log("[Auth] Updated role to", newRole, "for", user.name);
-    void syncToCloud(updated);
-  }, [user, syncToCloud]);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role: newRole })
+      .eq("id", user.id);
+    if (error) {
+      console.warn("[Auth] Toggle role error:", error.message);
+      return;
+    }
+    setUser({ ...user, role: newRole });
+    console.log("[Auth] Role updated to:", newRole);
+  }, [user]);
 
   return useMemo(
     () => ({ user, isLoading, login, signup, logout, deleteAccount, toggleRole }),

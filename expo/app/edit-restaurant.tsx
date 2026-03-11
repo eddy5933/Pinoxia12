@@ -109,7 +109,7 @@ export default function EditRestaurantScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!user || !id) return;
 
     if (!name.trim()) {
@@ -125,7 +125,7 @@ export default function EditRestaurantScreen() {
       return;
     }
 
-    updateRestaurant(id, {
+    await updateRestaurant(id, {
       name: name.trim(),
       description: description.trim() || "A wonderful place.",
       cuisine: cuisine || undefined,
@@ -409,7 +409,7 @@ export default function EditRestaurantScreen() {
 
         <TouchableOpacity
           style={styles.submitButton}
-          onPress={handleSave}
+          onPress={() => void handleSave()}
           testID="save-restaurant"
         >
           <Check size={18} color={Colors.white} />

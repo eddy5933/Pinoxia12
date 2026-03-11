@@ -92,7 +92,7 @@ export default function AddRestaurantScreen() {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!user) {
       Alert.alert("Error", "You must be logged in to register a business.");
       return;
@@ -112,7 +112,7 @@ export default function AddRestaurantScreen() {
     const finalLat = latitude ?? (userLocation?.latitude ?? 40.748) + (Math.random() - 0.5) * 0.02;
     const finalLng = longitude ?? (userLocation?.longitude ?? -73.985) + (Math.random() - 0.5) * 0.02;
 
-    addRestaurant({
+    await addRestaurant({
       ownerId: user.id,
       name: name.trim(),
       description: description.trim() || "A wonderful place.",

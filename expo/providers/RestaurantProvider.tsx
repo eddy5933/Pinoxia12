@@ -1,13 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import createContextHook from "@nkzw/create-context-hook";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Restaurant, Review } from "@/types";
 import { MOCK_RESTAURANTS, MOCK_REVIEWS } from "@/mocks/restaurants";
-
-const RESTAURANTS_KEY = "foodspot_restaurants";
-const REVIEWS_KEY = "foodspot_reviews";
-const INITIALIZED_KEY = "foodspot_initialized";
+import { supabase } from "@/lib/supabase";
 
 export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -17,34 +13,88 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
   const loadQuery = useQuery({
     queryKey: ["restaurants_load"],
     queryFn: async () => {
-      console.log("[RestaurantProvider] Loading data from AsyncStorage...");
-      const [storedRestaurants, storedReviews, initialized] = await Promise.all([
-        AsyncStorage.getItem(RESTAURANTS_KEY),
-        AsyncStorage.getItem(REVIEWS_KEY),
-        AsyncStorage.getItem(INITIALIZED_KEY),
+      console.log("[RestaurantProvider] Loading data from Supabase...");
+      const [restRes, revRes] = await Promise.all([
+        supabase.from("restaurants").select("*"),
+        supabase.from("reviews").select("*").order("created_at", { ascending: false }),
       ]);
 
-      let loadedRestaurants: Restaurant[];
-      let loadedReviews: Review[];
+      let loadedRestaurants: Restaurant[] = (restRes.data ?? []).map((r: any) => ({
+        id: r.id,
+        ownerId: r.owner_id,
+        name: r.name,
+        description: r.description,
+        cuisine: r.cuisine ?? undefined,
+        photos: r.photos ?? [],
+        address: r.address,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        openingHours: r.opening_hours ?? {
+          monday: "", tuesday: "", wednesday: "", thursday: "",
+          friday: "", saturday: "", sunday: "",
+        },
+        phone: r.phone ?? undefined,
+        rating: r.rating ?? 0,
+        reviewCount: r.review_count ?? 0,
+        priceRange: r.price_range ?? "$$",
+        createdAt: r.created_at,
+      }));
 
-      if (initialized && storedRestaurants && storedReviews) {
-        loadedRestaurants = JSON.parse(storedRestaurants) as Restaurant[];
-        loadedReviews = JSON.parse(storedReviews) as Review[];
-        console.log("[RestaurantProvider] Loaded from storage:", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
-      } else {
-        loadedRestaurants = MOCK_RESTAURANTS;
-        loadedReviews = MOCK_REVIEWS;
-        await Promise.all([
-          AsyncStorage.setItem(RESTAURANTS_KEY, JSON.stringify(loadedRestaurants)),
-          AsyncStorage.setItem(REVIEWS_KEY, JSON.stringify(loadedReviews)),
-          AsyncStorage.setItem(INITIALIZED_KEY, "true"),
-        ]);
-        console.log("[RestaurantProvider] Initialized with mock data");
+      let loadedReviews: Review[] = (revRes.data ?? []).map((rv: any) => ({
+        id: rv.id,
+        restaurantId: rv.restaurant_id,
+        userId: rv.user_id,
+        userName: rv.user_name,
+        rating: rv.rating,
+        comment: rv.comment,
+        createdAt: rv.created_at,
+      }));
+
+      if (loadedRestaurants.length === 0) {
+        console.log("[RestaurantProvider] No restaurants found, seeding mock data...");
+        const inserts = MOCK_RESTAURANTS.map((r) => ({
+          id: r.id,
+          owner_id: r.ownerId,
+          name: r.name,
+          description: r.description,
+          cuisine: r.cuisine ?? null,
+          photos: r.photos,
+          address: r.address,
+          latitude: r.latitude,
+          longitude: r.longitude,
+          opening_hours: r.openingHours,
+          phone: r.phone ?? null,
+          rating: r.rating,
+          review_count: r.reviewCount,
+          price_range: r.priceRange,
+        }));
+        const { error: seedError } = await supabase.from("restaurants").insert(inserts);
+        if (seedError) {
+          console.warn("[RestaurantProvider] Seed error:", seedError.message);
+        } else {
+          loadedRestaurants = MOCK_RESTAURANTS;
+        }
+
+        const reviewInserts = MOCK_REVIEWS.map((rv) => ({
+          id: rv.id,
+          restaurant_id: rv.restaurantId,
+          user_id: rv.userId,
+          user_name: rv.userName,
+          rating: rv.rating,
+          comment: rv.comment,
+        }));
+        const { error: revSeedError } = await supabase.from("reviews").insert(reviewInserts);
+        if (revSeedError) {
+          console.warn("[RestaurantProvider] Review seed error:", revSeedError.message);
+        } else {
+          loadedReviews = MOCK_REVIEWS;
+        }
       }
 
+      console.log("[RestaurantProvider] Loaded", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
       return { restaurants: loadedRestaurants, reviews: loadedReviews };
     },
-    staleTime: Infinity,
+    staleTime: 10000,
   });
 
   useEffect(() => {
@@ -55,100 +105,163 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
     }
   }, [loadQuery.data]);
 
-  const persistRestaurants = useMutation({
-    mutationFn: async (updated: Restaurant[]) => {
-      await AsyncStorage.setItem(RESTAURANTS_KEY, JSON.stringify(updated));
-      console.log("[RestaurantProvider] Persisted", updated.length, "restaurants");
-    },
-  });
+  const updateRestaurant = useCallback(async (id: string, updates: Partial<Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt" | "ownerId">>) => {
+    const dbUpdates: Record<string, any> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.cuisine !== undefined) dbUpdates.cuisine = updates.cuisine;
+    if (updates.photos !== undefined) dbUpdates.photos = updates.photos;
+    if (updates.address !== undefined) dbUpdates.address = updates.address;
+    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
+    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
+    if (updates.openingHours !== undefined) dbUpdates.opening_hours = updates.openingHours;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.priceRange !== undefined) dbUpdates.price_range = updates.priceRange;
 
-  const persistReviews = useMutation({
-    mutationFn: async (updated: Review[]) => {
-      await AsyncStorage.setItem(REVIEWS_KEY, JSON.stringify(updated));
-      console.log("[RestaurantProvider] Persisted", updated.length, "reviews");
-    },
-  });
+    const { error } = await supabase.from("restaurants").update(dbUpdates).eq("id", id);
+    if (error) {
+      console.warn("[RestaurantProvider] Update error:", error.message);
+    }
 
-  const updateRestaurant = useCallback((id: string, updates: Partial<Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt" | "ownerId">>) => {
-    setRestaurants((prev) => {
-      const updated = prev.map((r) => {
-        if (r.id === id) {
-          return { ...r, ...updates };
-        }
-        return r;
-      });
-      persistRestaurants.mutate(updated);
-      return updated;
-    });
+    setRestaurants((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...updates } : r))
+    );
     console.log("[RestaurantProvider] Updated restaurant:", id);
-  }, [persistRestaurants]);
+  }, []);
 
-  const addRestaurant = useCallback((restaurant: Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt">) => {
+  const addRestaurant = useCallback(async (restaurant: Omit<Restaurant, "id" | "rating" | "reviewCount" | "createdAt">) => {
+    const { data, error } = await supabase
+      .from("restaurants")
+      .insert({
+        owner_id: restaurant.ownerId,
+        name: restaurant.name,
+        description: restaurant.description,
+        cuisine: restaurant.cuisine ?? null,
+        photos: restaurant.photos,
+        address: restaurant.address,
+        latitude: restaurant.latitude,
+        longitude: restaurant.longitude,
+        opening_hours: restaurant.openingHours,
+        phone: restaurant.phone ?? null,
+        rating: 0,
+        review_count: 0,
+        price_range: restaurant.priceRange,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("[RestaurantProvider] Add error:", error.message);
+      const fallback: Restaurant = {
+        ...restaurant,
+        id: `r_${Date.now()}`,
+        rating: 0,
+        reviewCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+      setRestaurants((prev) => [fallback, ...prev]);
+      return fallback;
+    }
+
     const newRestaurant: Restaurant = {
-      ...restaurant,
-      id: `r_${Date.now()}`,
+      id: data.id,
+      ownerId: data.owner_id,
+      name: data.name,
+      description: data.description,
+      cuisine: data.cuisine ?? undefined,
+      photos: data.photos ?? [],
+      address: data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      openingHours: data.opening_hours,
+      phone: data.phone ?? undefined,
       rating: 0,
       reviewCount: 0,
-      createdAt: new Date().toISOString().split("T")[0],
+      priceRange: data.price_range,
+      createdAt: data.created_at,
     };
-    setRestaurants((prev) => {
-      const updated = [newRestaurant, ...prev];
-      persistRestaurants.mutate(updated);
-      return updated;
-    });
+    setRestaurants((prev) => [newRestaurant, ...prev]);
     console.log("[RestaurantProvider] Added restaurant:", newRestaurant.name);
     return newRestaurant;
-  }, [persistRestaurants]);
+  }, []);
 
-  const addReview = useCallback((review: Omit<Review, "id" | "createdAt">) => {
-    const newReview: Review = {
-      ...review,
-      id: `rev_${Date.now()}`,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setReviews((prev) => {
-      const updated = [newReview, ...prev];
-      persistReviews.mutate(updated);
-      return updated;
-    });
+  const addReview = useCallback(async (review: Omit<Review, "id" | "createdAt">) => {
+    const { data, error } = await supabase
+      .from("reviews")
+      .insert({
+        restaurant_id: review.restaurantId,
+        user_id: review.userId,
+        user_name: review.userName,
+        rating: review.rating,
+        comment: review.comment,
+      })
+      .select()
+      .single();
+
+    const newReview: Review = data
+      ? {
+          id: data.id,
+          restaurantId: data.restaurant_id,
+          userId: data.user_id,
+          userName: data.user_name,
+          rating: data.rating,
+          comment: data.comment,
+          createdAt: data.created_at,
+        }
+      : {
+          ...review,
+          id: `rev_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+        };
+
+    if (error) {
+      console.warn("[RestaurantProvider] Add review error:", error.message);
+    }
+
+    setReviews((prev) => [newReview, ...prev]);
+
     setRestaurants((prev) => {
       const updated = prev.map((r) => {
         if (r.id === review.restaurantId) {
-          const currentReviewCount = r.reviewCount;
-          const newAvg = (r.rating * currentReviewCount + review.rating) / (currentReviewCount + 1);
-          return {
+          const newCount = r.reviewCount + 1;
+          const newAvg = (r.rating * r.reviewCount + review.rating) / newCount;
+          const updatedR = {
             ...r,
             rating: Math.round(newAvg * 10) / 10,
-            reviewCount: currentReviewCount + 1,
+            reviewCount: newCount,
           };
+
+          supabase
+            .from("restaurants")
+            .update({ rating: updatedR.rating, review_count: updatedR.reviewCount })
+            .eq("id", r.id)
+            .then(({ error: upErr }) => {
+              if (upErr) console.warn("[RestaurantProvider] Rating update error:", upErr.message);
+            });
+
+          return updatedR;
         }
         return r;
       });
-      persistRestaurants.mutate(updated);
       return updated;
     });
+
     console.log("[RestaurantProvider] Added review for restaurant:", review.restaurantId);
     return newReview;
-  }, [persistRestaurants, persistReviews]);
+  }, []);
 
   const getReviewsForRestaurant = useCallback(
     (restaurantId: string) => reviews.filter((r) => r.restaurantId === restaurantId),
     [reviews]
   );
 
-  const deleteRestaurant = useCallback((id: string) => {
-    setRestaurants((prev) => {
-      const updated = prev.filter((r) => r.id !== id);
-      persistRestaurants.mutate(updated);
-      return updated;
-    });
-    setReviews((prev) => {
-      const updated = prev.filter((r) => r.restaurantId !== id);
-      persistReviews.mutate(updated);
-      return updated;
-    });
+  const deleteRestaurant = useCallback(async (id: string) => {
+    await supabase.from("reviews").delete().eq("restaurant_id", id);
+    await supabase.from("restaurants").delete().eq("id", id);
+    setRestaurants((prev) => prev.filter((r) => r.id !== id));
+    setReviews((prev) => prev.filter((r) => r.restaurantId !== id));
     console.log("[RestaurantProvider] Deleted restaurant:", id);
-  }, [persistRestaurants, persistReviews]);
+  }, []);
 
   const getRestaurantsByOwner = useCallback(
     (ownerId: string) => restaurants.filter((r) => r.ownerId === ownerId),

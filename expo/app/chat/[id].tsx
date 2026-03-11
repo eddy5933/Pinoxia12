@@ -68,9 +68,9 @@ export default function ChatScreen() {
     return otherId ? (conversation.participantNames[otherId] ?? "Friend") : "Friend";
   }, [conversation, user]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if (!inputText.trim() || !user || !id) return;
-    sendMessage(id, user.id, user.name, inputText.trim());
+    await sendMessage(id, user.id, user.name, inputText.trim());
     setInputText("");
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => {
@@ -110,7 +110,7 @@ export default function ChatScreen() {
     );
     setIsSharingLocation(true);
 
-    sendMessage(
+    void sendMessage(
       id,
       user.id,
       user.name,
@@ -317,7 +317,7 @@ export default function ChatScreen() {
           />
           <TouchableOpacity
             style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-            onPress={handleSend}
+            onPress={() => void handleSend()}
             disabled={!inputText.trim()}
             activeOpacity={0.7}
           >

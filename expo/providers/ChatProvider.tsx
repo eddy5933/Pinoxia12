@@ -1,12 +1,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import createContextHook from "@nkzw/create-context-hook";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ChatMessage, Conversation } from "@/types";
-
-const CONVERSATIONS_KEY = "foodspot_conversations";
-const MESSAGES_KEY = "foodspot_messages";
-const LIVE_LOCATIONS_KEY = "foodspot_live_locations";
+import { supabase } from "@/lib/supabase";
 
 export interface LiveLocation {
   userId: string;
@@ -28,102 +24,157 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   const loadQuery = useQuery({
     queryKey: ["chat_load"],
     queryFn: async () => {
-      console.log("[ChatProvider] Loading data...");
-      const [storedConvos, storedMessages, storedLocations] = await Promise.all([
-        AsyncStorage.getItem(CONVERSATIONS_KEY),
-        AsyncStorage.getItem(MESSAGES_KEY),
-        AsyncStorage.getItem(LIVE_LOCATIONS_KEY),
+      console.log("[ChatProvider] Loading data from Supabase...");
+      const [convosRes, messagesRes] = await Promise.all([
+        supabase.from("conversations").select("*"),
+        supabase.from("messages").select("*").order("created_at", { ascending: true }),
       ]);
 
-      const loadedConversations: Conversation[] = storedConvos ? JSON.parse(storedConvos) : [];
-      const loadedMessages: ChatMessage[] = storedMessages ? JSON.parse(storedMessages) : [];
-      const loadedLocations: LiveLocation[] = storedLocations ? JSON.parse(storedLocations) : [];
+      const loadedConversations: Conversation[] = (convosRes.data ?? []).map((c: any) => ({
+        id: c.id,
+        participants: c.participants ?? [],
+        participantNames: c.participant_names ?? {},
+        lastMessage: c.last_message ?? undefined,
+        lastMessageAt: c.last_message_at ?? undefined,
+        unreadCount: c.unread_count ?? 0,
+      }));
+
+      const loadedMessages: ChatMessage[] = (messagesRes.data ?? []).map((m: any) => ({
+        id: m.id,
+        conversationId: m.conversation_id,
+        senderId: m.sender_id,
+        senderName: m.sender_name,
+        text: m.text,
+        type: m.type ?? "text",
+        locationData: m.location_data ?? undefined,
+        createdAt: m.created_at,
+      }));
 
       console.log("[ChatProvider] Loaded", loadedConversations.length, "conversations,", loadedMessages.length, "messages");
-      return { conversations: loadedConversations, messages: loadedMessages, liveLocations: loadedLocations };
+      return { conversations: loadedConversations, messages: loadedMessages };
     },
-    staleTime: Infinity,
+    staleTime: 5000,
+    refetchInterval: 8000,
   });
 
   useEffect(() => {
     if (loadQuery.data) {
       setConversations(loadQuery.data.conversations);
       setMessages(loadQuery.data.messages);
-      setLiveLocations(loadQuery.data.liveLocations);
     }
   }, [loadQuery.data]);
 
-  const persistConversations = useMutation({
-    mutationFn: async (updated: Conversation[]) => {
-      await AsyncStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(updated));
-    },
-  });
-
-  const persistMessages = useMutation({
-    mutationFn: async (updated: ChatMessage[]) => {
-      await AsyncStorage.setItem(MESSAGES_KEY, JSON.stringify(updated));
-    },
-  });
-
-  const persistLiveLocations = useMutation({
-    mutationFn: async (updated: LiveLocation[]) => {
-      await AsyncStorage.setItem(LIVE_LOCATIONS_KEY, JSON.stringify(updated));
-    },
-  });
-
   const getOrCreateConversation = useCallback(
-    (currentUserId: string, currentUserName: string, friendUserId: string, friendName: string) => {
+    async (currentUserId: string, currentUserName: string, friendUserId: string, friendName: string) => {
       const existing = conversations.find(
         (c) => c.participants.includes(currentUserId) && c.participants.includes(friendUserId)
       );
       if (existing) return existing;
 
+      const participantNames: Record<string, string> = {
+        [currentUserId]: currentUserName,
+        [friendUserId]: friendName,
+      };
+
+      const { data, error } = await supabase
+        .from("conversations")
+        .insert({
+          participants: [currentUserId, friendUserId],
+          participant_names: participantNames,
+          unread_count: 0,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.warn("[ChatProvider] Create conversation error:", error.message);
+        const fallback: Conversation = {
+          id: `conv_${Date.now()}`,
+          participants: [currentUserId, friendUserId],
+          participantNames,
+          unreadCount: 0,
+        };
+        setConversations((prev) => [fallback, ...prev]);
+        return fallback;
+      }
+
       const newConvo: Conversation = {
-        id: `conv_${Date.now()}`,
-        participants: [currentUserId, friendUserId],
-        participantNames: { [currentUserId]: currentUserName, [friendUserId]: friendName },
+        id: data.id,
+        participants: data.participants,
+        participantNames: data.participant_names,
         unreadCount: 0,
       };
-      const updated = [newConvo, ...conversations];
-      setConversations(updated);
-      persistConversations.mutate(updated);
+      setConversations((prev) => [newConvo, ...prev]);
       console.log("[ChatProvider] Created conversation between", currentUserName, "and", friendName);
       return newConvo;
     },
-    [conversations, persistConversations]
+    [conversations]
   );
 
   const sendMessage = useCallback(
-    (conversationId: string, senderId: string, senderName: string, text: string, type: "text" | "location" = "text", locationData?: ChatMessage["locationData"]) => {
+    async (conversationId: string, senderId: string, senderName: string, text: string, type: "text" | "location" = "text", locationData?: ChatMessage["locationData"]) => {
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: senderId,
+          sender_name: senderName,
+          text,
+          type,
+          location_data: locationData ?? null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.warn("[ChatProvider] Send message error:", error.message);
+        const fallbackMsg: ChatMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          conversationId,
+          senderId,
+          senderName,
+          text,
+          type,
+          locationData,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, fallbackMsg]);
+        return fallbackMsg;
+      }
+
       const newMessage: ChatMessage = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: data.id,
         conversationId,
         senderId,
         senderName,
         text,
         type,
-        locationData,
-        createdAt: new Date().toISOString(),
+        locationData: data.location_data ?? undefined,
+        createdAt: data.created_at,
       };
 
-      const updatedMessages = [...messages, newMessage];
-      setMessages(updatedMessages);
-      persistMessages.mutate(updatedMessages);
+      setMessages((prev) => [...prev, newMessage]);
 
-      setConversations((prev) => {
-        const updated = prev.map((c) =>
+      await supabase
+        .from("conversations")
+        .update({
+          last_message: text,
+          last_message_at: newMessage.createdAt,
+        })
+        .eq("id", conversationId);
+
+      setConversations((prev) =>
+        prev.map((c) =>
           c.id === conversationId
             ? { ...c, lastMessage: text, lastMessageAt: newMessage.createdAt }
             : c
-        );
-        persistConversations.mutate(updated);
-        return updated;
-      });
+        )
+      );
 
       console.log("[ChatProvider] Sent message in", conversationId);
       return newMessage;
     },
-    [messages, persistMessages, persistConversations]
+    []
   );
 
   const getMessagesForConversation = useCallback(
@@ -161,43 +212,37 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         const filtered = prev.filter(
           (l) => !(l.userId === userId && l.conversationId === conversationId)
         );
-        const updated = [...filtered, newLocation];
-        persistLiveLocations.mutate(updated);
-        return updated;
+        return [...filtered, newLocation];
       });
 
       console.log("[ChatProvider] Started sharing location for", userName);
     },
-    [persistLiveLocations]
+    []
   );
 
   const updateSharedLocation = useCallback(
     (userId: string, conversationId: string, latitude: number, longitude: number, placeName?: string) => {
-      setLiveLocations((prev) => {
-        const updated = prev.map((l) =>
+      setLiveLocations((prev) =>
+        prev.map((l) =>
           l.userId === userId && l.conversationId === conversationId
             ? { ...l, latitude, longitude, placeName, updatedAt: new Date().toISOString() }
             : l
-        );
-        persistLiveLocations.mutate(updated);
-        return updated;
-      });
+        )
+      );
     },
-    [persistLiveLocations]
+    []
   );
 
   const stopSharingLocation = useCallback(
     (userId: string, conversationId: string) => {
-      setLiveLocations((prev) => {
-        const updated = prev.filter(
+      setLiveLocations((prev) =>
+        prev.filter(
           (l) => !(l.userId === userId && l.conversationId === conversationId)
-        );
-        persistLiveLocations.mutate(updated);
-        return updated;
-      });
+        )
+      );
       console.log("[ChatProvider] Stopped sharing location");
     },
-    [persistLiveLocations]
+    []
   );
 
   const getLiveLocationsForConversation = useCallback(

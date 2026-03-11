@@ -131,9 +131,9 @@ export default function FriendsScreen() {
   );
 
   const handleSendRequest = useCallback(
-    (toUser: PublicUser) => {
+    async (toUser: PublicUser) => {
       if (!user) return;
-      const success = sendFriendRequest(user, toUser);
+      const success = await sendFriendRequest(user, toUser);
       if (success) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showToast("Friend request sent!", toUser.name, "success");
@@ -146,10 +146,10 @@ export default function FriendsScreen() {
   );
 
   const handleAccept = useCallback(
-    (requestId: string) => {
+    async (requestId: string) => {
       if (!user) return;
       const req = pendingRequests.find((r) => r.id === requestId);
-      acceptFriendRequest(requestId, user.id);
+      await acceptFriendRequest(requestId, user.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast("Friend added!", req?.fromUserName ?? "User", "success");
     },
@@ -157,8 +157,8 @@ export default function FriendsScreen() {
   );
 
   const handleReject = useCallback(
-    (requestId: string) => {
-      rejectFriendRequest(requestId);
+    async (requestId: string) => {
+      await rejectFriendRequest(requestId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
     [rejectFriendRequest]
@@ -171,8 +171,8 @@ export default function FriendsScreen() {
         {
           text: "Cancel Request",
           style: "destructive",
-          onPress: () => {
-            cancelFriendRequest(requestId);
+          onPress: async () => {
+            await cancelFriendRequest(requestId);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             showToast("Request cancelled", userName, "info");
           },
@@ -189,8 +189,8 @@ export default function FriendsScreen() {
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => {
-            removeFriend(friend.id);
+          onPress: async () => {
+            await removeFriend(friend.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           },
         },
@@ -200,9 +200,9 @@ export default function FriendsScreen() {
   );
 
   const handleStartChat = useCallback(
-    (friend: Friend) => {
+    async (friend: Friend) => {
       if (!user) return;
-      const convo = getOrCreateConversation(user.id, user.name, friend.userId, friend.name);
+      const convo = await getOrCreateConversation(user.id, user.name, friend.userId, friend.name);
       router.push(`/chat/${convo.id}` as any);
     },
     [user, getOrCreateConversation, router]
@@ -223,7 +223,7 @@ export default function FriendsScreen() {
         <View style={styles.friendActions}>
           <TouchableOpacity
             style={styles.chatButton}
-            onPress={() => handleStartChat(item)}
+            onPress={() => void handleStartChat(item)}
             activeOpacity={0.7}
           >
             <MessageCircle size={18} color={Colors.white} />
@@ -259,14 +259,14 @@ export default function FriendsScreen() {
         <View style={styles.requestActions}>
           <TouchableOpacity
             style={styles.acceptButton}
-            onPress={() => handleAccept(item.id)}
+            onPress={() => void handleAccept(item.id)}
             activeOpacity={0.7}
           >
             <Check size={18} color={Colors.white} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.rejectButton}
-            onPress={() => handleReject(item.id)}
+            onPress={() => void handleReject(item.id)}
             activeOpacity={0.7}
           >
             <X size={18} color={Colors.textMuted} />
@@ -315,7 +315,7 @@ export default function FriendsScreen() {
           ) : (
             <TouchableOpacity
               style={styles.addButton}
-              onPress={() => handleSendRequest(item)}
+              onPress={() => void handleSendRequest(item)}
               activeOpacity={0.7}
             >
               <UserPlus size={16} color={Colors.white} />
