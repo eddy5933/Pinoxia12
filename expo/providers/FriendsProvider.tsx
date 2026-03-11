@@ -144,7 +144,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
           );
 
           if (r.status === "accepted") {
-            console.log("[FriendsProvider] Friend request accepted via realtime, current user:", currentUserId);
+            console.log("[FriendsProvider] Friend request accepted via realtime");
 
             const isRequester = r.from_user_id === currentUserId;
             const otherUserId = isRequester ? r.to_user_id : r.from_user_id;
@@ -162,7 +162,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
             setFriends((prev) => {
               if (prev.some((fr) => fr.userId === otherUserId)) return prev;
-              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName, "isRequester:", isRequester);
+              console.log("[FriendsProvider] Realtime: immediately adding friend to local state:", otherUserName);
               return [newFriend, ...prev];
             });
 
@@ -172,58 +172,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
               return { ...old, friends: [newFriend, ...old.friends] };
             });
 
-            void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-            void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-
             setTimeout(() => {
-              console.log("[FriendsProvider] Force refetching friends after accept (delayed)");
+              console.log("[FriendsProvider] Force refetching friends after accept");
               void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
               void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
-            }, 2000);
-
-            if (isRequester) {
-              console.log("[FriendsProvider] Requester detected, fetching fresh friend row from DB");
-              const fetchRequesterFriend = async () => {
-                try {
-                  const { data: friendRow } = await supabase
-                    .from("friends")
-                    .select("*")
-                    .eq("user_id", currentUserId)
-                    .eq("friend_id", otherUserId)
-                    .maybeSingle();
-
-                  if (friendRow) {
-                    const dbFriend: Friend = {
-                      id: friendRow.id,
-                      userId: friendRow.friend_id,
-                      name: friendRow.friend_name,
-                      email: friendRow.friend_email,
-                      avatar: friendRow.friend_avatar ?? undefined,
-                      isOnline: true,
-                      isCloseFriend: friendRow.is_close_friend ?? false,
-                    };
-                    setFriends((prev) => {
-                      const withoutTemp = prev.filter((fr) => fr.userId !== otherUserId);
-                      console.log("[FriendsProvider] Requester: replacing temp friend with DB row:", dbFriend.name);
-                      return [dbFriend, ...withoutTemp];
-                    });
-                    queryClient.setQueryData(["friends_load", currentUserId], (old: any) => {
-                      if (!old) return old;
-                      const withoutTemp = old.friends.filter((f: any) => f.userId !== otherUserId);
-                      return { ...old, friends: [dbFriend, ...withoutTemp] };
-                    });
-                  } else {
-                    console.log("[FriendsProvider] Requester: friend row not yet in DB, will refetch");
-                    setTimeout(() => {
-                      void queryClient.invalidateQueries({ queryKey: ["friends_load", currentUserId] });
-                    }, 3000);
-                  }
-                } catch (err: unknown) {
-                  console.warn("[FriendsProvider] Requester: error fetching friend row:", err);
-                }
-              };
-              void fetchRequesterFriend();
-            }
+            }, 1500);
           }
         }
       )
