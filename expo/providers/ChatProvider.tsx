@@ -159,23 +159,32 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         return localExisting;
       }
 
-      console.log("[Chat] Checking DB for conversation...");
+      console.log("[Chat] Checking DB for conversation between", currentUserId, "and", friendUserId);
+
       const { data: dbConvos, error: dbError } = await supabase
         .from("conversations")
-        .select("*")
-        .contains("participants", [currentUserId])
-        .contains("participants", [friendUserId]);
+        .select("*");
 
-      if (!dbError && dbConvos && dbConvos.length > 0) {
-        const dbConvo = dbConvos[0];
-        console.log("[Chat] Found in DB:", dbConvo.id);
+      if (dbError) {
+        console.warn("[Chat] DB query error:", dbError.message, dbError.code, dbError.details, dbError.hint);
+      }
+
+      const matchingConvo = (dbConvos ?? []).find(
+        (c: any) => {
+          const parts: string[] = c.participants ?? [];
+          return parts.includes(currentUserId) && parts.includes(friendUserId);
+        }
+      );
+
+      if (matchingConvo) {
+        console.log("[Chat] Found in DB:", matchingConvo.id);
         const convo: Conversation = {
-          id: dbConvo.id,
-          participants: dbConvo.participants ?? [],
-          participantNames: dbConvo.participant_names ?? {},
-          lastMessage: dbConvo.last_message ?? undefined,
-          lastMessageAt: dbConvo.last_message_at ?? undefined,
-          unreadCount: dbConvo.unread_count ?? 0,
+          id: matchingConvo.id,
+          participants: matchingConvo.participants ?? [],
+          participantNames: matchingConvo.participant_names ?? {},
+          lastMessage: matchingConvo.last_message ?? undefined,
+          lastMessageAt: matchingConvo.last_message_at ?? undefined,
+          unreadCount: matchingConvo.unread_count ?? 0,
         };
         void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
         return convo;
@@ -192,34 +201,45 @@ export const [ChatProvider, useChat] = createContextHook(() => {
         .insert({
           participants: [currentUserId, friendUserId],
           participant_names: participantNames,
+          last_message: null,
+          last_message_at: null,
           unread_count: 0,
         })
         .select()
         .single();
 
       if (error) {
-        console.warn("[Chat] Create conversation error:", error.message);
+        console.warn("[Chat] Create conversation error:", error.message, "code:", error.code, "details:", error.details, "hint:", error.hint);
 
-        const { data: retryData } = await supabase
+        const { data: allConvos } = await supabase
           .from("conversations")
-          .select("*")
-          .contains("participants", [currentUserId])
-          .contains("participants", [friendUserId]);
+          .select("*");
 
-        if (retryData && retryData.length > 0) {
+        const retryMatch = (allConvos ?? []).find(
+          (c: any) => {
+            const parts: string[] = c.participants ?? [];
+            return parts.includes(currentUserId) && parts.includes(friendUserId);
+          }
+        );
+
+        if (retryMatch) {
+          console.log("[Chat] Found on retry:", retryMatch.id);
           const retryConvo: Conversation = {
-            id: retryData[0].id,
-            participants: retryData[0].participants ?? [],
-            participantNames: retryData[0].participant_names ?? {},
-            lastMessage: retryData[0].last_message ?? undefined,
-            lastMessageAt: retryData[0].last_message_at ?? undefined,
-            unreadCount: retryData[0].unread_count ?? 0,
+            id: retryMatch.id,
+            participants: retryMatch.participants ?? [],
+            participantNames: retryMatch.participant_names ?? {},
+            lastMessage: retryMatch.last_message ?? undefined,
+            lastMessageAt: retryMatch.last_message_at ?? undefined,
+            unreadCount: retryMatch.unread_count ?? 0,
           };
           void queryClient.invalidateQueries({ queryKey: ["chat_conversations", currentUserId] });
           return retryConvo;
         }
 
-        Alert.alert("Chat Error", "Could not create conversation. Please try again.");
+        Alert.alert(
+          "Chat Error",
+          `Could not create conversation: ${error.message}. Make sure your Supabase conversations table has the correct RLS policies.`
+        );
         throw new Error("Failed to create conversation: " + error.message);
       }
 
