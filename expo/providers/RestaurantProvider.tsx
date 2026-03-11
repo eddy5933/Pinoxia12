@@ -136,6 +136,20 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
     [reviews]
   );
 
+  const deleteRestaurant = useCallback((id: string) => {
+    setRestaurants((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      persistRestaurants.mutate(updated);
+      return updated;
+    });
+    setReviews((prev) => {
+      const updated = prev.filter((r) => r.restaurantId !== id);
+      persistReviews.mutate(updated);
+      return updated;
+    });
+    console.log("[RestaurantProvider] Deleted restaurant:", id);
+  }, [persistRestaurants, persistReviews]);
+
   const getRestaurantsByOwner = useCallback(
     (ownerId: string) => restaurants.filter((r) => r.ownerId === ownerId),
     [restaurants]
@@ -148,11 +162,12 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
       isReady,
       addRestaurant,
       updateRestaurant,
+      deleteRestaurant,
       addReview,
       getReviewsForRestaurant,
       getRestaurantsByOwner,
     }),
-    [restaurants, reviews, isReady, addRestaurant, updateRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
+    [restaurants, reviews, isReady, addRestaurant, updateRestaurant, deleteRestaurant, addReview, getReviewsForRestaurant, getRestaurantsByOwner]
   );
 });
 

@@ -5,17 +5,34 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Star, MapPin, Plus, Store, Pencil } from "lucide-react-native";
+import { Star, MapPin, Plus, Store, Pencil, Trash2 } from "lucide-react-native";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { Restaurant } from "@/types";
 
-function OwnerRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+function OwnerRestaurantCard({ restaurant, onDelete }: { restaurant: Restaurant; onDelete: (id: string) => void }) {
   const router = useRouter();
+
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      "Delete Business",
+      `Are you sure you want to delete "${restaurant.name}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDelete(restaurant.id),
+        },
+      ]
+    );
+  }, [restaurant.id, restaurant.name, onDelete]);
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -27,15 +44,26 @@ function OwnerRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
         style={styles.cardImage}
         contentFit="cover"
       />
-      <TouchableOpacity
-        style={styles.editBadge}
-        onPress={() => router.push({ pathname: "/edit-restaurant", params: { id: restaurant.id } })}
-        activeOpacity={0.7}
-        hitSlop={8}
-      >
-        <Pencil size={14} color={Colors.white} />
-        <Text style={styles.editBadgeText}>Edit</Text>
-      </TouchableOpacity>
+      <View style={styles.badgeRow}>
+        <TouchableOpacity
+          style={styles.editBadge}
+          onPress={() => router.push({ pathname: "/edit-restaurant", params: { id: restaurant.id } })}
+          activeOpacity={0.7}
+          hitSlop={8}
+        >
+          <Pencil size={14} color={Colors.white} />
+          <Text style={styles.editBadgeText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteBadge}
+          onPress={handleDelete}
+          activeOpacity={0.7}
+          hitSlop={8}
+        >
+          <Trash2 size={14} color={Colors.white} />
+          <Text style={styles.deleteBadgeText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.cardContent}>
         <Text style={styles.cardName} numberOfLines={1}>
           {restaurant.name}
@@ -73,7 +101,7 @@ function OwnerRestaurantCard({ restaurant }: { restaurant: Restaurant }) {
 
 export default function MyRestaurantsScreen() {
   const { user } = useAuth();
-  const { getRestaurantsByOwner } = useRestaurants();
+  const { getRestaurantsByOwner, deleteRestaurant } = useRestaurants();
   const router = useRouter();
 
   const myRestaurants = useMemo(
@@ -81,9 +109,14 @@ export default function MyRestaurantsScreen() {
     [user, getRestaurantsByOwner]
   );
 
+  const handleDelete = useCallback((id: string) => {
+    deleteRestaurant(id);
+    console.log("[MyRestaurants] Deleted business:", id);
+  }, [deleteRestaurant]);
+
   const renderItem = useCallback(
-    ({ item }: { item: Restaurant }) => <OwnerRestaurantCard restaurant={item} />,
-    []
+    ({ item }: { item: Restaurant }) => <OwnerRestaurantCard restaurant={item} onDelete={handleDelete} />,
+    [handleDelete]
   );
 
   return (
@@ -138,10 +171,15 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 160,
   },
-  editBadge: {
+  badgeRow: {
     position: "absolute",
     top: 12,
     right: 12,
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 2,
+  },
+  editBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
@@ -149,9 +187,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
-    zIndex: 2,
   },
   editBadgeText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  deleteBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(200,30,30,0.8)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  deleteBadgeText: {
     fontSize: 13,
     fontWeight: "600" as const,
     color: Colors.white,
