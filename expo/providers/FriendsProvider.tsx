@@ -298,7 +298,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         .from("profiles")
         .select("*")
         .neq("id", userId)
-        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
+        .or(`name.ilike.*${q}*,email.ilike.*${q}*`)
         .limit(50);
       if (error) {
         console.warn("[Friends] Search error:", error.message);
