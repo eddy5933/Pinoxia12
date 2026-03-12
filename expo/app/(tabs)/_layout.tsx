@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Search, MapPin, User, Users, Radio } from "lucide-react-native";
+import { Search, MapPinned, User, Users, Radio } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
@@ -82,7 +82,7 @@ export default function TabLayout() {
         name="map"
         options={{
           title: "Map",
-          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <MapPinned color={color} size={size} />,
         }}
       />
       <Tabs.Screen

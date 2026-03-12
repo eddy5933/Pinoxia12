@@ -30,6 +30,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
+import CatchPinLogo from "@/components/CatchPinLogo";
 import { useAuth } from "@/providers/AuthProvider";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useChat } from "@/providers/ChatProvider";
@@ -450,7 +451,7 @@ export default function FriendsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Connect</Text>
+          <CatchPinLogo size="small" />
         </View>
         <View style={styles.emptyCenter}>
           <Users size={48} color={Colors.textMuted} />
@@ -491,12 +492,15 @@ export default function FriendsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Connect</Text>
-        {(pendingRequests.length > 0 || followers.length > 0) && (
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>{pendingRequests.length + followers.length}</Text>
-          </View>
-        )}
+        <CatchPinLogo size="small" />
+        <View style={styles.headerRight}>
+          <Text style={styles.headerPageTitle}>Connect</Text>
+          {(pendingRequests.length > 0 || followers.length > 0) && (
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{pendingRequests.length + followers.length}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.categoryRows}>
@@ -774,6 +778,16 @@ const styles = StyleSheet.create({
     fontWeight: "800" as const,
     color: Colors.white,
     letterSpacing: -0.5,
+  },
+  headerRight: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  headerPageTitle: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: Colors.textSecondary,
   },
   headerBadge: {
     backgroundColor: Colors.primary,

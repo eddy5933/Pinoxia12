@@ -18,6 +18,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   Star,
   MapPin,
+  MapPinned,
   ChevronUp,
   ChevronDown,
   Navigation,
@@ -1031,10 +1032,15 @@ export default function MapScreenExport() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
           <View style={styles.headerIcon}>
-            <MapPin size={14} color={Colors.white} />
+            <MapPinned size={14} color={Colors.white} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Explore Map</Text>
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitleCatch}>Catch</Text>
+              <Text style={styles.headerTitlePin}>Pin</Text>
+              <Text style={styles.headerTitleSep}> · </Text>
+              <Text style={styles.headerTitleLabel}>Map</Text>
+            </View>
             <Text style={styles.headerSubtitle}>
               {restaurants.length} places nearby
             </Text>
@@ -1939,6 +1945,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.white,
+  },
+  headerTitleRow: {
+    flexDirection: "row" as const,
+    alignItems: "baseline" as const,
+  },
+  headerTitleCatch: {
+    fontSize: 16,
+    fontWeight: "800" as const,
+    color: Colors.white,
+    letterSpacing: -0.3,
+  },
+  headerTitlePin: {
+    fontSize: 16,
+    fontWeight: "800" as const,
+    color: Colors.primary,
+    letterSpacing: -0.3,
+  },
+  headerTitleSep: {
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  headerTitleLabel: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
   },
   headerSubtitle: {
     fontSize: 10,
