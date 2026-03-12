@@ -20,7 +20,7 @@ import {
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import CatchPinLogo from "@/components/CatchPinLogo";
+import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useLocation, formatDistance, getDistanceKm } from "@/providers/LocationProvider";
 import { useFriends } from "@/providers/FriendsProvider";
 import type { FriendLocation } from "@/providers/LocationProvider";
@@ -280,7 +280,7 @@ export default function SharingScreen() {
     <View style={[styles.container]}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <CatchPinLogo size="small" />
+          <PinoxiaLogo size="small" />
 
           <View>
             <Text style={styles.headerTitle}>Sharing</Text>

@@ -30,7 +30,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import CatchPinLogo from "@/components/CatchPinLogo";
+import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useAuth } from "@/providers/AuthProvider";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useChat } from "@/providers/ChatProvider";
@@ -451,7 +451,7 @@ export default function FriendsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <CatchPinLogo size="small" />
+          <PinoxiaLogo size="small" />
         </View>
         <View style={styles.emptyCenter}>
           <Users size={48} color={Colors.textMuted} />
@@ -492,7 +492,7 @@ export default function FriendsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <CatchPinLogo size="small" />
+        <PinoxiaLogo size="small" />
         <View style={styles.headerRight}>
           <Text style={styles.headerPageTitle}>Connect</Text>
           {(pendingRequests.length > 0 || followers.length > 0) && (

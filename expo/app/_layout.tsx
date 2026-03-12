@@ -110,8 +110,8 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
           <MapPinned size={38} color="#FFFFFF" />
         </Animated.View>
         <View style={splashStyles.titleRow}>
-          <Text style={splashStyles.titleCatch}>Catch</Text>
-          <Text style={splashStyles.titlePin}>Pin</Text>
+          <Text style={splashStyles.titlePino}>Pino</Text>
+          <Text style={splashStyles.titleXia}>xia</Text>
         </View>
         <Text style={splashStyles.tagline}>Discover nearby spots</Text>
       </Animated.View>
@@ -135,7 +135,7 @@ const splashStyles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 18,
-    backgroundColor: Colors.primary,
+    backgroundColor: "#000000",
     justifyContent: "center" as const,
     alignItems: "center" as const,
     marginBottom: 4,
@@ -144,13 +144,13 @@ const splashStyles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "baseline" as const,
   },
-  titleCatch: {
+  titlePino: {
     fontSize: 42,
     fontWeight: "800" as const,
     color: Colors.white,
     letterSpacing: -1,
   },
-  titlePin: {
+  titleXia: {
     fontSize: 42,
     fontWeight: "800" as const,
     color: Colors.primary,

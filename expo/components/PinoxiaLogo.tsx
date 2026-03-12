@@ -3,12 +3,12 @@ import { View, Text, StyleSheet } from "react-native";
 import { MapPinned } from "lucide-react-native";
 import Colors from "@/constants/colors";
 
-interface CatchPinLogoProps {
+interface PinoxiaLogoProps {
   size?: "small" | "medium";
   showText?: boolean;
 }
 
-export default function CatchPinLogo({ size = "medium", showText = true }: CatchPinLogoProps) {
+export default function PinoxiaLogo({ size = "medium", showText = true }: PinoxiaLogoProps) {
   const iconBoxSize = size === "small" ? 24 : 32;
   const iconSize = size === "small" ? 13 : 18;
   const fontSize = size === "small" ? 20 : 28;
@@ -21,8 +21,8 @@ export default function CatchPinLogo({ size = "medium", showText = true }: Catch
       </View>
       {showText && (
         <View style={styles.textRow}>
-          <Text style={[styles.catch, { fontSize }]}>Catch</Text>
-          <Text style={[styles.pin, { fontSize }]}>Pin</Text>
+          <Text style={[styles.pino, { fontSize }]}>Pino</Text>
+          <Text style={[styles.xia, { fontSize }]}>xia</Text>
         </View>
       )}
     </View>
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconBox: {
-    backgroundColor: Colors.primary,
+    backgroundColor: "#000000",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -44,12 +44,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
   },
-  catch: {
+  pino: {
     fontWeight: "800",
     color: Colors.white,
     letterSpacing: -0.5,
   },
-  pin: {
+  xia: {
     fontWeight: "800",
     color: Colors.primary,
     letterSpacing: -0.5,

@@ -22,7 +22,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import CatchPinLogo from "@/components/CatchPinLogo";
+import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useAuth } from "@/providers/AuthProvider";
 import { useOnlineStatus } from "@/providers/OnlineStatusProvider";
 import { OnlineVisibility } from "@/types";
@@ -107,13 +107,13 @@ export default function ProfileScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <CatchPinLogo size="small" />
+          <PinoxiaLogo size="small" />
         </View>
         <View style={styles.centered}>
           <View style={styles.avatarPlaceholder}>
             <User size={48} color={Colors.textMuted} />
           </View>
-          <Text style={styles.guestTitle}>Welcome to CatchPin</Text>
+          <Text style={styles.guestTitle}>Welcome to Pinoxia</Text>
           <Text style={styles.guestSubtitle}>
             Sign in to leave reviews, register your business, and more
           </Text>
@@ -136,7 +136,7 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <CatchPinLogo size="small" />
+          <PinoxiaLogo size="small" />
         </View>
 
         <View style={styles.profileCard}>
