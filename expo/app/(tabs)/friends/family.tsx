@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Animated,
   Dimensions,
   Alert,
+  Modal,
+  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -17,6 +19,9 @@ import {
   UserMinus,
   Users,
   Sparkles,
+  Plus,
+  Search,
+  X,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -36,10 +41,12 @@ export default function FamilyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const { familyMembers, toggleFamily, removeFriend } = useFriends();
+  const { friends, familyMembers, toggleFamily, removeFriend } = useFriends();
   const { getOrCreateConversation } = useChat();
 
   const [toast, setToast] = useState<ToastState>({ visible: false, message: "", type: "success" });
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
   const toastAnim = useRef(new Animated.Value(-100)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
@@ -59,11 +66,29 @@ export default function FamilyScreen() {
     }, 2500);
   }, [toastAnim, toastOpacity]);
 
+  const nonFamilyFriends = useMemo(() => {
+    const q = addSearch.trim().toLowerCase();
+    const filtered = friends.filter((f) => !f.isFamily);
+    if (!q) return filtered;
+    return filtered.filter(
+      (f) => f.name.toLowerCase().includes(q) || f.email.toLowerCase().includes(q)
+    );
+  }, [friends, addSearch]);
+
   const handleRemoveFamily = useCallback(
     async (friend: Friend) => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await toggleFamily(friend.id);
       showToast(`${friend.name} removed from family`, "info");
+    },
+    [toggleFamily, showToast]
+  );
+
+  const handleAddToFamily = useCallback(
+    async (friend: Friend) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await toggleFamily(friend.id);
+      showToast(`${friend.name} added to family`, "success");
     },
     [toggleFamily, showToast]
   );
@@ -162,6 +187,14 @@ export default function FamilyScreen() {
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{familyMembers.length}</Text>
         </View>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => { setShowAddModal(true); setAddSearch(""); }}
+          activeOpacity={0.7}
+          testID="family-add-btn"
+        >
+          <Plus size={18} color={Colors.white} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.descriptionBar}>
@@ -197,6 +230,91 @@ export default function FamilyScreen() {
           </View>
         }
       />
+
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Home size={18} color="#4FC3F7" fill="#4FC3F7" />
+                <Text style={styles.modalTitle}>Add to Family</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowAddModal(false)}
+                activeOpacity={0.7}
+                testID="family-modal-close"
+              >
+                <X size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchWrap}>
+              <Search size={16} color={Colors.textMuted} />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search friends..."
+                placeholderTextColor={Colors.textMuted}
+                value={addSearch}
+                onChangeText={setAddSearch}
+                autoCapitalize="none"
+                testID="family-add-search"
+              />
+              {addSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setAddSearch("")} activeOpacity={0.7}>
+                  <X size={14} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <FlatList
+              data={nonFamilyFriends}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.modalCard}>
+                  <View style={styles.modalAvatar}>
+                    <Text style={styles.modalAvatarText}>
+                      {item.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.modalInfo}>
+                    <Text style={styles.modalName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.modalEmail} numberOfLines={1}>{item.email}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.modalAddBtn}
+                    onPress={() => void handleAddToFamily(item)}
+                    activeOpacity={0.7}
+                    testID={`family-add-${item.userId}`}
+                  >
+                    <Plus size={14} color={Colors.white} />
+                    <Text style={styles.modalAddBtnText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              contentContainerStyle={styles.modalListContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.modalEmpty}>
+                  <Users size={28} color={Colors.textMuted} />
+                  <Text style={styles.modalEmptyText}>
+                    {friends.length === 0
+                      ? "No friends yet. Add friends first!"
+                      : nonFamilyFriends.length === 0 && addSearch.trim()
+                      ? "No matching friends found"
+                      : "All friends are already in family"}
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
 
       {toast.visible && (
         <Animated.View
@@ -442,5 +560,139 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600" as const,
     color: Colors.white,
+  },
+  addBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(79,195,247,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(79,195,247,0.3)",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "75%",
+    paddingTop: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  modalHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalSearchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.white,
+    paddingVertical: 10,
+  },
+  modalListContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  modalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalAvatarText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  modalInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  modalName: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  modalEmail: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  modalAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "rgba(79,195,247,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(79,195,247,0.3)",
+  },
+  modalAddBtnText: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: "#4FC3F7",
+  },
+  modalEmpty: {
+    alignItems: "center",
+    paddingTop: 40,
+    paddingHorizontal: 30,
+    gap: 12,
+  },
+  modalEmptyText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
