@@ -14,6 +14,7 @@ import { OnlineStatusProvider } from "@/providers/OnlineStatusProvider";
 import { NotificationProvider, NotificationToast } from "@/providers/NotificationProvider";
 import StatusPickerModal from "@/components/StatusPickerModal";
 import UserSync from "@/components/UserSync";
+import PushNotificationSetup from "@/components/PushNotificationSetup";
 import Colors from "@/constants/colors";
 
 void SplashScreen.preventAutoHideAsync();
@@ -181,6 +182,7 @@ export default function RootLayout() {
                 <OnlineStatusProvider>
                   <NotificationProvider>
                     <UserSync />
+                    <PushNotificationSetup />
                     <RootLayoutNav />
                     <StatusPickerModal />
                     <NotificationToast />

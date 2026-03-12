@@ -3,6 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Friend, FriendRequest, User } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { sendPushToUser } from "@/lib/pushNotifications";
 
 export interface PublicUser {
   id: string;
@@ -346,6 +347,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
       console.log("[Friends] Now following:", toUser.name);
 
+      void sendPushToUser(toUser.id, "New Follower", `${fromUser.name} started following you`, {
+        type: "follow",
+        userId: fromUser.id,
+      });
+
       const { data: theyFollowMe } = await supabase
         .from("friends")
         .select("id")
@@ -400,6 +406,10 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       }
 
       console.log("[Friends] Followed back:", name);
+
+      void sendPushToUser(followerUserId, "New Follower", `Someone followed you back!`, {
+        type: "follow_back",
+      });
 
       const { data: myProfile } = await supabase
         .from("profiles")

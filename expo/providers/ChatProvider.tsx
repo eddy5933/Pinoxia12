@@ -5,6 +5,7 @@ import { ChatMessage, Conversation } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 import { Alert } from "react-native";
+import { sendPushToUser } from "@/lib/pushNotifications";
 
 export interface LiveLocation {
   userId: string;
@@ -294,6 +295,18 @@ export const [ChatProvider, useChat] = createContextHook(() => {
 
       void queryClient.invalidateQueries({ queryKey: ["chat_messages"] });
       void queryClient.invalidateQueries({ queryKey: ["chat_conversations", senderId] });
+
+      const convo = conversationsRef.current.find((c) => c.id === conversationId);
+      if (convo) {
+        const recipientIds = convo.participants.filter((p) => p !== senderId);
+        const pushBody = type === "location" ? `${senderName} shared their location` : text.length > 80 ? `${text.slice(0, 80)}...` : text;
+        for (const recipientId of recipientIds) {
+          void sendPushToUser(recipientId, senderName, pushBody, {
+            type: "message",
+            conversationId,
+          });
+        }
+      }
 
       console.log("[Chat] Message sent:", data.id);
       return newMessage;
