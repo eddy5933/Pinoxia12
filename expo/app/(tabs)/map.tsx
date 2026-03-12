@@ -56,6 +56,7 @@ function openNavigation(latitude: number, longitude: number, name: string) {
   const googleMapsUrl = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
   const wazeUrl = `waze://?ll=${latitude},${longitude}&navigate=yes`;
   const uberUrl = `uber://?action=setPickup&dropoff[latitude]=${latitude}&dropoff[longitude]=${longitude}&dropoff[nickname]=${encodedName}`;
+  const grabUrl = `grab://open?screenType=BOOKING&pickUpLatLng=&dropOffLatLng=${latitude},${longitude}&dropOffName=${encodedName}`;
 
   if (Platform.OS === 'ios') {
     const checkApps = async () => {
@@ -90,6 +91,16 @@ function openNavigation(latitude: number, longitude: number, name: string) {
         }
       } catch (e) {
         console.log('[MapScreen] Uber check failed:', e);
+      }
+
+      try {
+        const hasGrab = await Linking.canOpenURL(grabUrl);
+        if (hasGrab) {
+          options.push('Grab');
+          urls.push(grabUrl);
+        }
+      } catch (e) {
+        console.log('[MapScreen] Grab check failed:', e);
       }
 
       options.push('Cancel');
