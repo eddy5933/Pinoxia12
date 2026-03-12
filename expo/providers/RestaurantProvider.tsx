@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import createContextHook from "@nkzw/create-context-hook";
 import { useQuery } from "@tanstack/react-query";
 import { Restaurant, Review } from "@/types";
-import { MOCK_RESTAURANTS, MOCK_REVIEWS } from "@/mocks/restaurants";
+import { MOCK_RESTAURANTS, MOCK_REVIEWS, MOCK_MALAYSIA_REVIEWS } from "@/mocks/restaurants";
 import { supabase } from "@/lib/supabase";
 
 export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
@@ -58,7 +58,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
         }));
 
         if (loadedRestaurants.length === 0) {
-          console.log("[RestaurantProvider] No restaurants found in Supabase, seeding mock data...");
+          console.log("[RestaurantProvider] No restaurants found in Supabase, seeding all mock data...");
           const inserts = MOCK_RESTAURANTS.map((r) => ({
             id: r.id,
             owner_id: r.ownerId,
@@ -81,7 +81,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
           }
           loadedRestaurants = MOCK_RESTAURANTS;
 
-          const reviewInserts = MOCK_REVIEWS.map((rv) => ({
+          const allReviews = [...MOCK_REVIEWS, ...MOCK_MALAYSIA_REVIEWS];
+          const reviewInserts = allReviews.map((rv) => ({
             id: rv.id,
             restaurant_id: rv.restaurantId,
             user_id: rv.userId,
@@ -93,7 +94,50 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
           if (revSeedError) {
             console.warn("[RestaurantProvider] Review seed error:", revSeedError.message);
           }
-          loadedReviews = MOCK_REVIEWS;
+          loadedReviews = allReviews;
+        } else {
+          const hasMalaysia = loadedRestaurants.some((r) => r.id.startsWith("my-"));
+          if (!hasMalaysia) {
+            console.log("[RestaurantProvider] Malaysia places not found in Supabase, seeding...");
+            const malaysiaPlaces = MOCK_RESTAURANTS.filter((r) => r.id.startsWith("my-"));
+            const myInserts = malaysiaPlaces.map((r) => ({
+              id: r.id,
+              owner_id: r.ownerId,
+              name: r.name,
+              description: r.description,
+              cuisine: r.cuisine ?? null,
+              photos: r.photos,
+              address: r.address,
+              latitude: r.latitude,
+              longitude: r.longitude,
+              opening_hours: r.openingHours,
+              phone: r.phone ?? null,
+              rating: r.rating,
+              review_count: r.reviewCount,
+              price_range: r.priceRange,
+            }));
+            const { error: mySeedErr } = await supabase.from("restaurants").insert(myInserts);
+            if (mySeedErr) {
+              console.warn("[RestaurantProvider] Malaysia seed error:", mySeedErr.message);
+            } else {
+              console.log("[RestaurantProvider] Seeded", malaysiaPlaces.length, "Malaysia places");
+            }
+            loadedRestaurants = [...loadedRestaurants, ...malaysiaPlaces];
+
+            const myRevInserts = MOCK_MALAYSIA_REVIEWS.map((rv) => ({
+              id: rv.id,
+              restaurant_id: rv.restaurantId,
+              user_id: rv.userId,
+              user_name: rv.userName,
+              rating: rv.rating,
+              comment: rv.comment,
+            }));
+            const { error: myRevErr } = await supabase.from("reviews").insert(myRevInserts);
+            if (myRevErr) {
+              console.warn("[RestaurantProvider] Malaysia reviews seed error:", myRevErr.message);
+            }
+            loadedReviews = [...loadedReviews, ...MOCK_MALAYSIA_REVIEWS];
+          }
         }
 
         console.log("[RestaurantProvider] Loaded", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
