@@ -537,9 +537,12 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
   const toggleFamily = useCallback(
     async (friendId: string) => {
       const friend = dataRef.current.friends.find((f) => f.id === friendId);
-      if (!friend) return;
+      if (!friend) {
+        console.warn("[Friends] toggleFamily: friend not found for id:", friendId);
+        return;
+      }
       const newValue = !friend.isFamily;
-      console.log("[Friends] Toggle family:", friend.name, "=>", newValue);
+      console.log("[Friends] Toggle family:", friend.name, "=>", newValue, "row id:", friendId, "userId:", friend.userId);
 
       const updateData: Record<string, boolean> = { is_family: newValue };
       if (newValue && friend.isCloseFriend) {
@@ -552,11 +555,28 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         .eq("id", friendId);
 
       if (error) {
-        console.warn("[Friends] Toggle family error:", error.message);
+        console.warn("[Friends] Toggle family error by id:", error.message);
+        if (currentUserId) {
+          console.log("[Friends] Retrying toggle family by user_id + friend_id");
+          const { error: err2 } = await supabase
+            .from("friends")
+            .update(updateData)
+            .eq("user_id", currentUserId)
+            .eq("friend_id", friend.userId);
+          if (err2) {
+            console.warn("[Friends] Toggle family fallback error:", err2.message);
+          } else {
+            console.log("[Friends] Toggle family fallback success");
+          }
+        }
+      } else {
+        console.log("[Friends] Toggle family success");
       }
+
       invalidate();
+      delayedInvalidate(1500);
     },
-    [invalidate]
+    [invalidate, delayedInvalidate, currentUserId]
   );
 
   const removeFriend = useCallback(
