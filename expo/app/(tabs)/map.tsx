@@ -775,6 +775,8 @@ export default function MapScreenExport() {
 
   const handleFocusFriend = useCallback((friend: FriendLocation) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
     setFocusFriendLocation(friend);
     setFocusFriendTrigger((prev) => prev + 1);
     setShowFriendLocations(true);
@@ -794,6 +796,8 @@ export default function MapScreenExport() {
     (restaurantId: string) => {
       console.log("[MapScreen] Marker pressed:", restaurantId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowSuggestions(false);
+      searchInputRef.current?.blur();
       const place = restaurants.find((r) => r.id === restaurantId) ?? null;
       setSelectedPlace(place);
       if (place) {
@@ -820,18 +824,24 @@ export default function MapScreenExport() {
   const handleNavigateToPlace = useCallback((place: Restaurant) => {
     console.log("[MapScreen] Navigate to place:", place.name);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
     openNavigation(place.latitude, place.longitude, place.name);
   }, []);
 
   const handleViewDetails = useCallback((place: Restaurant) => {
     console.log("[MapScreen] View details:", place.name);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
     setSelectedPlace(null);
     router.push(`/restaurant/${place.id}`);
   }, [router]);
 
   const toggleList = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
     setListExpanded((prev) => !prev);
   }, []);
 
