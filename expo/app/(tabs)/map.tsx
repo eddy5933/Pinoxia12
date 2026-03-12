@@ -254,6 +254,7 @@ function NativeMapView({
   focusFriendLocation,
   focusFriendTrigger,
   onFriendMarkerPress,
+  onMarkerPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -265,6 +266,7 @@ function NativeMapView({
   focusFriendLocation: FriendLocation | null;
   focusFriendTrigger: number;
   onFriendMarkerPress?: (friend: FriendLocation) => void;
+  onMarkerPress?: (restaurantId: string) => void;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -273,7 +275,6 @@ function NativeMapView({
 
   const mapRef = useRef<InstanceType<typeof MapView>>(null);
   const hasAnimatedToUser = useRef(false);
-  const router = useRouter();
   const prevSearchRef = useRef("");
 
   const initialRegion = focusedRestaurant
@@ -420,7 +421,7 @@ function NativeMapView({
           onPress={() => {
             console.log("[MapScreen] Marker tapped:", r.name, r.id);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push(`/restaurant/${r.id}`);
+            if (onMarkerPress) onMarkerPress(r.id);
           }}
           pinColor={isSearchResult ? '#2563EB' : isFocused ? '#F59E0B' : Colors.primary}
         >
@@ -456,17 +457,12 @@ function NativeMapView({
           <Callout tooltip onPress={() => {
             console.log("[MapScreen] Callout pressed:", r.name);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push(`/restaurant/${r.id}`);
+            if (onMarkerPress) onMarkerPress(r.id);
           }}>
             <View style={markerStyles.calloutBox}>
               <Text style={markerStyles.calloutTitle} numberOfLines={1}>{r.name}</Text>
               <Text style={markerStyles.calloutSubtitle}>{r.cuisine ?? 'Place'}{dist ? ` · ${dist}` : ''}</Text>
-              <View style={markerStyles.calloutButtons}>
-                <View style={markerStyles.calloutBtnDetails}>
-                  <Eye size={12} color="#fff" />
-                  <Text style={markerStyles.calloutBtnText}>View Details</Text>
-                </View>
-              </View>
+              <Text style={markerStyles.calloutTapHint}>Tap for details & navigation</Text>
             </View>
             <View style={markerStyles.calloutArrowDown} />
           </Callout>
@@ -584,6 +580,8 @@ export default function MapScreenExport() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const searchInputRef = useRef<TextInput>(null);
   const [centerTrigger, setCenterTrigger] = useState(0);
+  const [selectedPlace, setSelectedPlace] = useState<Restaurant | null>(null);
+  const selectedPlaceAnim = useRef(new Animated.Value(0)).current;
 
   const focusedRestaurant = useMemo(
     () => (focus ? restaurants.find((r) => r.id === focus) ?? null : null),
@@ -737,10 +735,41 @@ export default function MapScreenExport() {
     (restaurantId: string) => {
       console.log("[MapScreen] Marker pressed:", restaurantId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.push(`/restaurant/${restaurantId}`);
+      const place = restaurants.find((r) => r.id === restaurantId) ?? null;
+      setSelectedPlace(place);
+      if (place) {
+        selectedPlaceAnim.setValue(0);
+        Animated.spring(selectedPlaceAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }).start();
+      }
     },
-    [router]
+    [restaurants, selectedPlaceAnim]
   );
+
+  const handleDismissSelected = useCallback(() => {
+    Animated.timing(selectedPlaceAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => setSelectedPlace(null));
+  }, [selectedPlaceAnim]);
+
+  const handleNavigateToPlace = useCallback((place: Restaurant) => {
+    console.log("[MapScreen] Navigate to place:", place.name);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    openNavigation(place.latitude, place.longitude, place.name);
+  }, []);
+
+  const handleViewDetails = useCallback((place: Restaurant) => {
+    console.log("[MapScreen] View details:", place.name);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPlace(null);
+    router.push(`/restaurant/${place.id}`);
+  }, [router]);
 
   const toggleList = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1084,11 +1113,82 @@ export default function MapScreenExport() {
             focusFriendLocation={focusFriendLocation}
             focusFriendTrigger={focusFriendTrigger}
             onFriendMarkerPress={handleFocusFriend}
+            onMarkerPress={handleMarkerPress}
           />
         )}
 
 
       </View>
+
+      {selectedPlace && (
+        <Animated.View
+          style={[
+            selectedCardStyles.overlay,
+            {
+              opacity: selectedPlaceAnim,
+              transform: [{
+                translateY: selectedPlaceAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [120, 0],
+                }),
+              }],
+            },
+          ]}
+        >
+          <View style={selectedCardStyles.card}>
+            <TouchableOpacity
+              style={selectedCardStyles.closeBtn}
+              onPress={handleDismissSelected}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              testID="dismiss-selected-place"
+            >
+              <X size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={selectedCardStyles.header}>
+              <Image
+                source={{ uri: selectedPlace.photos[0] }}
+                style={selectedCardStyles.image}
+                contentFit="cover"
+              />
+              <View style={selectedCardStyles.info}>
+                <Text style={selectedCardStyles.name} numberOfLines={1}>{selectedPlace.name}</Text>
+                <Text style={selectedCardStyles.cuisine}>{selectedPlace.cuisine ?? 'Place'}</Text>
+                <View style={selectedCardStyles.meta}>
+                  <Star size={12} color={Colors.star} fill={Colors.star} />
+                  <Text style={selectedCardStyles.rating}>{selectedPlace.rating}</Text>
+                  <Text style={selectedCardStyles.reviews}>({selectedPlace.reviewCount})</Text>
+                  {distanceMap.get(selectedPlace.id) && (
+                    <>
+                      <View style={selectedCardStyles.dot} />
+                      <Text style={selectedCardStyles.distance}>{distanceMap.get(selectedPlace.id)}</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+            <View style={selectedCardStyles.buttons}>
+              <TouchableOpacity
+                style={selectedCardStyles.detailsBtn}
+                onPress={() => handleViewDetails(selectedPlace)}
+                activeOpacity={0.8}
+                testID="selected-view-details"
+              >
+                <Eye size={16} color="#fff" />
+                <Text style={selectedCardStyles.btnText}>View Details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={selectedCardStyles.navigateBtn}
+                onPress={() => handleNavigateToPlace(selectedPlace)}
+                activeOpacity={0.8}
+                testID="selected-navigate"
+              >
+                <Navigation size={16} color="#fff" />
+                <Text style={selectedCardStyles.btnText}>Navigate</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
 
       <View style={styles.bottomSheet}>
         <TouchableOpacity
@@ -1951,6 +2051,121 @@ const cardStyles = StyleSheet.create({
   arrow: {
     justifyContent: "center",
     paddingRight: 14,
+  },
+});
+
+const selectedCardStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute" as const,
+    bottom: 70,
+    left: 12,
+    right: 12,
+    zIndex: 1000,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 15,
+  },
+  closeBtn: {
+    position: "absolute" as const,
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  header: {
+    flexDirection: "row" as const,
+    gap: 12,
+  },
+  image: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+  },
+  info: {
+    flex: 1,
+    justifyContent: "center" as const,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    paddingRight: 24,
+  },
+  cuisine: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: "500" as const,
+    marginTop: 2,
+  },
+  meta: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    marginTop: 4,
+  },
+  rating: {
+    fontSize: 12,
+    color: Colors.star,
+    fontWeight: "600" as const,
+  },
+  reviews: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+  distance: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontWeight: "700" as const,
+  },
+  buttons: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginTop: 12,
+  },
+  detailsBtn: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  navigateBtn: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    backgroundColor: "#2563EB",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  btnText: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: "#fff",
   },
 });
 
