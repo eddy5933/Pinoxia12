@@ -24,7 +24,6 @@ import {
   Store,
   Bell,
   Heart,
-  Home,
   UserCheck,
   ChevronRight,
 } from "lucide-react-native";
@@ -327,12 +326,12 @@ export default function FriendsScreen() {
           <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
           {item.isCloseFriend && (
             <View style={styles.closeBadge}>
-              <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
+              <Users size={8} color="#3B82F6" fill="#3B82F6" />
             </View>
           )}
           {item.isFamily && (
             <View style={styles.familyBadge}>
-              <Home size={8} color="#4FC3F7" fill="#4FC3F7" />
+              <Heart size={8} color="#A855F7" fill="#A855F7" />
             </View>
           )}
         </TouchableOpacity>
@@ -341,13 +340,13 @@ export default function FriendsScreen() {
             <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
             {item.isCloseFriend && (
               <View style={styles.closeTag}>
-                <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
+                <Users size={8} color="#3B82F6" fill="#3B82F6" />
                 <Text style={styles.closeTagText}>Close</Text>
               </View>
             )}
             {item.isFamily && (
               <View style={styles.familyTag}>
-                <Home size={8} color="#4FC3F7" fill="#4FC3F7" />
+                <Heart size={8} color="#A855F7" fill="#A855F7" />
                 <Text style={styles.familyTagText}>Family</Text>
               </View>
             )}
@@ -360,10 +359,10 @@ export default function FriendsScreen() {
             onPress={() => void handleToggleCloseFriend(item)}
             activeOpacity={0.7}
           >
-            <Heart
+            <Users
               size={15}
-              color={item.isCloseFriend ? "#FF6B8A" : Colors.textMuted}
-              fill={item.isCloseFriend ? "#FF6B8A" : "transparent"}
+              color={item.isCloseFriend ? "#3B82F6" : Colors.textMuted}
+              fill={item.isCloseFriend ? "#3B82F6" : "transparent"}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -372,10 +371,10 @@ export default function FriendsScreen() {
             activeOpacity={0.7}
             testID={`family-toggle-${item.userId}`}
           >
-            <Home
+            <Heart
               size={15}
-              color={item.isFamily ? "#4FC3F7" : Colors.textMuted}
-              fill={item.isFamily ? "#4FC3F7" : "transparent"}
+              color={item.isFamily ? "#A855F7" : Colors.textMuted}
+              fill={item.isFamily ? "#A855F7" : "transparent"}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -509,7 +508,7 @@ export default function FriendsScreen() {
         >
           <View style={styles.closeFriendsLeft}>
             <View style={styles.closeFriendsIcon}>
-              <Heart size={16} color="#FF6B8A" fill="#FF6B8A" />
+              <Users size={16} color="#3B82F6" fill="#3B82F6" />
             </View>
             <View>
               <Text style={styles.closeFriendsTitle}>Close Friends</Text>
@@ -529,7 +528,7 @@ export default function FriendsScreen() {
         >
           <View style={styles.closeFriendsLeft}>
             <View style={styles.familyIcon}>
-              <Home size={16} color="#4FC3F7" fill="#4FC3F7" />
+              <Heart size={16} color="#A855F7" fill="#A855F7" />
             </View>
             <View>
               <Text style={styles.closeFriendsTitle}>Family</Text>
@@ -805,7 +804,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,107,138,0.15)",
+    borderColor: "rgba(59,130,246,0.15)",
   },
   familyRow: {
     flexDirection: "row",
@@ -816,13 +815,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(79,195,247,0.15)",
+    borderColor: "rgba(168,85,247,0.15)",
   },
   familyIcon: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(79,195,247,0.12)",
+    backgroundColor: "rgba(168,85,247,0.12)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -835,7 +834,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(255,107,138,0.12)",
+    backgroundColor: "rgba(59,130,246,0.12)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -934,10 +933,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cardCloseFriend: {
-    borderColor: "rgba(255,107,138,0.2)",
+    borderColor: "rgba(59,130,246,0.2)",
   },
   cardFamily: {
-    borderColor: "rgba(79,195,247,0.2)",
+    borderColor: "rgba(168,85,247,0.2)",
   },
   avatar: {
     width: 44,
@@ -948,10 +947,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarCloseFriend: {
-    backgroundColor: "#C2185B",
+    backgroundColor: "#2563EB",
   },
   avatarFamily: {
-    backgroundColor: "#0277BD",
+    backgroundColor: "#7C3AED",
   },
   searchAvatar: {
     backgroundColor: Colors.surfaceHighlight,
@@ -978,7 +977,7 @@ const styles = StyleSheet.create({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     borderWidth: 1,
-    borderColor: "rgba(255,107,138,0.3)",
+    borderColor: "rgba(59,130,246,0.3)",
   },
   familyBadge: {
     position: "absolute" as const,
@@ -991,7 +990,7 @@ const styles = StyleSheet.create({
     justifyContent: "center" as const,
     alignItems: "center" as const,
     borderWidth: 1,
-    borderColor: "rgba(79,195,247,0.3)",
+    borderColor: "rgba(168,85,247,0.3)",
   },
   closeTag: {
     flexDirection: "row" as const,
@@ -1000,12 +999,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: "rgba(255,107,138,0.12)",
+    backgroundColor: "rgba(59,130,246,0.12)",
   },
   closeTagText: {
     fontSize: 10,
     fontWeight: "700" as const,
-    color: "#FF6B8A",
+    color: "#3B82F6",
   },
   familyTag: {
     flexDirection: "row" as const,
@@ -1014,12 +1013,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: "rgba(79,195,247,0.12)",
+    backgroundColor: "rgba(168,85,247,0.12)",
   },
   familyTagText: {
     fontSize: 10,
     fontWeight: "700" as const,
-    color: "#4FC3F7",
+    color: "#A855F7",
   },
   cardInfo: {
     flex: 1,
@@ -1071,10 +1070,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E88E5",
   },
   iconBtnCloseFriendActive: {
-    backgroundColor: "rgba(255,107,138,0.15)",
+    backgroundColor: "rgba(59,130,246,0.15)",
   },
   iconBtnFamilyActive: {
-    backgroundColor: "rgba(79,195,247,0.15)",
+    backgroundColor: "rgba(168,85,247,0.15)",
   },
   followBtn: {
     flexDirection: "row",
