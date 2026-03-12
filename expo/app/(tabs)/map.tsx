@@ -471,12 +471,15 @@ function NativeMapView({
       {restaurants.map((r) => {
         const isSearchResult = searchQuery.trim().length > 0;
         const isFocused = focusedRestaurant?.id === r.id;
+        const hasFocused = focusedRestaurant !== null;
+        const isUnfocused = hasFocused && !isFocused;
         const dist = distanceMap.get(r.id);
         return (
         <Marker
           key={r.id}
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
           tracksViewChanges={Platform.OS === 'android' ? false : false}
+          zIndex={isFocused ? 999 : isUnfocused ? 1 : 10}
           onPress={() => {
             console.log("[MapScreen] Marker tapped:", r.name, r.id);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -485,31 +488,35 @@ function NativeMapView({
           pinColor={isSearchResult ? '#2563EB' : isFocused ? '#F59E0B' : Colors.primary}
         >
           {Platform.OS === 'ios' ? (
-            <View style={markerStyles.touchable}>
+            <View style={[markerStyles.touchable, isUnfocused && { opacity: 0.4, transform: [{ scale: 0.7 }] }]}>
               <View style={markerStyles.container}>
                 <View style={[
                   markerStyles.pin,
                   isFocused && markerStyles.pinFocused,
-                  isSearchResult && markerStyles.pinSearchResult,
+                  isSearchResult && !hasFocused && markerStyles.pinSearchResult,
                 ]}>
-                  <MapPin size={16} color={Colors.white} />
+                  <MapPin size={isFocused ? 20 : isUnfocused ? 12 : 16} color={Colors.white} />
                 </View>
                 <View style={[
                   markerStyles.pinTail,
-                  isSearchResult && markerStyles.pinTailSearch,
+                  isSearchResult && !hasFocused && markerStyles.pinTailSearch,
+                  isFocused && { borderTopColor: Colors.star },
                 ]} />
-                <View style={[
-                  markerStyles.labelContainer,
-                  isSearchResult && markerStyles.labelContainerSearch,
-                ]}>
-                  <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
-                  {dist && (
-                    <Text style={[
-                      markerStyles.labelDistance,
-                      !isSearchResult && markerStyles.labelDistanceDefault,
-                    ]}>{dist}</Text>
-                  )}
-                </View>
+                {!isUnfocused && (
+                  <View style={[
+                    markerStyles.labelContainer,
+                    isFocused && markerStyles.labelContainerFocused,
+                    isSearchResult && !hasFocused && markerStyles.labelContainerSearch,
+                  ]}>
+                    <Text style={[markerStyles.labelText, isFocused && { fontSize: 12 }]} numberOfLines={1}>{r.name}</Text>
+                    {dist && (
+                      <Text style={[
+                        markerStyles.labelDistance,
+                        !isSearchResult && markerStyles.labelDistanceDefault,
+                      ]}>{dist}</Text>
+                    )}
+                  </View>
+                )}
               </View>
             </View>
           ) : null}
@@ -651,6 +658,8 @@ export default function MapScreenExport() {
     if (focusedRestaurant) {
       console.log("[MapScreen] Focused on restaurant:", focusedRestaurant.name);
       setListExpanded(true);
+      setShowSuggestions(false);
+      searchInputRef.current?.blur();
     }
   }, [focusedRestaurant]);
 
@@ -1378,14 +1387,16 @@ const markerStyles = StyleSheet.create({
     elevation: 5,
   },
   pinFocused: {
-    width: Platform.OS === 'android' ? 32 : 44,
-    height: Platform.OS === 'android' ? 32 : 44,
-    borderRadius: Platform.OS === 'android' ? 16 : 22,
-    backgroundColor: Colors.star,
-    borderColor: Colors.star,
-    shadowColor: Colors.star,
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
+    width: Platform.OS === 'android' ? 36 : 50,
+    height: Platform.OS === 'android' ? 36 : 50,
+    borderRadius: Platform.OS === 'android' ? 18 : 25,
+    backgroundColor: '#F59E0B',
+    borderColor: '#FDE68A',
+    borderWidth: Platform.OS === 'android' ? 3 : 4,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   pinSearchResult: {
     width: Platform.OS === 'android' ? 30 : 40,
@@ -1425,6 +1436,18 @@ const markerStyles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 4,
     elevation: 8,
+  },
+  labelContainerFocused: {
+    backgroundColor: '#92400E',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    maxWidth: Platform.OS === 'android' ? 110 : 160,
+    paddingHorizontal: Platform.OS === 'android' ? 8 : 12,
+    paddingVertical: Platform.OS === 'android' ? 3 : 5,
+    borderRadius: Platform.OS === 'android' ? 6 : 10,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
   },
   labelContainerSearch: {
     backgroundColor: "#1E40AF",
