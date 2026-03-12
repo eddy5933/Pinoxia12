@@ -730,8 +730,7 @@ export default function MapScreenExport() {
   const [showFamilyLocations, setShowFamilyLocations] = useState(familySharingEnabled);
   const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
   const [focusFriendTrigger, setFocusFriendTrigger] = useState(0);
-  const closeFriendPulse = useRef(new Animated.Value(0)).current;
-  const familyPulse = useRef(new Animated.Value(0)).current;
+
 
   const friendListRef = useRef<FlatList>(null);
   const familyListRef = useRef<FlatList>(null);
@@ -837,47 +836,7 @@ export default function MapScreenExport() {
     ).start();
   }, [pulseAnim]);
 
-  useEffect(() => {
-    if (closeFriendSharingEnabled) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(closeFriendPulse, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(closeFriendPulse, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      closeFriendPulse.setValue(0);
-    }
-  }, [closeFriendSharingEnabled, closeFriendPulse]);
 
-  useEffect(() => {
-    if (familySharingEnabled) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(familyPulse, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(familyPulse, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      familyPulse.setValue(0);
-    }
-  }, [familySharingEnabled, familyPulse]);
 
   const handleToggleShareFriends = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1211,201 +1170,71 @@ export default function MapScreenExport() {
 
 
       {friends.length > 0 && (
-        <View style={styles.liveLocationSection}>
-          <View style={styles.liveLocationGroup}>
-            <Text style={styles.liveGroupLabel}>Share My Location</Text>
-            <View style={styles.liveLocationRow}>
-              <View style={styles.pulseButtonWrapper}>
-                {closeFriendSharingEnabled && (
-                  <Animated.View
-                    style={[
-                      styles.friendPulseRing,
-                      {
-                        opacity: closeFriendPulse.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.7, 0],
-                        }),
-                        transform: [{
-                          scale: closeFriendPulse.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 1.8],
-                          }),
-                        }],
-                      },
-                    ]}
-                  />
-                )}
-                {closeFriendSharingEnabled && (
-                  <Animated.View
-                    style={[
-                      styles.friendPulseRingOuter,
-                      {
-                        opacity: closeFriendPulse.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.4, 0],
-                        }),
-                        transform: [{
-                          scale: closeFriendPulse.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.2],
-                          }),
-                        }],
-                      },
-                    ]}
-                  />
-                )}
-                <Animated.View
-                  style={closeFriendSharingEnabled ? {
-                    transform: [{
-                      scale: closeFriendPulse.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [1, 1.05, 1],
-                      }),
-                    }],
-                  } : undefined}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.shareButton,
-                      closeFriendSharingEnabled && styles.shareButtonActiveBlue,
-                    ]}
-                    onPress={handleToggleShareFriends}
-                    activeOpacity={0.7}
-                    testID="share-friends-button"
-                  >
-                    <Users size={12} color={closeFriendSharingEnabled ? Colors.white : Colors.textSecondary} />
-                    <Text style={[
-                      styles.shareButtonText,
-                      closeFriendSharingEnabled && styles.shareButtonTextActive,
-                    ]}>
-                      {closeFriendSharingEnabled ? "Sharing" : "Share"} Friends
-                    </Text>
-                    {closeFriendSharingEnabled && <View style={styles.liveDotBlue} />}
-                  </TouchableOpacity>
-                </Animated.View>
-              </View>
+        <View style={styles.controlBar}>
+          <View style={styles.controlRow}>
+            <TouchableOpacity
+              style={[
+                styles.controlChip,
+                closeFriendSharingEnabled && styles.controlChipActiveBlue,
+              ]}
+              onPress={handleToggleShareFriends}
+              activeOpacity={0.7}
+              testID="share-friends-button"
+            >
+              <Users size={13} color={closeFriendSharingEnabled ? "#fff" : Colors.textSecondary} />
+              <Text style={[styles.controlChipText, closeFriendSharingEnabled && styles.controlChipTextActive]}>
+                Share Friends
+              </Text>
+              {closeFriendSharingEnabled && <View style={styles.controlLiveDot} />}
+            </TouchableOpacity>
 
-              <View style={styles.pulseButtonWrapper}>
-                {familySharingEnabled && (
-                  <Animated.View
-                    style={[
-                      styles.familyPulseRing,
-                      {
-                        opacity: familyPulse.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.7, 0],
-                        }),
-                        transform: [{
-                          scale: familyPulse.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 1.8],
-                          }),
-                        }],
-                      },
-                    ]}
-                  />
-                )}
-                {familySharingEnabled && (
-                  <Animated.View
-                    style={[
-                      styles.familyPulseRingOuter,
-                      {
-                        opacity: familyPulse.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.4, 0],
-                        }),
-                        transform: [{
-                          scale: familyPulse.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 2.2],
-                          }),
-                        }],
-                      },
-                    ]}
-                  />
-                )}
-                <Animated.View
-                  style={familySharingEnabled ? {
-                    transform: [{
-                      scale: familyPulse.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [1, 1.05, 1],
-                      }),
-                    }],
-                  } : undefined}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.shareButton,
-                      familySharingEnabled && styles.shareButtonActivePurple,
-                    ]}
-                    onPress={handleToggleShareFamily}
-                    activeOpacity={0.7}
-                    testID="share-family-button"
-                  >
-                    <Heart size={12} color={familySharingEnabled ? Colors.white : Colors.textSecondary} />
-                    <Text style={[
-                      styles.shareButtonText,
-                      familySharingEnabled && styles.shareButtonTextActive,
-                    ]}>
-                      {familySharingEnabled ? "Sharing" : "Share"} Family
-                    </Text>
-                    {familySharingEnabled && <View style={styles.liveDotPurple} />}
-                  </TouchableOpacity>
-                </Animated.View>
-              </View>
-            </View>
-          </View>
+            <TouchableOpacity
+              style={[
+                styles.controlChip,
+                familySharingEnabled && styles.controlChipActivePurple,
+              ]}
+              onPress={handleToggleShareFamily}
+              activeOpacity={0.7}
+              testID="share-family-button"
+            >
+              <Heart size={13} color={familySharingEnabled ? "#fff" : Colors.textSecondary} />
+              <Text style={[styles.controlChipText, familySharingEnabled && styles.controlChipTextActive]}>
+                Share Family
+              </Text>
+              {familySharingEnabled && <View style={[styles.controlLiveDot, { backgroundColor: "#D8B4FE" }]} />}
+            </TouchableOpacity>
 
-          <View style={styles.viewDivider} />
+            <View style={styles.controlSep} />
 
-          <View style={styles.liveLocationGroup}>
-            <Text style={styles.viewGroupLabel}>View on Map</Text>
-            <View style={styles.liveLocationRow}>
-              <TouchableOpacity
-                style={[
-                  styles.viewMapButton,
-                  showFriendLocations && styles.viewMapButtonActiveBlue,
-                ]}
-                onPress={handleToggleViewFriends}
-                activeOpacity={0.7}
-                testID="view-friends-location-button"
-              >
-                {showFriendLocations ? (
-                  <Eye size={12} color={Colors.white} />
-                ) : (
-                  <EyeOff size={12} color={Colors.textSecondary} />
-                )}
-                <Text style={[
-                  styles.viewMapButtonText,
-                  showFriendLocations && styles.viewMapButtonTextActive,
-                ]}>
-                  Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
-                </Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.controlChip,
+                showFriendLocations && styles.controlChipViewBlue,
+              ]}
+              onPress={handleToggleViewFriends}
+              activeOpacity={0.7}
+              testID="view-friends-location-button"
+            >
+              {showFriendLocations ? <Eye size={13} color="#60A5FA" /> : <EyeOff size={13} color={Colors.textSecondary} />}
+              <Text style={[styles.controlChipText, showFriendLocations && { color: "#60A5FA" }]}>
+                Friends{friendLocations.length > 0 ? ` ${friendLocations.length}` : ""}
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.viewMapButton,
-                  showFamilyLocations && styles.viewMapButtonActivePurple,
-                ]}
-                onPress={handleToggleViewFamily}
-                activeOpacity={0.7}
-                testID="view-family-location-button"
-              >
-                {showFamilyLocations ? (
-                  <Eye size={12} color={Colors.white} />
-                ) : (
-                  <EyeOff size={12} color={Colors.textSecondary} />
-                )}
-                <Text style={[
-                  styles.viewMapButtonText,
-                  showFamilyLocations && styles.viewMapButtonTextActive,
-                ]}>
-                  Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.controlChip,
+                showFamilyLocations && styles.controlChipViewPurple,
+              ]}
+              onPress={handleToggleViewFamily}
+              activeOpacity={0.7}
+              testID="view-family-location-button"
+            >
+              {showFamilyLocations ? <Eye size={13} color="#C084FC" /> : <EyeOff size={13} color={Colors.textSecondary} />}
+              <Text style={[styles.controlChipText, showFamilyLocations && { color: "#C084FC" }]}>
+                Family{familyLocations.length > 0 ? ` ${familyLocations.length}` : ""}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -2111,163 +1940,64 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     gap: 8,
   },
-  liveLocationSection: {
-    paddingHorizontal: 12,
+  controlBar: {
+    paddingHorizontal: 10,
     paddingVertical: 6,
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  controlRow: {
     flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
-    gap: 8,
+    alignItems: "center" as const,
+    gap: 6,
+    flexWrap: "wrap" as const,
   },
-  liveLocationGroup: {
-    flex: 1,
-  },
-  liveGroupLabel: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#10B981",
-    letterSpacing: 0.5,
-    textTransform: "uppercase" as const,
-    marginBottom: 5,
-  },
-  viewGroupLabel: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#60A5FA",
-    letterSpacing: 0.5,
-    textTransform: "uppercase" as const,
-    marginBottom: 5,
-  },
-  viewDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    alignSelf: "stretch" as const,
-    marginVertical: 2,
-  },
-  liveLocationRow: {
+  controlChip: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 5,
-    flexWrap: "wrap" as const,
-  },
-  shareButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  shareButtonActiveBlue: {
+  controlChipActiveBlue: {
     backgroundColor: "#2563EB",
     borderColor: "#3B82F6",
   },
-  shareButtonActivePurple: {
-    backgroundColor: "#9333EA",
+  controlChipActivePurple: {
+    backgroundColor: "#7C3AED",
     borderColor: "#A855F7",
   },
-  shareButtonText: {
-    fontSize: 10,
+  controlChipViewBlue: {
+    backgroundColor: "rgba(59,130,246,0.12)",
+    borderColor: "#3B82F6",
+  },
+  controlChipViewPurple: {
+    backgroundColor: "rgba(168,85,247,0.12)",
+    borderColor: "#A855F7",
+  },
+  controlChipText: {
+    fontSize: 11,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
-  shareButtonTextActive: {
-    color: Colors.white,
+  controlChipTextActive: {
+    color: "#fff",
   },
-  viewMapButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  viewMapButtonActiveBlue: {
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
-    borderColor: "#3B82F6",
-  },
-  viewMapButtonActivePurple: {
-    backgroundColor: "rgba(168, 85, 247, 0.2)",
-    borderColor: "#A855F7",
-  },
-  viewMapButtonText: {
-    fontSize: 10,
-    fontWeight: "600" as const,
-    color: Colors.textSecondary,
-  },
-  viewMapButtonTextActive: {
-    color: Colors.white,
-  },
-  pulseButtonWrapper: {
-    position: "relative" as const,
-    overflow: "visible" as const,
-  },
-  friendPulseRing: {
-    position: "absolute" as const,
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#3B82F6",
-    zIndex: -1,
-  },
-  familyPulseRing: {
-    position: "absolute" as const,
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#A855F7",
-    zIndex: -1,
-  },
-  friendPulseRingOuter: {
-    position: "absolute" as const,
-    top: -6,
-    left: -6,
-    right: -6,
-    bottom: -6,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#3B82F6",
-    zIndex: -2,
-  },
-  familyPulseRingOuter: {
-    position: "absolute" as const,
-    top: -6,
-    left: -6,
-    right: -6,
-    bottom: -6,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#A855F7",
-    zIndex: -2,
-  },
-
-  liveDotBlue: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+  controlLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#93C5FD",
-    marginLeft: 2,
   },
-  liveDotPurple: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "#D8B4FE",
-    marginLeft: 2,
+  controlSep: {
+    width: 1,
+    height: 18,
+    backgroundColor: Colors.border,
   },
 
   noFriendsText: {
