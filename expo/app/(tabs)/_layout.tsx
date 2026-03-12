@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Search, MapPin, User, Users } from "lucide-react-native";
+import { Search, MapPin, User, Users, Radio } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
@@ -99,6 +99,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <TabIcon icon={Users} color={color} size={size} badgeCount={friendBadgeCount} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="sharing"
+        options={{
+          title: "Sharing",
+          tabBarIcon: ({ color, size }) => <Radio color={color} size={size} />,
         }}
       />
       <Tabs.Screen
