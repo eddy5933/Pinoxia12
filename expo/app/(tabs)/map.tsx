@@ -1281,30 +1281,6 @@ export default function MapScreenExport() {
                 </Animated.View>
               </View>
 
-              <View style={styles.viewMapButtonSeparator} />
-
-              <TouchableOpacity
-                style={[
-                  styles.viewMapButton,
-                  showFriendLocations && styles.viewMapButtonActiveBlue,
-                ]}
-                onPress={handleToggleViewFriends}
-                activeOpacity={0.7}
-                testID="view-friends-location-button"
-              >
-                {showFriendLocations ? (
-                  <Eye size={12} color={Colors.white} />
-                ) : (
-                  <EyeOff size={12} color={Colors.textSecondary} />
-                )}
-                <Text style={[
-                  styles.viewMapButtonText,
-                  showFriendLocations && styles.viewMapButtonTextActive,
-                ]}>
-                  Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
-                </Text>
-              </TouchableOpacity>
-
               <View style={styles.pulseButtonWrapper}>
                 {familySharingEnabled && (
                   <Animated.View
@@ -1375,29 +1351,6 @@ export default function MapScreenExport() {
                 </Animated.View>
               </View>
 
-              <View style={styles.viewMapButtonSeparator} />
-
-              <TouchableOpacity
-                style={[
-                  styles.viewMapButton,
-                  showFamilyLocations && styles.viewMapButtonActivePurple,
-                ]}
-                onPress={handleToggleViewFamily}
-                activeOpacity={0.7}
-                testID="view-family-location-button"
-              >
-                {showFamilyLocations ? (
-                  <Eye size={12} color={Colors.white} />
-                ) : (
-                  <EyeOff size={12} color={Colors.textSecondary} />
-                )}
-                <Text style={[
-                  styles.viewMapButtonText,
-                  showFamilyLocations && styles.viewMapButtonTextActive,
-                ]}>
-                  Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
-                </Text>
-              </TouchableOpacity>
             </View>
         </View>
       )}
@@ -1544,7 +1497,53 @@ export default function MapScreenExport() {
           />
         )}
 
+        {friends.length > 0 && (
+          <View style={styles.mapOverlayButtons}>
+            <TouchableOpacity
+              style={[
+                styles.mapOverlayBtn,
+                showFriendLocations && styles.mapOverlayBtnActiveBlue,
+              ]}
+              onPress={handleToggleViewFriends}
+              activeOpacity={0.7}
+              testID="view-friends-location-button"
+            >
+              {showFriendLocations ? (
+                <Eye size={14} color={Colors.white} />
+              ) : (
+                <EyeOff size={14} color={Colors.textSecondary} />
+              )}
+              <Text style={[
+                styles.mapOverlayBtnText,
+                showFriendLocations && styles.mapOverlayBtnTextActive,
+              ]}>
+                Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
+              </Text>
+            </TouchableOpacity>
 
+            <TouchableOpacity
+              style={[
+                styles.mapOverlayBtn,
+                showFamilyLocations && styles.mapOverlayBtnActivePurple,
+              ]}
+              onPress={handleToggleViewFamily}
+              activeOpacity={0.7}
+              testID="view-family-location-button"
+            >
+              {showFamilyLocations ? (
+                <Eye size={14} color={Colors.white} />
+              ) : (
+                <EyeOff size={14} color={Colors.textSecondary} />
+              )}
+              <Text style={[
+                styles.mapOverlayBtnText,
+                showFamilyLocations && styles.mapOverlayBtnTextActive,
+              ]}>
+                Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {selectedPlace && (
@@ -2065,7 +2064,47 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
-    position: "relative",
+    position: "relative" as const,
+  },
+  mapOverlayButtons: {
+    position: "absolute" as const,
+    top: 10,
+    left: 10,
+    flexDirection: "row" as const,
+    gap: 8,
+    zIndex: 10,
+  },
+  mapOverlayBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(30,30,30,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapOverlayBtnActiveBlue: {
+    backgroundColor: "rgba(37,99,235,0.9)",
+    borderColor: "#3B82F6",
+  },
+  mapOverlayBtnActivePurple: {
+    backgroundColor: "rgba(147,51,234,0.9)",
+    borderColor: "#A855F7",
+  },
+  mapOverlayBtnText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  mapOverlayBtnTextActive: {
+    color: Colors.white,
   },
 
   bottomSheet: {
