@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -94,7 +95,15 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={styles.brandSection}>
-            <Text style={styles.brandTitle}>FoodSpot</Text>
+            <Image
+              source={require("@/assets/images/pinoxia-logo.png")}
+              style={styles.brandLogo}
+              contentFit="contain"
+            />
+            <View style={styles.brandTitleRow}>
+              <Text style={styles.brandTitleRed}>Pin</Text>
+              <Text style={styles.brandTitleWhite}>oxia</Text>
+            </View>
             <Text style={styles.brandSubtitle}>
               {isSignup
                 ? "Create your account"
@@ -227,10 +236,25 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginBottom: 40,
   },
-  brandTitle: {
+  brandLogo: {
+    width: 70,
+    height: 70,
+    marginBottom: 8,
+  },
+  brandTitleRow: {
+    flexDirection: "row" as const,
+    alignItems: "baseline" as const,
+  },
+  brandTitleRed: {
     fontSize: 42,
     fontWeight: "900" as const,
-    color: Colors.primary,
+    color: "#E63946",
+    letterSpacing: -1,
+  },
+  brandTitleWhite: {
+    fontSize: 42,
+    fontWeight: "900" as const,
+    color: Colors.white,
     letterSpacing: -1,
   },
   brandSubtitle: {

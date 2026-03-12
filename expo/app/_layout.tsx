@@ -4,7 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { MapPinned } from "lucide-react-native";
+import { Image } from "expo-image";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { RestaurantProvider } from "@/providers/RestaurantProvider";
 import { LocationProvider } from "@/providers/LocationProvider";
@@ -106,12 +106,16 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
   return (
     <Animated.View style={[splashStyles.container, { opacity: fadeAnim }]}>
       <Animated.View style={[splashStyles.content, { transform: [{ scale: scaleAnim }] }]}>
-        <Animated.View style={[splashStyles.iconBox, { transform: [{ scale: iconScaleAnim }] }]}>
-          <MapPinned size={38} color="#FFFFFF" />
+        <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
+          <Image
+            source={require("@/assets/images/pinoxia-logo.png")}
+            style={splashStyles.splashLogo}
+            contentFit="contain"
+          />
         </Animated.View>
         <View style={splashStyles.titleRow}>
-          <Text style={splashStyles.titlePino}>Pino</Text>
-          <Text style={splashStyles.titleXia}>xia</Text>
+          <Text style={splashStyles.titlePino}>Pin</Text>
+          <Text style={splashStyles.titleXia}>oxia</Text>
         </View>
         <Text style={splashStyles.tagline}>Discover nearby spots</Text>
       </Animated.View>
@@ -131,13 +135,9 @@ const splashStyles = StyleSheet.create({
     alignItems: "center" as const,
     gap: 14,
   },
-  iconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: "#000000",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
+  splashLogo: {
+    width: 90,
+    height: 90,
     marginBottom: 4,
   },
   titleRow: {
@@ -147,13 +147,13 @@ const splashStyles = StyleSheet.create({
   titlePino: {
     fontSize: 42,
     fontWeight: "800" as const,
-    color: Colors.white,
+    color: "#E63946",
     letterSpacing: -1,
   },
   titleXia: {
     fontSize: 42,
     fontWeight: "800" as const,
-    color: Colors.primary,
+    color: Colors.white,
     letterSpacing: -1,
   },
   tagline: {

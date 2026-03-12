@@ -1,28 +1,28 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { MapPinned } from "lucide-react-native";
+import { Image } from "expo-image";
 import Colors from "@/constants/colors";
 
 interface PinoxiaLogoProps {
-  size?: "small" | "medium";
+  size?: "small" | "medium" | "large";
   showText?: boolean;
 }
 
 export default function PinoxiaLogo({ size = "medium", showText = true }: PinoxiaLogoProps) {
-  const iconBoxSize = size === "small" ? 24 : 32;
-  const iconSize = size === "small" ? 13 : 18;
-  const fontSize = size === "small" ? 20 : 28;
-  const borderRadius = size === "small" ? 6 : 8;
+  const imageSize = size === "small" ? 28 : size === "large" ? 64 : 36;
+  const fontSize = size === "small" ? 20 : size === "large" ? 36 : 28;
 
   return (
     <View style={styles.row}>
-      <View style={[styles.iconBox, { width: iconBoxSize, height: iconBoxSize, borderRadius }]}>
-        <MapPinned size={iconSize} color={Colors.white} />
-      </View>
+      <Image
+        source={require("@/assets/images/pinoxia-logo.png")}
+        style={{ width: imageSize, height: imageSize }}
+        contentFit="contain"
+      />
       {showText && (
         <View style={styles.textRow}>
-          <Text style={[styles.pino, { fontSize }]}>Pino</Text>
-          <Text style={[styles.xia, { fontSize }]}>xia</Text>
+          <Text style={[styles.pino, { fontSize }]}>Pin</Text>
+          <Text style={[styles.xia, { fontSize }]}>oxia</Text>
         </View>
       )}
     </View>
@@ -35,23 +35,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  iconBox: {
-    backgroundColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   textRow: {
     flexDirection: "row",
     alignItems: "baseline",
   },
   pino: {
     fontWeight: "800",
-    color: Colors.white,
+    color: "#E63946",
     letterSpacing: -0.5,
   },
   xia: {
     fontWeight: "800",
-    color: Colors.primary,
+    color: Colors.white,
     letterSpacing: -0.5,
   },
 });
