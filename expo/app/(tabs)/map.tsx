@@ -1274,7 +1274,7 @@ export default function MapScreenExport() {
                       styles.shareButtonText,
                       closeFriendSharingEnabled && styles.shareButtonTextActive,
                     ]}>
-                      {closeFriendSharingEnabled ? "Friends" : "Friends"}
+                      {closeFriendSharingEnabled ? "Sharing Friends" : "Sharing Friends"}
                     </Text>
                     {closeFriendSharingEnabled && <View style={styles.liveDotBlue} />}
                   </TouchableOpacity>
@@ -1368,7 +1368,7 @@ export default function MapScreenExport() {
                       styles.shareButtonText,
                       familySharingEnabled && styles.shareButtonTextActive,
                     ]}>
-                      {familySharingEnabled ? "Family" : "Family"}
+                      {familySharingEnabled ? "Sharing Family" : "Sharing Family"}
                     </Text>
                     {familySharingEnabled && <View style={styles.liveDotPurple} />}
                   </TouchableOpacity>
