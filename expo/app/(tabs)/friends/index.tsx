@@ -24,6 +24,7 @@ import {
   Store,
   Bell,
   Heart,
+  Home,
   UserCheck,
   ChevronRight,
 } from "lucide-react-native";
@@ -59,6 +60,7 @@ export default function FriendsScreen() {
     removeFriend,
     unfollowUser,
     toggleCloseFriend,
+    toggleFamily,
     isFriend,
     isFollowing,
     getPendingRequests,
@@ -199,6 +201,20 @@ export default function FriendsScreen() {
     [toggleCloseFriend, showToast]
   );
 
+  const handleToggleFamily = useCallback(
+    async (friend: Friend) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await toggleFamily(friend.id);
+      const wasFamily = friend.isFamily;
+      showToast(
+        wasFamily ? "Removed from family" : "Added to family",
+        friend.name,
+        wasFamily ? "info" : "success"
+      );
+    },
+    [toggleFamily, showToast]
+  );
+
   const handleRemoveFriend = useCallback(
     (friend: Friend) => {
       Alert.alert("Remove Friend", `Remove ${friend.name} from your friends? This will unfollow both ways.`, [
@@ -250,6 +266,7 @@ export default function FriendsScreen() {
   );
 
   const closeFriendsCount = useMemo(() => friends.filter((f) => f.isCloseFriend).length, [friends]);
+  const familyCount = useMemo(() => friends.filter((f) => f.isFamily).length, [friends]);
 
   const renderFollowerItem = useCallback(
     ({ item }: { item: Friend }) => (
@@ -300,9 +317,9 @@ export default function FriendsScreen() {
 
   const renderFriendItem = useCallback(
     ({ item }: { item: Friend }) => (
-      <View style={[styles.card, item.isCloseFriend && styles.cardCloseFriend]}>
+      <View style={[styles.card, item.isCloseFriend && styles.cardCloseFriend, item.isFamily && styles.cardFamily]}>
         <TouchableOpacity
-          style={[styles.avatar, item.isCloseFriend && styles.avatarCloseFriend]}
+          style={[styles.avatar, item.isCloseFriend && styles.avatarCloseFriend, item.isFamily && styles.avatarFamily]}
           onPress={() => void handleToggleCloseFriend(item)}
           activeOpacity={0.7}
           testID={`close-friend-toggle-${item.userId}`}
@@ -313,6 +330,11 @@ export default function FriendsScreen() {
               <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
             </View>
           )}
+          {item.isFamily && (
+            <View style={styles.familyBadge}>
+              <Home size={8} color="#4FC3F7" fill="#4FC3F7" />
+            </View>
+          )}
         </TouchableOpacity>
         <View style={styles.cardInfo}>
           <View style={styles.nameRow}>
@@ -321,6 +343,12 @@ export default function FriendsScreen() {
               <View style={styles.closeTag}>
                 <Heart size={8} color="#FF6B8A" fill="#FF6B8A" />
                 <Text style={styles.closeTagText}>Close</Text>
+              </View>
+            )}
+            {item.isFamily && (
+              <View style={styles.familyTag}>
+                <Home size={8} color="#4FC3F7" fill="#4FC3F7" />
+                <Text style={styles.familyTagText}>Family</Text>
               </View>
             )}
           </View>
@@ -336,6 +364,18 @@ export default function FriendsScreen() {
               size={15}
               color={item.isCloseFriend ? "#FF6B8A" : Colors.textMuted}
               fill={item.isCloseFriend ? "#FF6B8A" : "transparent"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, item.isFamily ? styles.iconBtnFamilyActive : null]}
+            onPress={() => void handleToggleFamily(item)}
+            activeOpacity={0.7}
+            testID={`family-toggle-${item.userId}`}
+          >
+            <Home
+              size={15}
+              color={item.isFamily ? "#4FC3F7" : Colors.textMuted}
+              fill={item.isFamily ? "#4FC3F7" : "transparent"}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -355,7 +395,7 @@ export default function FriendsScreen() {
         </View>
       </View>
     ),
-    [handleStartChat, handleRemoveFriend, handleToggleCloseFriend]
+    [handleStartChat, handleRemoveFriend, handleToggleCloseFriend, handleToggleFamily]
   );
 
   const renderSearchItem = useCallback(
@@ -460,25 +500,47 @@ export default function FriendsScreen() {
         )}
       </View>
 
-      <TouchableOpacity
-        style={styles.closeFriendsRow}
-        onPress={() => router.push("/(tabs)/friends/close-friends" as any)}
-        activeOpacity={0.7}
-        testID="close-friends-list-btn"
-      >
-        <View style={styles.closeFriendsLeft}>
-          <View style={styles.closeFriendsIcon}>
-            <Heart size={16} color="#FF6B8A" fill="#FF6B8A" />
+      <View style={styles.categoryRows}>
+        <TouchableOpacity
+          style={styles.closeFriendsRow}
+          onPress={() => router.push("/(tabs)/friends/close-friends" as any)}
+          activeOpacity={0.7}
+          testID="close-friends-list-btn"
+        >
+          <View style={styles.closeFriendsLeft}>
+            <View style={styles.closeFriendsIcon}>
+              <Heart size={16} color="#FF6B8A" fill="#FF6B8A" />
+            </View>
+            <View>
+              <Text style={styles.closeFriendsTitle}>Close Friends</Text>
+              <Text style={styles.closeFriendsSubtitle}>
+                {closeFriendsCount} {closeFriendsCount === 1 ? "person" : "people"}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.closeFriendsTitle}>Close Friends</Text>
-            <Text style={styles.closeFriendsSubtitle}>
-              {closeFriendsCount} {closeFriendsCount === 1 ? "person" : "people"}
-            </Text>
+          <ChevronRight size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.familyRow}
+          onPress={() => router.push("/(tabs)/friends/family" as any)}
+          activeOpacity={0.7}
+          testID="family-list-btn"
+        >
+          <View style={styles.closeFriendsLeft}>
+            <View style={styles.familyIcon}>
+              <Home size={16} color="#4FC3F7" fill="#4FC3F7" />
+            </View>
+            <View>
+              <Text style={styles.closeFriendsTitle}>Family</Text>
+              <Text style={styles.closeFriendsSubtitle}>
+                {familyCount} {familyCount === 1 ? "member" : "members"}
+              </Text>
+            </View>
           </View>
-        </View>
-        <ChevronRight size={18} color={Colors.textMuted} />
-      </TouchableOpacity>
+          <ChevronRight size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.tabBar}>
         <Animated.View
@@ -728,19 +790,41 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.white,
   },
+  categoryRows: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 14,
+    gap: 8,
+  },
   closeFriendsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: "rgba(255,107,138,0.15)",
+  },
+  familyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(79,195,247,0.15)",
+  },
+  familyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(79,195,247,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   closeFriendsLeft: {
     flexDirection: "row",
@@ -852,6 +936,9 @@ const styles = StyleSheet.create({
   cardCloseFriend: {
     borderColor: "rgba(255,107,138,0.2)",
   },
+  cardFamily: {
+    borderColor: "rgba(79,195,247,0.2)",
+  },
   avatar: {
     width: 44,
     height: 44,
@@ -862,6 +949,9 @@ const styles = StyleSheet.create({
   },
   avatarCloseFriend: {
     backgroundColor: "#C2185B",
+  },
+  avatarFamily: {
+    backgroundColor: "#0277BD",
   },
   searchAvatar: {
     backgroundColor: Colors.surfaceHighlight,
@@ -890,6 +980,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,107,138,0.3)",
   },
+  familyBadge: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 1,
+    borderColor: "rgba(79,195,247,0.3)",
+  },
   closeTag: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
@@ -903,6 +1006,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700" as const,
     color: "#FF6B8A",
+  },
+  familyTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(79,195,247,0.12)",
+  },
+  familyTagText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: "#4FC3F7",
   },
   cardInfo: {
     flex: 1,
@@ -955,6 +1072,9 @@ const styles = StyleSheet.create({
   },
   iconBtnCloseFriendActive: {
     backgroundColor: "rgba(255,107,138,0.15)",
+  },
+  iconBtnFamilyActive: {
+    backgroundColor: "rgba(79,195,247,0.15)",
   },
   followBtn: {
     flexDirection: "row",

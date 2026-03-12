@@ -70,6 +70,7 @@ export interface Friend {
   avatar?: string;
   isOnline?: boolean;
   isCloseFriend?: boolean;
+  isFamily?: boolean;
 }
 
 export interface ChatMessage {

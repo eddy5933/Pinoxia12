@@ -113,6 +113,7 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
         avatar: profile?.avatar ?? row.friend_avatar ?? undefined,
         isOnline: true,
         isCloseFriend: row.is_close_friend ?? false,
+        isFamily: row.is_family ?? false,
       });
     }
   }
@@ -134,6 +135,7 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
       avatar: profile?.avatar ?? undefined,
       isOnline: true,
       isCloseFriend: false,
+      isFamily: false,
     });
   }
 
@@ -153,6 +155,7 @@ async function fetchFriendsData(userId: string): Promise<FriendsData> {
       avatar: profile?.avatar ?? followRow.friend_avatar ?? undefined,
       isOnline: true,
       isCloseFriend: false,
+      isFamily: false,
     });
   }
 
@@ -513,13 +516,43 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const newValue = !friend.isCloseFriend;
       console.log("[Friends] Toggle close friend:", friend.name, "=>", newValue);
 
+      const updateData: Record<string, boolean> = { is_close_friend: newValue };
+      if (newValue && friend.isFamily) {
+        updateData.is_family = false;
+      }
+
       const { error } = await supabase
         .from("friends")
-        .update({ is_close_friend: newValue })
+        .update(updateData)
         .eq("id", friendId);
 
       if (error) {
         console.warn("[Friends] Toggle close friend error:", error.message);
+      }
+      invalidate();
+    },
+    [invalidate]
+  );
+
+  const toggleFamily = useCallback(
+    async (friendId: string) => {
+      const friend = dataRef.current.friends.find((f) => f.id === friendId);
+      if (!friend) return;
+      const newValue = !friend.isFamily;
+      console.log("[Friends] Toggle family:", friend.name, "=>", newValue);
+
+      const updateData: Record<string, boolean> = { is_family: newValue };
+      if (newValue && friend.isCloseFriend) {
+        updateData.is_close_friend = false;
+      }
+
+      const { error } = await supabase
+        .from("friends")
+        .update(updateData)
+        .eq("id", friendId);
+
+      if (error) {
+        console.warn("[Friends] Toggle family error:", error.message);
       }
       invalidate();
     },
@@ -563,8 +596,18 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
     [currentData.friends]
   );
 
+  const familyMembers = useMemo(
+    () => currentData.friends.filter((f) => f.isFamily),
+    [currentData.friends]
+  );
+
   const isCloseFriend = useCallback(
     (userId: string) => dataRef.current.friends.some((f) => f.userId === userId && f.isCloseFriend),
+    []
+  );
+
+  const isFamilyMember = useCallback(
+    (userId: string) => dataRef.current.friends.some((f) => f.userId === userId && f.isFamily),
     []
   );
 
@@ -615,6 +658,7 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       followers: currentData.followers,
       following: currentData.following,
       closeFriends,
+      familyMembers,
       requests: currentData.requests,
       registerUser,
       searchUsersFromSupabase,
@@ -624,9 +668,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       rejectFriendRequest,
       cancelFriendRequest,
       toggleCloseFriend,
+      toggleFamily,
       removeFriend,
       unfollowUser,
       isCloseFriend,
+      isFamilyMember,
       isFriend,
       isFollowing,
       getPendingRequests,
@@ -636,10 +682,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       isRefetching,
     }),
     [
-      currentData, closeFriends,
+      currentData, closeFriends, familyMembers,
       registerUser, searchUsersFromSupabase, sendFriendRequest, followBack,
       acceptFriendRequest, rejectFriendRequest, cancelFriendRequest,
-      toggleCloseFriend, removeFriend, unfollowUser, isCloseFriend, isFriend,
+      toggleCloseFriend, toggleFamily, removeFriend, unfollowUser,
+      isCloseFriend, isFamilyMember, isFriend,
       isFollowing, getPendingRequests, getSentRequests, hasPendingRequest,
       refetchUsers, isRefetching,
     ]
