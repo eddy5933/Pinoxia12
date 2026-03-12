@@ -37,6 +37,7 @@ import Colors from "@/constants/colors";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
 import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
+import { Heart } from "lucide-react-native";
 import { useFriends } from "@/providers/FriendsProvider";
 
 import { Restaurant } from "@/types";
@@ -302,6 +303,104 @@ function FriendMarkerWrapper({
   );
 }
 
+function FamilyMarkerView({ member, onLoad }: { member: FriendLocation; onLoad?: () => void }) {
+  const initials = member.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  useEffect(() => {
+    if (!member.avatar && onLoad) {
+      onLoad();
+    }
+  }, [member.avatar, onLoad]);
+
+  return (
+    <View style={familyMarkerStyles.container}>
+      <View style={familyMarkerStyles.label}>
+        <Text style={familyMarkerStyles.labelName} numberOfLines={1}>{member.name}</Text>
+      </View>
+      <View style={familyMarkerStyles.labelArrow} />
+      <View style={familyMarkerStyles.avatarRing}>
+        {member.avatar ? (
+          <RNImage
+            source={{ uri: member.avatar }}
+            style={familyMarkerStyles.avatar}
+            resizeMode="cover"
+            onLoad={onLoad}
+          />
+        ) : (
+          <View style={familyMarkerStyles.avatarFallback}>
+            <Text style={familyMarkerStyles.initials}>{initials}</Text>
+          </View>
+        )}
+        <View style={familyMarkerStyles.onlineDot} />
+      </View>
+    </View>
+  );
+}
+
+function FamilyMarkerWrapper({
+  member,
+  Marker,
+  Callout,
+  onPress,
+}: {
+  member: FriendLocation;
+  Marker: any;
+  Callout: any;
+  onPress?: (member: FriendLocation) => void;
+}) {
+  const [trackChanges, setTrackChanges] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLoad = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setTrackChanges(false);
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    const fallback = setTimeout(() => {
+      setTrackChanges(false);
+    }, 3000);
+    return () => {
+      clearTimeout(fallback);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <Marker
+      coordinate={{ latitude: member.latitude, longitude: member.longitude }}
+      tracksViewChanges={Platform.OS === 'android' ? false : trackChanges}
+      pinColor={Platform.OS === 'android' ? '#9333EA' : undefined}
+      title={Platform.OS === 'android' ? member.name : undefined}
+      onPress={() => {
+        console.log("[MapScreen] Family marker tapped:", member.name);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (onPress) onPress(member);
+      }}
+    >
+      {Platform.OS === 'ios' ? (
+        <FamilyMarkerView member={member} onLoad={handleLoad} />
+      ) : null}
+      <Callout tooltip onPress={() => {
+        console.log("[MapScreen] Family callout tapped:", member.name);
+        if (onPress) onPress(member);
+      }}>
+        <View style={markerStyles.calloutSimple}>
+          <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{member.name}</Text>
+        </View>
+        <View style={markerStyles.calloutArrow} />
+      </Callout>
+    </Marker>
+  );
+}
+
 function NativeMapView({
   restaurants,
   userLocation,
@@ -310,9 +409,11 @@ function NativeMapView({
   distanceMap,
   searchQuery,
   friendLocations,
+  familyLocations,
   focusFriendLocation,
   focusFriendTrigger,
   onFriendMarkerPress,
+  onFamilyMarkerPress,
   onMarkerPress,
   onMapPress,
 }: {
@@ -323,9 +424,11 @@ function NativeMapView({
   distanceMap: Map<string, string>;
   searchQuery: string;
   friendLocations: FriendLocation[];
+  familyLocations: FriendLocation[];
   focusFriendLocation: FriendLocation | null;
   focusFriendTrigger: number;
   onFriendMarkerPress?: (friend: FriendLocation) => void;
+  onFamilyMarkerPress?: (member: FriendLocation) => void;
   onMarkerPress?: (restaurantId: string) => void;
   onMapPress?: () => void;
 }) {
@@ -544,6 +647,9 @@ function NativeMapView({
       {friendLocations.map((fl) => (
         <FriendMarkerWrapper key={`friend-${fl.userId}`} friend={fl} Marker={Marker} Callout={Callout} onPress={onFriendMarkerPress} />
       ))}
+      {familyLocations.map((fl) => (
+        <FamilyMarkerWrapper key={`family-${fl.userId}`} member={fl} Marker={Marker} Callout={Callout} onPress={onFamilyMarkerPress} />
+      ))}
     </MapView>
   );
 }
@@ -618,16 +724,18 @@ function WebMapView({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled } = useLocation();
   const { friends, closeFriends, familyMembers } = useFriends();
 
   const [showFriendLocations, setShowFriendLocations] = useState(true);
+  const [showFamilyLocations, setShowFamilyLocations] = useState(false);
   const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
   const [focusFriendTrigger, setFocusFriendTrigger] = useState(0);
   const sharingPulse = useRef(new Animated.Value(0)).current;
   const shareButtonScale = useRef(new Animated.Value(1)).current;
 
   const friendListRef = useRef<FlatList>(null);
+  const familyListRef = useRef<FlatList>(null);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -781,6 +889,12 @@ export default function MapScreenExport() {
     console.log("[MapScreen] Toggle friend locations visibility");
   }, []);
 
+  const handleToggleFamilyLocations = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowFamilyLocations((prev) => !prev);
+    console.log("[MapScreen] Toggle family locations visibility");
+  }, []);
+
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) {
       console.log("[MapScreen] Friend locations hidden by user toggle");
@@ -789,6 +903,15 @@ export default function MapScreenExport() {
     console.log("[MapScreen] Friend locations to display:", friendLocations.length, friendLocations.map(f => ({ name: f.name, lat: f.latitude, lng: f.longitude })));
     return friendLocations;
   }, [showFriendLocations, friendLocations]);
+
+  const visibleFamilyLocations = useMemo(() => {
+    if (!showFamilyLocations) {
+      console.log("[MapScreen] Family locations hidden by user toggle");
+      return [];
+    }
+    console.log("[MapScreen] Family locations to display:", familyLocations.length, familyLocations.map(f => ({ name: f.name, lat: f.latitude, lng: f.longitude })));
+    return familyLocations;
+  }, [showFamilyLocations, familyLocations]);
 
   const handleFocusFriend = useCallback((friend: FriendLocation) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -808,6 +931,25 @@ export default function MapScreenExport() {
       }
     }
   }, [visibleFriendLocations]);
+
+  const handleFocusFamily = useCallback((member: FriendLocation) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
+    setFocusFriendLocation(member);
+    setFocusFriendTrigger((prev) => prev + 1);
+    setShowFamilyLocations(true);
+    console.log("[MapScreen] Focusing on family member:", member.name, member.latitude, member.longitude);
+    const idx = visibleFamilyLocations.findIndex((f) => f.userId === member.userId);
+    if (idx >= 0 && familyListRef.current) {
+      try {
+        familyListRef.current.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      } catch (e) {
+        console.log("[MapScreen] family scrollToIndex fallback", e);
+        familyListRef.current.scrollToOffset({ offset: idx * 78, animated: true });
+      }
+    }
+  }, [visibleFamilyLocations]);
 
   const handleMapPress = useCallback(() => {
     console.log("[MapScreen] Map pressed, closing dropdown");
@@ -1125,16 +1267,16 @@ export default function MapScreenExport() {
           <TouchableOpacity
             style={[
               styles.familyButton,
-              showFriendLocations && styles.familyButtonActive,
+              showFamilyLocations && styles.familyButtonActive,
             ]}
-            onPress={handleToggleFriendLocations}
+            onPress={handleToggleFamilyLocations}
             activeOpacity={0.7}
             testID="view-family-location-button"
           >
-            <Users size={14} color={showFriendLocations ? Colors.white : Colors.textSecondary} />
+            <Heart size={14} color={showFamilyLocations ? Colors.white : Colors.textSecondary} />
             <Text style={[
               styles.familyText,
-              showFriendLocations && styles.familyTextActive,
+              showFamilyLocations && styles.familyTextActive,
             ]}>
               Family{familyMembers.length > 0 ? ` (${familyMembers.length})` : ""}
             </Text>
@@ -1147,7 +1289,73 @@ export default function MapScreenExport() {
         {showFriendLocations && visibleFriendLocations.length > 0 && (
           <Text style={styles.noFriendsText}>{visibleFriendLocations.length} friend{visibleFriendLocations.length !== 1 ? 's' : ''} on map</Text>
         )}
+        {showFamilyLocations && visibleFamilyLocations.length === 0 && familyLocations.length === 0 && friends.length > 0 && (
+          <Text style={styles.noFriendsText}>No family sharing location</Text>
+        )}
+        {showFamilyLocations && visibleFamilyLocations.length > 0 && (
+          <Text style={styles.noFriendsText}>{visibleFamilyLocations.length} family on map</Text>
+        )}
       </View>
+
+      {showFamilyLocations && visibleFamilyLocations.length > 0 && (
+        <View style={familyListStyles.container}>
+          <View style={familyListStyles.header}>
+            <Heart size={14} color="#A855F7" />
+            <Text style={familyListStyles.headerText}>Family Nearby</Text>
+          </View>
+          <FlatList
+            ref={familyListRef}
+            data={visibleFamilyLocations}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.userId}
+            contentContainerStyle={familyListStyles.listContent}
+            getItemLayout={(_data, index) => ({ length: 78, offset: 78 * index, index })}
+            renderItem={({ item }) => {
+              const dist = userLocation
+                ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
+                : null;
+
+              const initials = item.name
+                .split(" ")
+                .map((w: string) => w[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2);
+              return (
+                <TouchableOpacity
+                  style={[
+                    familyListStyles.card,
+                    focusFriendLocation?.userId === item.userId && familyListStyles.cardActive,
+                  ]}
+                  testID={`family-loc-${item.userId}`}
+                  onPress={() => handleFocusFamily(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={familyListStyles.avatarContainerSmall}>
+                    {item.avatar ? (
+                      <Image source={{ uri: item.avatar }} style={familyListStyles.avatarSmall} contentFit="cover" />
+                    ) : (
+                      <View style={familyListStyles.avatarFallbackSmall}>
+                        <Text style={familyListStyles.avatarInitialsSmall}>{initials}</Text>
+                      </View>
+                    )}
+                    <View style={familyListStyles.onlineBadgeSmall} />
+                  </View>
+                  <View style={familyListStyles.infoSmall}>
+                    <Text style={familyListStyles.nameSmall} numberOfLines={1}>{item.name}</Text>
+                    <View style={familyListStyles.metaRowSmall}>
+                      {dist && (
+                        <Text style={familyListStyles.distTextSmall}>{dist}</Text>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
 
       {showFriendLocations && visibleFriendLocations.length > 0 && (
         <View style={friendListStyles.container}>
@@ -1221,9 +1429,11 @@ export default function MapScreenExport() {
             distanceMap={distanceMap}
             searchQuery={searchQuery}
             friendLocations={visibleFriendLocations}
+            familyLocations={visibleFamilyLocations}
             focusFriendLocation={focusFriendLocation}
             focusFriendTrigger={focusFriendTrigger}
             onFriendMarkerPress={handleFocusFriend}
+            onFamilyMarkerPress={handleFocusFamily}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
           />
@@ -1973,6 +2183,180 @@ const friendMarkerStyles = StyleSheet.create({
     color: "#93C5FD",
     textAlign: "center" as const,
     marginTop: 1,
+  },
+});
+
+const familyMarkerStyles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+  },
+  avatarRing: {
+    width: Platform.OS === 'android' ? 22 : 28,
+    height: Platform.OS === 'android' ? 22 : 28,
+    borderRadius: Platform.OS === 'android' ? 11 : 14,
+    borderWidth: Platform.OS === 'android' ? 1.5 : 2,
+    borderColor: "#A855F7",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    shadowColor: "#A855F7",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  avatar: {
+    width: Platform.OS === 'android' ? 16 : 22,
+    height: Platform.OS === 'android' ? 16 : 22,
+    borderRadius: Platform.OS === 'android' ? 8 : 11,
+  },
+  avatarFallback: {
+    width: Platform.OS === 'android' ? 16 : 22,
+    height: Platform.OS === 'android' ? 16 : 22,
+    borderRadius: Platform.OS === 'android' ? 8 : 11,
+    backgroundColor: "#7E22CE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initials: {
+    fontSize: Platform.OS === 'android' ? 7 : 9,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: -1,
+    right: -2,
+    width: Platform.OS === 'android' ? 6 : 8,
+    height: Platform.OS === 'android' ? 6 : 8,
+    borderRadius: Platform.OS === 'android' ? 3 : 4,
+    backgroundColor: Colors.success,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
+  },
+  label: {
+    backgroundColor: "#3B1A5E",
+    paddingHorizontal: Platform.OS === 'android' ? 4 : 6,
+    paddingVertical: Platform.OS === 'android' ? 1 : 2,
+    borderRadius: Platform.OS === 'android' ? 4 : 5,
+    maxWidth: Platform.OS === 'android' ? 65 : 80,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#A855F7",
+  },
+  labelArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 4,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#3B1A5E",
+    alignSelf: "center" as const,
+    marginBottom: 1,
+  },
+  labelName: {
+    fontSize: Platform.OS === 'android' ? 7 : 8,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    textAlign: "center" as const,
+  },
+});
+
+const familyListStyles = StyleSheet.create({
+  container: {
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  headerText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: "#A855F7",
+    letterSpacing: 0.3,
+  },
+  listContent: {
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  card: {
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: "#3B1A5E",
+    width: 72,
+    gap: 3,
+  },
+  cardActive: {
+    borderColor: "#A855F7",
+    backgroundColor: "rgba(168,85,247,0.15)",
+  },
+  avatarContainerSmall: {
+    position: "relative" as const,
+  },
+  avatarSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#A855F7",
+  },
+  avatarFallbackSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#7E22CE",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#A855F7",
+  },
+  avatarInitialsSmall: {
+    fontSize: 11,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  onlineBadgeSmall: {
+    position: "absolute" as const,
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.success,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
+  },
+  infoSmall: {
+    alignItems: "center",
+    width: "100%" as const,
+  },
+  nameSmall: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    textAlign: "center" as const,
+  },
+  metaRowSmall: {
+    alignItems: "center",
+    marginTop: 1,
+  },
+  distTextSmall: {
+    fontSize: 9,
+    fontWeight: "700" as const,
+    color: "#C084FC",
   },
 });
 

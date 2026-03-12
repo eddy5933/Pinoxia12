@@ -365,7 +365,84 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     refetchInterval: 15000,
   });
 
+  const familyLocationsQuery = useQuery({
+    queryKey: ["family_locations", currentUserId],
+    queryFn: async (): Promise<FriendLocation[]> => {
+      if (!currentUserId) {
+        console.log("[LocationProvider] No currentUserId, skipping family locations");
+        return [];
+      }
+      console.log("[LocationProvider] Fetching family locations for user:", currentUserId);
+
+      const { data: friendRows, error: fErr } = await supabase
+        .from("friends")
+        .select("user_id, is_family")
+        .eq("friend_id", currentUserId);
+
+      if (fErr) {
+        console.warn("[LocationProvider] Family friends query error:", fErr.message);
+        return [];
+      }
+      if (!friendRows || friendRows.length === 0) {
+        console.log("[LocationProvider] No one added me as friend (family check)");
+        return [];
+      }
+
+      const familyIds = friendRows
+        .filter((f: any) => f.is_family === true || f.is_family === "true")
+        .map((f: any) => f.user_id);
+
+      console.log("[LocationProvider] Users who marked me as family:", familyIds, "out of", friendRows.length, "total");
+
+      if (familyIds.length === 0) {
+        console.log("[LocationProvider] No one marked me as family, skipping location fetch");
+        return [];
+      }
+
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled")
+        .in("id", familyIds);
+
+      if (pErr) {
+        console.warn("[LocationProvider] Error fetching family profiles:", pErr.message);
+        return [];
+      }
+
+      if (!profiles || profiles.length === 0) {
+        console.log("[LocationProvider] No profiles found for family IDs.");
+        return [];
+      }
+
+      const now = Date.now();
+      const STALE_MS = 24 * 60 * 60 * 1000;
+      const locations: FriendLocation[] = (profiles ?? [])
+        .filter((p: any) => {
+          const hasCoords = p.latitude != null && p.longitude != null;
+          const sharingOn = p.location_sharing_enabled !== false;
+          const isRecent = !p.location_updated_at || (now - new Date(p.location_updated_at).getTime()) < STALE_MS;
+          return hasCoords && sharingOn && isRecent;
+        })
+        .map((p: any) => ({
+          userId: p.id,
+          name: p.name ?? "Family",
+          avatar: p.avatar ?? undefined,
+          latitude: Number(p.latitude),
+          longitude: Number(p.longitude),
+          placeName: p.location_place_name ?? undefined,
+          updatedAt: p.location_updated_at ?? new Date().toISOString(),
+        }));
+
+      console.log("[LocationProvider] Final family locations:", locations.length, "out of", profiles.length, "profiles");
+      return locations;
+    },
+    enabled: !!currentUserId,
+    staleTime: 10000,
+    refetchInterval: 15000,
+  });
+
   const friendLocations = useMemo(() => friendLocationsQuery.data ?? [], [friendLocationsQuery.data]);
+  const familyLocations = useMemo(() => familyLocationsQuery.data ?? [], [familyLocationsQuery.data]);
 
   return useMemo(
     () => ({
@@ -377,9 +454,11 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       sharingEnabled,
       setSharingEnabled,
       friendLocations,
+      familyLocations,
       friendLocationsLoading: friendLocationsQuery.isLoading,
+      familyLocationsLoading: familyLocationsQuery.isLoading,
     }),
-    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, friendLocations, friendLocationsQuery.isLoading]
+    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading]
   );
 });
 
