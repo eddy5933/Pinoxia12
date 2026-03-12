@@ -724,11 +724,11 @@ function WebMapView({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled } = useLocation();
   const { friends } = useFriends();
 
-  const [showFriendLocations, setShowFriendLocations] = useState(true);
-  const [showFamilyLocations, setShowFamilyLocations] = useState(false);
+  const [showFriendLocations, setShowFriendLocations] = useState(closeFriendSharingEnabled);
+  const [showFamilyLocations, setShowFamilyLocations] = useState(familySharingEnabled);
   const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
   const [focusFriendTrigger, setFocusFriendTrigger] = useState(0);
   const sharingPulse = useRef(new Animated.Value(0)).current;
@@ -885,15 +885,19 @@ export default function MapScreenExport() {
 
   const handleToggleFriendLocations = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowFriendLocations((prev) => !prev);
-    console.log("[MapScreen] Toggle friend locations visibility");
-  }, []);
+    const newVal = !closeFriendSharingEnabled;
+    setCloseFriendSharingEnabled(newVal);
+    setShowFriendLocations(newVal);
+    console.log("[MapScreen] Toggle close friend location sharing:", newVal);
+  }, [closeFriendSharingEnabled, setCloseFriendSharingEnabled]);
 
   const handleToggleFamilyLocations = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowFamilyLocations((prev) => !prev);
-    console.log("[MapScreen] Toggle family locations visibility");
-  }, []);
+    const newVal = !familySharingEnabled;
+    setFamilySharingEnabled(newVal);
+    setShowFamilyLocations(newVal);
+    console.log("[MapScreen] Toggle family location sharing:", newVal);
+  }, [familySharingEnabled, setFamilySharingEnabled]);
 
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) {
@@ -1258,7 +1262,7 @@ export default function MapScreenExport() {
               styles.viewFriendsText,
               showFriendLocations && styles.viewFriendsTextActive,
             ]}>
-              Close Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
+              {closeFriendSharingEnabled ? "Sharing" : "Share"} Close Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
@@ -1278,7 +1282,7 @@ export default function MapScreenExport() {
               styles.familyText,
               showFamilyLocations && styles.familyTextActive,
             ]}>
-              Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
+              {familySharingEnabled ? "Sharing" : "Share"} Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
