@@ -314,6 +314,7 @@ function NativeMapView({
   focusFriendTrigger,
   onFriendMarkerPress,
   onMarkerPress,
+  onMapPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -326,6 +327,7 @@ function NativeMapView({
   focusFriendTrigger: number;
   onFriendMarkerPress?: (friend: FriendLocation) => void;
   onMarkerPress?: (restaurantId: string) => void;
+  onMapPress?: () => void;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -467,6 +469,10 @@ function NativeMapView({
       showsMyLocationButton={false}
       showsCompass={false}
       customMapStyle={brightMapStyle}
+      onPress={() => {
+        console.log("[MapScreen] Map background tapped, closing dropdown");
+        if (onMapPress) onMapPress();
+      }}
     >
       {restaurants.map((r) => {
         const isSearchResult = searchQuery.trim().length > 0;
@@ -659,6 +665,7 @@ export default function MapScreenExport() {
       console.log("[MapScreen] Focused on restaurant:", focusedRestaurant.name);
       setListExpanded(true);
       setShowSuggestions(false);
+      setSearchFocused(false);
       searchInputRef.current?.blur();
     }
   }, [focusedRestaurant]);
@@ -691,9 +698,10 @@ export default function MapScreenExport() {
     (restaurant: Restaurant) => {
       console.log("[MapScreen] Search suggestion selected:", restaurant.name);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setSearchQuery(restaurant.name);
       setShowSuggestions(false);
+      setSearchFocused(false);
       searchInputRef.current?.blur();
+      setSearchQuery(restaurant.name);
       router.replace({ pathname: "/(tabs)/map", params: { focus: restaurant.id } });
     },
     [router]
@@ -800,6 +808,12 @@ export default function MapScreenExport() {
       }
     }
   }, [visibleFriendLocations]);
+
+  const handleMapPress = useCallback(() => {
+    console.log("[MapScreen] Map pressed, closing dropdown");
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
+  }, []);
 
   const handleMarkerPress = useCallback(
     (restaurantId: string) => {
@@ -927,7 +941,6 @@ export default function MapScreenExport() {
             }}
             onBlur={() => {
               setSearchFocused(false);
-              setTimeout(() => setShowSuggestions(false), 200);
             }}
             returnKeyType="search"
             onSubmitEditing={() => setShowSuggestions(false)}
@@ -1192,6 +1205,7 @@ export default function MapScreenExport() {
             focusFriendTrigger={focusFriendTrigger}
             onFriendMarkerPress={handleFocusFriend}
             onMarkerPress={handleMarkerPress}
+            onMapPress={handleMapPress}
           />
         )}
 
