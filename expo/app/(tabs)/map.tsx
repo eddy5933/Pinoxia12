@@ -2131,6 +2131,7 @@ const styles = StyleSheet.create({
   liveLocationRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
+    justifyContent: "center" as const,
     gap: 5,
     flexWrap: "wrap" as const,
   },
