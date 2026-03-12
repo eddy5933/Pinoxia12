@@ -878,7 +878,7 @@ export default function MapScreenExport() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
           <View style={styles.headerIcon}>
-            <MapPin size={18} color={Colors.white} />
+            <MapPin size={14} color={Colors.white} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Explore Map</Text>
@@ -911,7 +911,7 @@ export default function MapScreenExport() {
           ) : (
             <Animated.View style={{ transform: [{ scale: userLocation ? pulseAnim : 1 }] }}>
               <Crosshair
-                size={20}
+                size={16}
                 color={userLocation ? Colors.white : Colors.textSecondary}
               />
             </Animated.View>
@@ -1603,8 +1603,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 6,
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -1612,30 +1612,30 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.white,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.textSecondary,
-    marginTop: 1,
+    marginTop: 0,
   },
   locateButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
@@ -1652,19 +1652,19 @@ const styles = StyleSheet.create({
   locationBanner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     backgroundColor: "rgba(230,57,70,0.1)",
-    gap: 8,
+    gap: 6,
   },
   locationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.success,
   },
   locationText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: "500" as const,
   },
@@ -1687,18 +1687,18 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     backgroundColor: Colors.background,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    gap: 10,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+    gap: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -1708,7 +1708,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.white,
     fontWeight: "500" as const,
     paddingVertical: 0,
@@ -1740,15 +1740,15 @@ const styles = StyleSheet.create({
   },
   toggleBar: {
     alignItems: "center",
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 6,
+    paddingBottom: 4,
   },
   toggleHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 28,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: Colors.textMuted,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   toggleContent: {
     flexDirection: "row",
@@ -1756,33 +1756,33 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   toggleText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
   list: {
-    maxHeight: 300,
+    maxHeight: 180,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+    gap: 8,
   },
   liveLocationRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     backgroundColor: Colors.background,
-    gap: 8,
+    gap: 6,
   },
   shareLocationButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1794,7 +1794,7 @@ const styles = StyleSheet.create({
     borderColor: "#22C55E",
   },
   shareLocationText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
@@ -1821,10 +1821,10 @@ const styles = StyleSheet.create({
   viewFriendsButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1834,7 +1834,7 @@ const styles = StyleSheet.create({
     borderColor: "#3B82F6",
   },
   viewFriendsText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
@@ -1842,7 +1842,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   noFriendsText: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.textMuted,
     fontStyle: "italic" as const,
   },
