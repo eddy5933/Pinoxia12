@@ -380,49 +380,58 @@ function NativeMapView({
         <Marker
           key={r.id}
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
-          pinColor={Colors.primary}
+          tracksViewChanges={false}
           onPress={() => {
-            console.log("[MapScreen] Marker tapped:", r.name);
+            console.log("[MapScreen] Marker tapped:", r.name, r.id);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push(`/restaurant/${r.id}`);
           }}
-          onCalloutPress={() => {
+        >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              console.log("[MapScreen] Marker view tapped:", r.name, r.id);
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push(`/restaurant/${r.id}`);
+            }}
+            style={markerStyles.touchable}
+          >
+            <View style={markerStyles.container}>
+              <View style={[
+                markerStyles.pin,
+                isFocused && markerStyles.pinFocused,
+                isSearchResult && markerStyles.pinSearchResult,
+              ]}>
+                <MapPin size={Platform.OS === 'android' ? 12 : 16} color={Colors.white} />
+              </View>
+              <View style={[
+                markerStyles.pinTail,
+                isSearchResult && markerStyles.pinTailSearch,
+              ]} />
+              <View style={[
+                markerStyles.labelContainer,
+                isSearchResult && markerStyles.labelContainerSearch,
+              ]}>
+                <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
+                {dist && (
+                  <Text style={[
+                    markerStyles.labelDistance,
+                    !isSearchResult && markerStyles.labelDistanceDefault,
+                  ]}>{dist}</Text>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+          <Callout onPress={() => {
             console.log("[MapScreen] Callout pressed, navigating to:", r.name);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push(`/restaurant/${r.id}`);
-          }}
-        >
-          <View style={markerStyles.container}>
-            <View style={[
-              markerStyles.pin,
-              isFocused && markerStyles.pinFocused,
-              isSearchResult && markerStyles.pinSearchResult,
-            ]}>
-              <MapPin size={Platform.OS === 'android' ? 12 : 16} color={Colors.white} />
+          }}>
+            <View style={markerStyles.calloutContainer}>
+              <Text style={markerStyles.calloutTitle} numberOfLines={1}>{r.name}</Text>
+              <Text style={markerStyles.calloutSubtitle}>{r.cuisine ?? 'Place'}{dist ? ` · ${dist}` : ''}</Text>
+              <Text style={markerStyles.calloutAction}>Tap to view details →</Text>
             </View>
-            <View style={[
-              markerStyles.pinTail,
-              isSearchResult && markerStyles.pinTailSearch,
-            ]} />
-            <View style={[
-              markerStyles.labelContainer,
-              isSearchResult && markerStyles.labelContainerSearch,
-            ]}>
-              <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
-              {dist && (
-                <Text style={[
-                  markerStyles.labelDistance,
-                  !isSearchResult && markerStyles.labelDistanceDefault,
-                ]}>{dist}</Text>
-              )}
-            </View>
-          </View>
-          <Callout tooltip>
-            <View style={markerStyles.calloutSimple}>
-              <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{r.name}</Text>
-              <Text style={markerStyles.calloutTapHint}>Tap to view details</Text>
-            </View>
-            <View style={markerStyles.calloutArrow} />
           </Callout>
         </Marker>
         );
@@ -1141,6 +1150,9 @@ const brightMapStyle = [
 ];
 
 const markerStyles = StyleSheet.create({
+  touchable: {
+    alignItems: "center",
+  },
   container: {
     alignItems: "center",
   },
@@ -1233,6 +1245,26 @@ const markerStyles = StyleSheet.create({
   },
   labelDistanceDefault: {
     color: "#FFB4B4",
+  },
+  calloutContainer: {
+    width: 180,
+    padding: 8,
+  },
+  calloutTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: "#1a1a1a",
+  },
+  calloutSubtitle: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  calloutAction: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontWeight: "600" as const,
+    marginTop: 4,
   },
   calloutSimple: {
     backgroundColor: Colors.surface,

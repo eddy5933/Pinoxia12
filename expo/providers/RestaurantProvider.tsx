@@ -14,87 +14,97 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
     queryKey: ["restaurants_load"],
     queryFn: async () => {
       console.log("[RestaurantProvider] Loading data from Supabase...");
-      const [restRes, revRes] = await Promise.all([
-        supabase.from("restaurants").select("*"),
-        supabase.from("reviews").select("*").order("created_at", { ascending: false }),
-      ]);
+      try {
+        const [restRes, revRes] = await Promise.all([
+          supabase.from("restaurants").select("*"),
+          supabase.from("reviews").select("*").order("created_at", { ascending: false }),
+        ]);
 
-      let loadedRestaurants: Restaurant[] = (restRes.data ?? []).map((r: any) => ({
-        id: r.id,
-        ownerId: r.owner_id,
-        name: r.name,
-        description: r.description,
-        cuisine: r.cuisine ?? undefined,
-        photos: r.photos ?? [],
-        address: r.address,
-        latitude: r.latitude,
-        longitude: r.longitude,
-        openingHours: r.opening_hours ?? {
-          monday: "", tuesday: "", wednesday: "", thursday: "",
-          friday: "", saturday: "", sunday: "",
-        },
-        phone: r.phone ?? undefined,
-        rating: r.rating ?? 0,
-        reviewCount: r.review_count ?? 0,
-        priceRange: r.price_range ?? "$$",
-        createdAt: r.created_at,
-      }));
+        if (restRes.error) {
+          console.warn("[RestaurantProvider] Supabase restaurants error:", restRes.error.message);
+          console.log("[RestaurantProvider] Falling back to mock data (", MOCK_RESTAURANTS.length, "restaurants)");
+          return { restaurants: MOCK_RESTAURANTS, reviews: MOCK_REVIEWS };
+        }
 
-      let loadedReviews: Review[] = (revRes.data ?? []).map((rv: any) => ({
-        id: rv.id,
-        restaurantId: rv.restaurant_id,
-        userId: rv.user_id,
-        userName: rv.user_name,
-        rating: rv.rating,
-        comment: rv.comment,
-        createdAt: rv.created_at,
-      }));
-
-      if (loadedRestaurants.length === 0) {
-        console.log("[RestaurantProvider] No restaurants found, seeding mock data...");
-        const inserts = MOCK_RESTAURANTS.map((r) => ({
+        let loadedRestaurants: Restaurant[] = (restRes.data ?? []).map((r: any) => ({
           id: r.id,
-          owner_id: r.ownerId,
+          ownerId: r.owner_id,
           name: r.name,
           description: r.description,
-          cuisine: r.cuisine ?? null,
-          photos: r.photos,
+          cuisine: r.cuisine ?? undefined,
+          photos: r.photos ?? [],
           address: r.address,
           latitude: r.latitude,
           longitude: r.longitude,
-          opening_hours: r.openingHours,
-          phone: r.phone ?? null,
-          rating: r.rating,
-          review_count: r.reviewCount,
-          price_range: r.priceRange,
+          openingHours: r.opening_hours ?? {
+            monday: "", tuesday: "", wednesday: "", thursday: "",
+            friday: "", saturday: "", sunday: "",
+          },
+          phone: r.phone ?? undefined,
+          rating: r.rating ?? 0,
+          reviewCount: r.review_count ?? 0,
+          priceRange: r.price_range ?? "$",
+          createdAt: r.created_at,
         }));
-        const { error: seedError } = await supabase.from("restaurants").insert(inserts);
-        if (seedError) {
-          console.warn("[RestaurantProvider] Seed error:", seedError.message);
-        } else {
-          loadedRestaurants = MOCK_RESTAURANTS;
-        }
 
-        const reviewInserts = MOCK_REVIEWS.map((rv) => ({
+        let loadedReviews: Review[] = (revRes.data ?? []).map((rv: any) => ({
           id: rv.id,
-          restaurant_id: rv.restaurantId,
-          user_id: rv.userId,
-          user_name: rv.userName,
+          restaurantId: rv.restaurant_id,
+          userId: rv.user_id,
+          userName: rv.user_name,
           rating: rv.rating,
           comment: rv.comment,
+          createdAt: rv.created_at,
         }));
-        const { error: revSeedError } = await supabase.from("reviews").insert(reviewInserts);
-        if (revSeedError) {
-          console.warn("[RestaurantProvider] Review seed error:", revSeedError.message);
-        } else {
+
+        if (loadedRestaurants.length === 0) {
+          console.log("[RestaurantProvider] No restaurants found in Supabase, seeding mock data...");
+          const inserts = MOCK_RESTAURANTS.map((r) => ({
+            id: r.id,
+            owner_id: r.ownerId,
+            name: r.name,
+            description: r.description,
+            cuisine: r.cuisine ?? null,
+            photos: r.photos,
+            address: r.address,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            opening_hours: r.openingHours,
+            phone: r.phone ?? null,
+            rating: r.rating,
+            review_count: r.reviewCount,
+            price_range: r.priceRange,
+          }));
+          const { error: seedError } = await supabase.from("restaurants").insert(inserts);
+          if (seedError) {
+            console.warn("[RestaurantProvider] Seed error:", seedError.message, "- using mock data directly");
+          }
+          loadedRestaurants = MOCK_RESTAURANTS;
+
+          const reviewInserts = MOCK_REVIEWS.map((rv) => ({
+            id: rv.id,
+            restaurant_id: rv.restaurantId,
+            user_id: rv.userId,
+            user_name: rv.userName,
+            rating: rv.rating,
+            comment: rv.comment,
+          }));
+          const { error: revSeedError } = await supabase.from("reviews").insert(reviewInserts);
+          if (revSeedError) {
+            console.warn("[RestaurantProvider] Review seed error:", revSeedError.message);
+          }
           loadedReviews = MOCK_REVIEWS;
         }
-      }
 
-      console.log("[RestaurantProvider] Loaded", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
-      return { restaurants: loadedRestaurants, reviews: loadedReviews };
+        console.log("[RestaurantProvider] Loaded", loadedRestaurants.length, "restaurants,", loadedReviews.length, "reviews");
+        return { restaurants: loadedRestaurants, reviews: loadedReviews };
+      } catch (err) {
+        console.warn("[RestaurantProvider] Network/Supabase error, falling back to mock data:", err);
+        return { restaurants: MOCK_RESTAURANTS, reviews: MOCK_REVIEWS };
+      }
     },
     staleTime: 10000,
+    retry: 1,
   });
 
   useEffect(() => {
