@@ -196,7 +196,7 @@ export default function ExploreScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>FoodSpot</Text>
+            <Text style={styles.title}>CatchPin</Text>
             <Text style={styles.subtitle}>Discover shops, restaurants & services</Text>
           </View>
           <TouchableOpacity
