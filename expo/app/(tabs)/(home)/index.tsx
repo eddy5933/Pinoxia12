@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Search, Star, MapPin, Clock, Navigation2, Locate, Map as MapIcon, SlidersHorizontal, MapPinned } from "lucide-react-native";
+import { Search, Star, MapPin, Clock, Navigation2, Locate, Map as MapIcon, SlidersHorizontal } from "lucide-react-native";
+import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -196,17 +197,7 @@ export default function ExploreScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View>
-            <View style={styles.logoRow}>
-              <View style={styles.logoIcon}>
-                <MapPinned size={18} color={Colors.white} />
-              </View>
-              <View>
-                <View style={styles.titleRow}>
-                  <Text style={styles.titleCatch}>Catch</Text>
-                  <Text style={styles.titlePin}>Pin</Text>
-                </View>
-              </View>
-            </View>
+            <PinoxiaLogo size="medium" />
             <Text style={styles.subtitle}>Discover shops, restaurants & services</Text>
           </View>
           <TouchableOpacity
@@ -364,35 +355,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  logoRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
-  titleRow: {
-    flexDirection: "row" as const,
-    alignItems: "baseline" as const,
-  },
-  titleCatch: {
-    fontSize: 28,
-    fontWeight: "800" as const,
-    color: Colors.white,
-    letterSpacing: -0.5,
-  },
-  titlePin: {
-    fontSize: 28,
-    fontWeight: "800" as const,
-    color: Colors.primary,
-    letterSpacing: -0.5,
-  },
+
   subtitle: {
     fontSize: 14,
     color: Colors.textSecondary,
