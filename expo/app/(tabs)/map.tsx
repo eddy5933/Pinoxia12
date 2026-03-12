@@ -667,6 +667,9 @@ export default function MapScreenExport() {
       setShowSuggestions(false);
       setSearchFocused(false);
       searchInputRef.current?.blur();
+      setTimeout(() => {
+        setShowSuggestions(false);
+      }, 100);
     }
   }, [focusedRestaurant]);
 
@@ -698,11 +701,14 @@ export default function MapScreenExport() {
     (restaurant: Restaurant) => {
       console.log("[MapScreen] Search suggestion selected:", restaurant.name);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSearchQuery(restaurant.name);
       setShowSuggestions(false);
       setSearchFocused(false);
       searchInputRef.current?.blur();
-      setSearchQuery(restaurant.name);
-      router.replace({ pathname: "/(tabs)/map", params: { focus: restaurant.id } });
+      setTimeout(() => {
+        setShowSuggestions(false);
+        router.replace({ pathname: "/(tabs)/map", params: { focus: restaurant.id } });
+      }, 50);
     },
     [router]
   );
@@ -793,6 +799,7 @@ export default function MapScreenExport() {
   const handleFocusFriend = useCallback((friend: FriendLocation) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowSuggestions(false);
+    setSearchFocused(false);
     searchInputRef.current?.blur();
     setFocusFriendLocation(friend);
     setFocusFriendTrigger((prev) => prev + 1);
@@ -941,6 +948,9 @@ export default function MapScreenExport() {
             }}
             onBlur={() => {
               setSearchFocused(false);
+              setTimeout(() => {
+                setShowSuggestions(false);
+              }, 200);
             }}
             returnKeyType="search"
             onSubmitEditing={() => setShowSuggestions(false)}
@@ -965,7 +975,7 @@ export default function MapScreenExport() {
         )}
       </View>
 
-      {(showSuggestions && searchSuggestions.length > 0) && (
+      {(showSuggestions && searchFocused && searchSuggestions.length > 0) && (
         <View style={suggestStyles.wrapper}>
         <View style={suggestStyles.container}>
           {searchSuggestions.map((item, index) => {
@@ -1029,7 +1039,7 @@ export default function MapScreenExport() {
         </View>
       )}
 
-      {showSuggestions && searchSuggestions.length === 0 && searchQuery.trim().length > 0 && (
+      {showSuggestions && searchFocused && searchSuggestions.length === 0 && searchQuery.trim().length > 0 && (
         <View style={suggestStyles.wrapper}>
         <View style={suggestStyles.container}>
           <View style={suggestStyles.emptyRow}>
