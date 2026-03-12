@@ -1210,9 +1210,7 @@ export default function MapScreenExport() {
 
       {friends.length > 0 && (
         <View style={styles.liveLocationSection}>
-          <View style={styles.liveLocationGroup}>
-            <Text style={styles.liveGroupLabel}>Share My Location</Text>
-            <View style={styles.liveLocationRow}>
+          <View style={styles.liveLocationRow}>
               <View style={styles.pulseButtonWrapper}>
                 {closeFriendSharingEnabled && (
                   <Animated.View
@@ -1276,12 +1274,36 @@ export default function MapScreenExport() {
                       styles.shareButtonText,
                       closeFriendSharingEnabled && styles.shareButtonTextActive,
                     ]}>
-                      {closeFriendSharingEnabled ? "Sharing" : "Share"} Friends
+                      {closeFriendSharingEnabled ? "Friends" : "Friends"}
                     </Text>
                     {closeFriendSharingEnabled && <View style={styles.liveDotBlue} />}
                   </TouchableOpacity>
                 </Animated.View>
               </View>
+
+              <View style={styles.viewMapButtonSeparator} />
+
+              <TouchableOpacity
+                style={[
+                  styles.viewMapButton,
+                  showFriendLocations && styles.viewMapButtonActiveBlue,
+                ]}
+                onPress={handleToggleViewFriends}
+                activeOpacity={0.7}
+                testID="view-friends-location-button"
+              >
+                {showFriendLocations ? (
+                  <Eye size={12} color={Colors.white} />
+                ) : (
+                  <EyeOff size={12} color={Colors.textSecondary} />
+                )}
+                <Text style={[
+                  styles.viewMapButtonText,
+                  showFriendLocations && styles.viewMapButtonTextActive,
+                ]}>
+                  Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
+                </Text>
+              </TouchableOpacity>
 
               <View style={styles.pulseButtonWrapper}>
                 {familySharingEnabled && (
@@ -1346,41 +1368,14 @@ export default function MapScreenExport() {
                       styles.shareButtonText,
                       familySharingEnabled && styles.shareButtonTextActive,
                     ]}>
-                      {familySharingEnabled ? "Sharing" : "Share"} Family
+                      {familySharingEnabled ? "Family" : "Family"}
                     </Text>
                     {familySharingEnabled && <View style={styles.liveDotPurple} />}
                   </TouchableOpacity>
                 </Animated.View>
               </View>
-            </View>
-          </View>
 
-          <View style={styles.viewDivider} />
-
-          <View style={styles.liveLocationGroup}>
-            <Text style={styles.viewGroupLabel}>View on Map</Text>
-            <View style={styles.liveLocationRow}>
-              <TouchableOpacity
-                style={[
-                  styles.viewMapButton,
-                  showFriendLocations && styles.viewMapButtonActiveBlue,
-                ]}
-                onPress={handleToggleViewFriends}
-                activeOpacity={0.7}
-                testID="view-friends-location-button"
-              >
-                {showFriendLocations ? (
-                  <Eye size={12} color={Colors.white} />
-                ) : (
-                  <EyeOff size={12} color={Colors.textSecondary} />
-                )}
-                <Text style={[
-                  styles.viewMapButtonText,
-                  showFriendLocations && styles.viewMapButtonTextActive,
-                ]}>
-                  Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.viewMapButtonSeparator} />
 
               <TouchableOpacity
                 style={[
@@ -1404,7 +1399,6 @@ export default function MapScreenExport() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
         </View>
       )}
 
@@ -2115,40 +2109,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
-    gap: 8,
-  },
-  liveLocationGroup: {
-    flex: 1,
-  },
-  liveGroupLabel: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#10B981",
-    letterSpacing: 0.5,
-    textTransform: "uppercase" as const,
-    marginBottom: 5,
-  },
-  viewGroupLabel: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#60A5FA",
-    letterSpacing: 0.5,
-    textTransform: "uppercase" as const,
-    marginBottom: 5,
-  },
-  viewDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    alignSelf: "stretch" as const,
-    marginVertical: 2,
   },
   liveLocationRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 5,
     flexWrap: "wrap" as const,
+  },
+  viewMapButtonSeparator: {
+    width: 1,
+    height: 20,
+    backgroundColor: Colors.border,
   },
   shareButton: {
     flexDirection: "row" as const,
