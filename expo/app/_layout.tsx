@@ -136,8 +136,8 @@ const splashStyles = StyleSheet.create({
     gap: 14,
   },
   splashLogo: {
-    width: 90,
-    height: 90,
+    width: 120,
+    height: 120,
     marginBottom: 4,
   },
   titleRow: {

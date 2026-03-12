@@ -9,8 +9,8 @@ interface PinoxiaLogoProps {
 }
 
 export default function PinoxiaLogo({ size = "medium", showText = true }: PinoxiaLogoProps) {
-  const imageSize = size === "small" ? 28 : size === "large" ? 64 : 36;
-  const fontSize = size === "small" ? 20 : size === "large" ? 36 : 28;
+  const imageSize = size === "small" ? 38 : size === "large" ? 80 : 48;
+  const fontSize = size === "small" ? 22 : size === "large" ? 40 : 30;
 
   return (
     <View style={styles.row}>

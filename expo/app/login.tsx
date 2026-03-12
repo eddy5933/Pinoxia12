@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   brandLogo: {
-    width: 70,
-    height: 70,
+    width: 96,
+    height: 96,
     marginBottom: 8,
   },
   brandTitleRow: {
