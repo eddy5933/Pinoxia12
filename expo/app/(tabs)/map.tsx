@@ -1369,12 +1369,8 @@ export default function MapScreenExport() {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.userId}
             contentContainerStyle={familyListStyles.listContent}
-            getItemLayout={(_data, index) => ({ length: 78, offset: 78 * index, index })}
+            getItemLayout={(_data, index) => ({ length: 40, offset: 40 * index, index })}
             renderItem={({ item }) => {
-              const dist = userLocation
-                ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
-                : null;
-
               const initials = item.name
                 .split(" ")
                 .map((w: string) => w[0])
@@ -1401,14 +1397,7 @@ export default function MapScreenExport() {
                     )}
                     <View style={familyListStyles.onlineBadgeSmall} />
                   </View>
-                  <View style={familyListStyles.infoSmall}>
-                    <Text style={familyListStyles.nameSmall} numberOfLines={1}>{item.name}</Text>
-                    <View style={familyListStyles.metaRowSmall}>
-                      {dist && (
-                        <Text style={familyListStyles.distTextSmall}>{dist}</Text>
-                      )}
-                    </View>
-                  </View>
+                  <Text style={familyListStyles.nameSmall} numberOfLines={1}>{item.name.split(' ')[0]}</Text>
                 </TouchableOpacity>
               );
             }}
@@ -1429,12 +1418,8 @@ export default function MapScreenExport() {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.userId}
             contentContainerStyle={friendListStyles.listContent}
-            getItemLayout={(_data, index) => ({ length: 78, offset: 78 * index, index })}
+            getItemLayout={(_data, index) => ({ length: 40, offset: 40 * index, index })}
             renderItem={({ item }) => {
-              const dist = userLocation
-                ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude))
-                : null;
-
               const initials = item.name
                 .split(" ")
                 .map((w: string) => w[0])
@@ -1461,14 +1446,7 @@ export default function MapScreenExport() {
                     )}
                     <View style={friendListStyles.onlineBadgeSmall} />
                   </View>
-                  <View style={friendListStyles.infoSmall}>
-                    <Text style={friendListStyles.nameSmall} numberOfLines={1}>{item.name}</Text>
-                    <View style={friendListStyles.metaRowSmall}>
-                      {dist && (
-                        <Text style={friendListStyles.distTextSmall}>{dist}</Text>
-                      )}
-                    </View>
-                  </View>
+                  <Text style={friendListStyles.nameSmall} numberOfLines={1}>{item.name.split(' ')[0]}</Text>
                 </TouchableOpacity>
               );
             }}
@@ -2460,35 +2438,35 @@ const familyListStyles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 4,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 3,
   },
   headerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700" as const,
     color: "#A855F7",
     letterSpacing: 0.3,
   },
   listContent: {
-    paddingHorizontal: 8,
-    gap: 6,
+    paddingHorizontal: 4,
+    gap: 3,
   },
   card: {
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 6,
+    borderRadius: 8,
+    padding: 3,
     borderWidth: 1,
     borderColor: "#3B1A5E",
-    width: 72,
-    gap: 3,
+    width: 36,
+    gap: 2,
   },
   cardActive: {
     borderColor: "#A855F7",
@@ -2498,24 +2476,24 @@ const familyListStyles = StyleSheet.create({
     position: "relative" as const,
   },
   avatarSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
     borderColor: "#A855F7",
   },
   avatarFallbackSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#7E22CE",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#A855F7",
   },
   avatarInitialsSmall: {
-    fontSize: 11,
+    fontSize: 8,
     fontWeight: "800" as const,
     color: Colors.white,
   },
@@ -2523,31 +2501,19 @@ const familyListStyles = StyleSheet.create({
     position: "absolute" as const,
     bottom: -1,
     right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: Colors.success,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: Colors.surface,
   },
-  infoSmall: {
-    alignItems: "center",
-    width: "100%" as const,
-  },
   nameSmall: {
-    fontSize: 10,
+    fontSize: 7,
     fontWeight: "700" as const,
     color: Colors.white,
     textAlign: "center" as const,
-  },
-  metaRowSmall: {
-    alignItems: "center",
-    marginTop: 1,
-  },
-  distTextSmall: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#C084FC",
+    width: 30,
   },
 });
 
@@ -2556,35 +2522,35 @@ const friendListStyles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 4,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 3,
   },
   headerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700" as const,
     color: "#3B82F6",
     letterSpacing: 0.3,
   },
   listContent: {
-    paddingHorizontal: 8,
-    gap: 6,
+    paddingHorizontal: 4,
+    gap: 3,
   },
   card: {
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 6,
+    borderRadius: 8,
+    padding: 3,
     borderWidth: 1,
     borderColor: "#1E3A5F",
-    width: 72,
-    gap: 3,
+    width: 36,
+    gap: 2,
   },
   cardActive: {
     borderColor: "#3B82F6",
@@ -2594,24 +2560,24 @@ const friendListStyles = StyleSheet.create({
     position: "relative" as const,
   },
   avatarSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
     borderColor: "#3B82F6",
   },
   avatarFallbackSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: "#1E40AF",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#3B82F6",
   },
   avatarInitialsSmall: {
-    fontSize: 11,
+    fontSize: 8,
     fontWeight: "800" as const,
     color: Colors.white,
   },
@@ -2619,31 +2585,19 @@ const friendListStyles = StyleSheet.create({
     position: "absolute" as const,
     bottom: -1,
     right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: Colors.success,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: Colors.surface,
   },
-  infoSmall: {
-    alignItems: "center",
-    width: "100%" as const,
-  },
   nameSmall: {
-    fontSize: 10,
+    fontSize: 7,
     fontWeight: "700" as const,
     color: Colors.white,
     textAlign: "center" as const,
-  },
-  metaRowSmall: {
-    alignItems: "center",
-    marginTop: 1,
-  },
-  distTextSmall: {
-    fontSize: 9,
-    fontWeight: "700" as const,
-    color: "#60A5FA",
+    width: 30,
   },
 });
 
