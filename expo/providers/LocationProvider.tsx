@@ -62,6 +62,8 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [sharingEnabled, setSharingEnabled] = useState(true);
+  const [sharingToCloseFriends, setSharingToCloseFriends] = useState(true);
+  const [sharingToFamily, setSharingToFamily] = useState(true);
   const shareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const requestLocation = useCallback(async () => {
@@ -190,9 +192,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     void requestLocation();
   }, [requestLocation]);
 
-  const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
+  const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean, toCloseFriends: boolean, toFamily: boolean) => {
     try {
-      console.log("[LocationProvider] Sharing location to Supabase for user:", userId, "enabled:", sharing, "coords:", loc.latitude, loc.longitude);
+      console.log("[LocationProvider] Sharing location to Supabase for user:", userId, "enabled:", sharing, "closeFriends:", toCloseFriends, "family:", toFamily, "coords:", loc.latitude, loc.longitude);
       const { data, error } = await supabase
         .from("profiles")
         .update({
@@ -201,6 +203,8 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           location_place_name: loc.placeName ?? null,
           location_updated_at: new Date().toISOString(),
           location_sharing_enabled: sharing,
+          sharing_to_close_friends: toCloseFriends,
+          sharing_to_family: toFamily,
         })
         .eq("id", userId)
         .select();
@@ -223,7 +227,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     if (!currentUserId || !userLocation) return;
 
     if (sharingEnabled) {
-      void shareLocationToSupabase(userLocation, currentUserId, true);
+      void shareLocationToSupabase(userLocation, currentUserId, true, sharingToCloseFriends, sharingToFamily);
     } else {
       void supabase
         .from("profiles")
@@ -233,6 +237,8 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           longitude: null,
           location_place_name: null,
           location_updated_at: new Date().toISOString(),
+          sharing_to_close_friends: false,
+          sharing_to_family: false,
         })
         .eq("id", currentUserId)
         .then(({ error }) => {
@@ -247,7 +253,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     if (sharingEnabled) {
       shareIntervalRef.current = setInterval(() => {
         if (userLocation && currentUserId && sharingEnabled) {
-          void shareLocationToSupabase(userLocation, currentUserId, true);
+          void shareLocationToSupabase(userLocation, currentUserId, true, sharingToCloseFriends, sharingToFamily);
         }
       }, 30000);
     }
@@ -257,7 +263,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         clearInterval(shareIntervalRef.current);
       }
     };
-  }, [currentUserId, userLocation, sharingEnabled, shareLocationToSupabase]);
+  }, [currentUserId, userLocation, sharingEnabled, sharingToCloseFriends, sharingToFamily, shareLocationToSupabase]);
 
   const friendLocationsQuery = useQuery({
     queryKey: ["friend_locations", currentUserId],
@@ -301,7 +307,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled")
+        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled, sharing_to_close_friends")
         .in("id", closeFriendIds);
 
       console.log("[LocationProvider] Profiles query result:", {
@@ -333,11 +339,13 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         .filter((p: any) => {
           const hasCoords = p.latitude != null && p.longitude != null;
           const sharingOn = p.location_sharing_enabled !== false;
+          const sharingToFriends = p.sharing_to_close_friends !== false;
           const isRecent = !p.location_updated_at || (now - new Date(p.location_updated_at).getTime()) < STALE_MS;
 
           console.log("[LocationProvider] Filter check for", p.name, ":", {
             hasCoords,
             sharingOn,
+            sharingToFriends,
             isRecent,
             lat: p.latitude,
             lng: p.longitude,
@@ -345,7 +353,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
             updatedAt: p.location_updated_at,
           });
 
-          return hasCoords && sharingOn && isRecent;
+          return hasCoords && sharingOn && sharingToFriends && isRecent;
         })
         .map((p: any) => ({
           userId: p.id,
@@ -401,7 +409,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled")
+        .select("id, name, avatar, latitude, longitude, location_place_name, location_updated_at, location_sharing_enabled, sharing_to_family")
         .in("id", familyIds);
 
       if (pErr) {
@@ -420,8 +428,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         .filter((p: any) => {
           const hasCoords = p.latitude != null && p.longitude != null;
           const sharingOn = p.location_sharing_enabled !== false;
+          const sharingToFam = p.sharing_to_family !== false;
           const isRecent = !p.location_updated_at || (now - new Date(p.location_updated_at).getTime()) < STALE_MS;
-          return hasCoords && sharingOn && isRecent;
+          return hasCoords && sharingOn && sharingToFam && isRecent;
         })
         .map((p: any) => ({
           userId: p.id,
@@ -453,12 +462,16 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       setLocationUser,
       sharingEnabled,
       setSharingEnabled,
+      sharingToCloseFriends,
+      setSharingToCloseFriends,
+      sharingToFamily,
+      setSharingToFamily,
       friendLocations,
       familyLocations,
       friendLocationsLoading: friendLocationsQuery.isLoading,
       familyLocationsLoading: familyLocationsQuery.isLoading,
     }),
-    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading]
+    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, sharingToCloseFriends, sharingToFamily, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading]
   );
 });
 

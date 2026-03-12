@@ -724,11 +724,11 @@ function WebMapView({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled, sharingToCloseFriends, setSharingToCloseFriends, sharingToFamily, setSharingToFamily } = useLocation();
   const { friends } = useFriends();
 
-  const [showFriendLocations, setShowFriendLocations] = useState(true);
-  const [showFamilyLocations, setShowFamilyLocations] = useState(false);
+  const [showFriendLocations, setShowFriendLocations] = useState(sharingToCloseFriends);
+  const [showFamilyLocations, setShowFamilyLocations] = useState(sharingToFamily);
   const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
   const [focusFriendTrigger, setFocusFriendTrigger] = useState(0);
   const sharingPulse = useRef(new Animated.Value(0)).current;
@@ -885,15 +885,19 @@ export default function MapScreenExport() {
 
   const handleToggleFriendLocations = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowFriendLocations((prev) => !prev);
-    console.log("[MapScreen] Toggle friend locations visibility");
-  }, []);
+    const newVal = !sharingToCloseFriends;
+    setSharingToCloseFriends(newVal);
+    setShowFriendLocations(newVal);
+    console.log("[MapScreen] Toggle sharing to close friends:", newVal);
+  }, [sharingToCloseFriends, setSharingToCloseFriends]);
 
   const handleToggleFamilyLocations = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowFamilyLocations((prev) => !prev);
-    console.log("[MapScreen] Toggle family locations visibility");
-  }, []);
+    const newVal = !sharingToFamily;
+    setSharingToFamily(newVal);
+    setShowFamilyLocations(newVal);
+    console.log("[MapScreen] Toggle sharing to family:", newVal);
+  }, [sharingToFamily, setSharingToFamily]);
 
   const visibleFriendLocations = useMemo(() => {
     if (!showFriendLocations) {
@@ -1243,20 +1247,20 @@ export default function MapScreenExport() {
           <TouchableOpacity
             style={[
               styles.viewFriendsButton,
-              showFriendLocations && styles.viewFriendsButtonActive,
+              sharingToCloseFriends && styles.viewFriendsButtonActive,
             ]}
             onPress={handleToggleFriendLocations}
             activeOpacity={0.7}
             testID="view-friends-location-button"
           >
-            {showFriendLocations ? (
+            {sharingToCloseFriends ? (
               <Eye size={14} color={Colors.white} />
             ) : (
               <EyeOff size={14} color={Colors.textSecondary} />
             )}
             <Text style={[
               styles.viewFriendsText,
-              showFriendLocations && styles.viewFriendsTextActive,
+              sharingToCloseFriends && styles.viewFriendsTextActive,
             ]}>
               Close Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
             </Text>
@@ -1267,16 +1271,16 @@ export default function MapScreenExport() {
           <TouchableOpacity
             style={[
               styles.familyButton,
-              showFamilyLocations && styles.familyButtonActive,
+              sharingToFamily && styles.familyButtonActive,
             ]}
             onPress={handleToggleFamilyLocations}
             activeOpacity={0.7}
             testID="view-family-location-button"
           >
-            <Heart size={14} color={showFamilyLocations ? Colors.white : Colors.textSecondary} />
+            <Heart size={14} color={sharingToFamily ? Colors.white : Colors.textSecondary} />
             <Text style={[
               styles.familyText,
-              showFamilyLocations && styles.familyTextActive,
+              sharingToFamily && styles.familyTextActive,
             ]}>
               Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
             </Text>
