@@ -28,7 +28,8 @@ import {
   Eye,
   EyeOff,
   Users,
-
+  Store,
+  UtensilsCrossed,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -645,7 +646,7 @@ export default function MapScreenExport() {
   const [listExpanded, setListExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const router = useRouter();
   const { focus } = useLocalSearchParams<{ focus?: string }>();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -663,6 +664,7 @@ export default function MapScreenExport() {
     if (focusedRestaurant) {
       console.log("[MapScreen] Focused on restaurant:", focusedRestaurant.name);
       setListExpanded(true);
+      setShowSuggestions(false);
       setSearchFocused(false);
       searchInputRef.current?.blur();
     }
@@ -679,12 +681,35 @@ export default function MapScreenExport() {
     );
   }, [restaurants, searchQuery]);
 
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 1) return [];
+    const q = searchQuery.toLowerCase();
+    return restaurants
+      .filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.cuisine ?? "").toLowerCase().includes(q) ||
+          r.address.toLowerCase().includes(q)
+      )
+      .slice(0, 6);
+  }, [restaurants, searchQuery]);
 
-
-
+  const handleSelectSuggestion = useCallback(
+    (restaurant: Restaurant) => {
+      console.log("[MapScreen] Search suggestion selected:", restaurant.name);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setShowSuggestions(false);
+      setSearchFocused(false);
+      searchInputRef.current?.blur();
+      setSearchQuery(restaurant.name);
+      router.replace({ pathname: "/(tabs)/map", params: { focus: restaurant.id } });
+    },
+    [router]
+  );
 
   const clearSearch = useCallback(() => {
     setSearchQuery("");
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
   }, []);
 
@@ -767,7 +792,7 @@ export default function MapScreenExport() {
 
   const handleFocusFriend = useCallback((friend: FriendLocation) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSearchFocused(false);
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
     setFocusFriendLocation(friend);
     setFocusFriendTrigger((prev) => prev + 1);
@@ -785,7 +810,8 @@ export default function MapScreenExport() {
   }, [visibleFriendLocations]);
 
   const handleMapPress = useCallback(() => {
-    console.log("[MapScreen] Map pressed");
+    console.log("[MapScreen] Map pressed, closing dropdown");
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
   }, []);
 
@@ -793,6 +819,7 @@ export default function MapScreenExport() {
     (restaurantId: string) => {
       console.log("[MapScreen] Marker pressed:", restaurantId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowSuggestions(false);
       searchInputRef.current?.blur();
       const place = restaurants.find((r) => r.id === restaurantId) ?? null;
       setSelectedPlace(place);
@@ -820,6 +847,7 @@ export default function MapScreenExport() {
   const handleNavigateToPlace = useCallback((place: Restaurant) => {
     console.log("[MapScreen] Navigate to place:", place.name);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
     openNavigation(place.latitude, place.longitude, place.name);
   }, []);
@@ -827,6 +855,7 @@ export default function MapScreenExport() {
   const handleViewDetails = useCallback((place: Restaurant) => {
     console.log("[MapScreen] View details:", place.name);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
     setSelectedPlace(null);
     router.push(`/restaurant/${place.id}`);
@@ -834,6 +863,7 @@ export default function MapScreenExport() {
 
   const toggleList = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowSuggestions(false);
     searchInputRef.current?.blur();
     setListExpanded((prev) => !prev);
   }, []);
@@ -903,14 +933,17 @@ export default function MapScreenExport() {
             value={searchQuery}
             onChangeText={(text) => {
               setSearchQuery(text);
+              setShowSuggestions(text.trim().length > 0);
             }}
             onFocus={() => {
               setSearchFocused(true);
+              if (searchQuery.trim().length > 0) setShowSuggestions(true);
             }}
             onBlur={() => {
               setSearchFocused(false);
             }}
             returnKeyType="search"
+            onSubmitEditing={() => setShowSuggestions(false)}
             testID="map-search-input"
           />
           {searchQuery.length > 0 && (
@@ -925,14 +958,87 @@ export default function MapScreenExport() {
             </TouchableOpacity>
           )}
         </View>
-        {searchQuery.trim().length > 0 && (
+        {searchQuery.trim().length > 0 && !showSuggestions && (
           <Text style={styles.searchResultCount}>
             {filteredRestaurants.length} result{filteredRestaurants.length !== 1 ? "s" : ""} found
           </Text>
         )}
       </View>
 
+      {(showSuggestions && searchSuggestions.length > 0) && (
+        <View style={suggestStyles.wrapper}>
+        <View style={suggestStyles.container}>
+          {searchSuggestions.map((item, index) => {
+            const dist = distanceMap.get(item.id) ?? null;
+            const isShop = (item.cuisine ?? "").toLowerCase().includes("shop") ||
+              (item.cuisine ?? "").toLowerCase().includes("store") ||
+              (item.cuisine ?? "").toLowerCase().includes("retail") ||
+              (item.cuisine ?? "").toLowerCase().includes("market") ||
+              (item.cuisine ?? "").toLowerCase().includes("grocery") ||
+              (item.cuisine ?? "").toLowerCase().includes("supermarket") ||
+              (item.cuisine ?? "").toLowerCase().includes("mall") ||
+              (item.cuisine ?? "").toLowerCase().includes("electronics") ||
+              (item.cuisine ?? "").toLowerCase().includes("fashion") ||
+              (item.cuisine ?? "").toLowerCase().includes("convenience");
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  suggestStyles.item,
+                  index < searchSuggestions.length - 1 && suggestStyles.itemBorder,
+                ]}
+                onPress={() => handleSelectSuggestion(item)}
+                activeOpacity={0.7}
+                testID={`search-suggestion-${item.id}`}
+              >
+                <View style={[suggestStyles.iconWrap, isShop && suggestStyles.iconWrapShop]}>
+                  {isShop ? (
+                    <Store size={14} color="#F59E0B" />
+                  ) : (
+                    <UtensilsCrossed size={14} color={Colors.primary} />
+                  )}
+                </View>
+                <View style={suggestStyles.info}>
+                  <Text style={suggestStyles.name} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <View style={suggestStyles.metaRow}>
+                    <Text style={suggestStyles.cuisine} numberOfLines={1}>
+                      {item.cuisine ?? "Place"}
+                    </Text>
+                    {dist && (
+                      <>
+                        <View style={suggestStyles.dot} />
+                        <Text style={suggestStyles.distance}>{dist}</Text>
+                      </>
+                    )}
+                  </View>
+                </View>
+                <Navigation size={12} color={Colors.textMuted} />
+              </TouchableOpacity>
+            );
+          })}
+          {filteredRestaurants.length > 6 && (
+            <View style={suggestStyles.moreRow}>
+              <Text style={suggestStyles.moreText}>
+                +{filteredRestaurants.length - 6} more results
+              </Text>
+            </View>
+          )}
+        </View>
+        </View>
+      )}
 
+      {showSuggestions && searchSuggestions.length === 0 && searchQuery.trim().length > 0 && (
+        <View style={suggestStyles.wrapper}>
+        <View style={suggestStyles.container}>
+          <View style={suggestStyles.emptyRow}>
+            <Search size={16} color={Colors.textMuted} />
+            <Text style={suggestStyles.emptyText}>No places found for "{searchQuery}"</Text>
+          </View>
+        </View>
+        </View>
+      )}
 
       {userLocation && (
         <View style={styles.locationBanner}>
@@ -2169,4 +2275,101 @@ const selectedCardStyles = StyleSheet.create({
   },
 });
 
-
+const suggestStyles = StyleSheet.create({
+  wrapper: {
+    zIndex: 999,
+    position: "relative" as const,
+  },
+  container: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 20,
+    overflow: "hidden" as const,
+  },
+  item: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  itemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "rgba(230,57,70,0.15)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  iconWrapShop: {
+    backgroundColor: "rgba(245,158,11,0.15)",
+  },
+  info: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  metaRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 2,
+  },
+  cuisine: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: "500" as const,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+  distance: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontWeight: "600" as const,
+  },
+  moreRow: {
+    paddingVertical: 10,
+    alignItems: "center" as const,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  moreText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: "500" as const,
+  },
+  emptyRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 20,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontWeight: "500" as const,
+  },
+});
