@@ -619,7 +619,7 @@ export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, sharingEnabled, setSharingEnabled } = useLocation();
-  const { friends, closeFriends } = useFriends();
+  const { friends, closeFriends, familyMembers } = useFriends();
 
   const [showFriendLocations, setShowFriendLocations] = useState(true);
   const [focusFriendLocation, setFocusFriendLocation] = useState<FriendLocation | null>(null);
@@ -1117,6 +1117,26 @@ export default function MapScreenExport() {
               showFriendLocations && styles.viewFriendsTextActive,
             ]}>
               Close Friends{closeFriends.length > 0 ? ` (${closeFriends.length})` : ""}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {friends.length > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.familyButton,
+              showFriendLocations && styles.familyButtonActive,
+            ]}
+            onPress={handleToggleFriendLocations}
+            activeOpacity={0.7}
+            testID="view-family-location-button"
+          >
+            <Users size={14} color={showFriendLocations ? Colors.white : Colors.textSecondary} />
+            <Text style={[
+              styles.familyText,
+              showFriendLocations && styles.familyTextActive,
+            ]}>
+              Family{familyMembers.length > 0 ? ` (${familyMembers.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
@@ -1839,6 +1859,29 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   viewFriendsTextActive: {
+    color: Colors.white,
+  },
+  familyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  familyButtonActive: {
+    backgroundColor: "#9333EA",
+    borderColor: "#A855F7",
+  },
+  familyText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  familyTextActive: {
     color: Colors.white,
   },
   noFriendsText: {
