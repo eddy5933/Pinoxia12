@@ -11,6 +11,7 @@ import {
   TextInput,
   Image as RNImage,
   Linking,
+  ActionSheetIOS,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -50,18 +51,54 @@ const DEFAULT_REGION = {
 function openNavigation(latitude: number, longitude: number, name: string) {
   const encodedName = encodeURIComponent(name);
   console.log('[MapScreen] Opening navigation to:', name, latitude, longitude);
+
+  const appleMapsUrl = `maps:0,0?q=${encodedName}&ll=${latitude},${longitude}&dirflg=d`;
+  const googleMapsUrl = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
+  const wazeUrl = `waze://?ll=${latitude},${longitude}&navigate=yes`;
+
   if (Platform.OS === 'ios') {
-    const appleMapsUrl = `maps:0,0?q=${encodedName}&ll=${latitude},${longitude}&dirflg=d`;
-    const googleMapsUrl = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
-    void Linking.canOpenURL(googleMapsUrl).then((supported) => {
-      if (supported) {
-        void Linking.openURL(googleMapsUrl);
-      } else {
-        void Linking.openURL(appleMapsUrl);
+    const checkApps = async () => {
+      const options: string[] = ['Apple Maps'];
+      const urls: string[] = [appleMapsUrl];
+
+      try {
+        const hasGoogle = await Linking.canOpenURL(googleMapsUrl);
+        if (hasGoogle) {
+          options.push('Google Maps');
+          urls.push(googleMapsUrl);
+        }
+      } catch (e) {
+        console.log('[MapScreen] Google Maps check failed:', e);
       }
-    }).catch(() => {
-      void Linking.openURL(appleMapsUrl);
-    });
+
+      try {
+        const hasWaze = await Linking.canOpenURL(wazeUrl);
+        if (hasWaze) {
+          options.push('Waze');
+          urls.push(wazeUrl);
+        }
+      } catch (e) {
+        console.log('[MapScreen] Waze check failed:', e);
+      }
+
+      options.push('Cancel');
+
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: options.length - 1,
+          title: 'Open in...',
+          message: `Navigate to ${name}`,
+        },
+        (buttonIndex) => {
+          if (buttonIndex < urls.length) {
+            console.log('[MapScreen] Opening navigation app:', options[buttonIndex]);
+            void Linking.openURL(urls[buttonIndex]);
+          }
+        }
+      );
+    };
+    void checkApps();
   } else if (Platform.OS === 'android') {
     const url = `google.navigation:q=${latitude},${longitude}`;
     void Linking.canOpenURL(url).then((supported) => {
