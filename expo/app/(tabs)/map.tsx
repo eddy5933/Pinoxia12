@@ -29,6 +29,7 @@ import {
   Users,
   Store,
   UtensilsCrossed,
+  Radio,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -1269,7 +1270,7 @@ export default function MapScreenExport() {
                     activeOpacity={0.7}
                     testID="share-friends-button"
                   >
-                    <Users size={12} color={closeFriendSharingEnabled ? Colors.white : Colors.textSecondary} />
+                    <Radio size={12} color={closeFriendSharingEnabled ? Colors.white : Colors.textSecondary} />
                     <Text style={[
                       styles.shareButtonText,
                       closeFriendSharingEnabled && styles.shareButtonTextActive,
@@ -1339,7 +1340,7 @@ export default function MapScreenExport() {
                     activeOpacity={0.7}
                     testID="share-family-button"
                   >
-                    <Heart size={12} color={familySharingEnabled ? Colors.white : Colors.textSecondary} />
+                    <Radio size={12} color={familySharingEnabled ? Colors.white : Colors.textSecondary} />
                     <Text style={[
                       styles.shareButtonText,
                       familySharingEnabled && styles.shareButtonTextActive,
@@ -2081,22 +2082,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "rgba(30,30,30,0.85)",
+    backgroundColor: "rgba(30,30,30,0.45)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.08)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 3,
   },
   mapOverlayBtnActiveBlue: {
-    backgroundColor: "rgba(37,99,235,0.9)",
-    borderColor: "#3B82F6",
+    backgroundColor: "rgba(37,99,235,0.5)",
+    borderColor: "rgba(59,130,246,0.6)",
   },
   mapOverlayBtnActivePurple: {
-    backgroundColor: "rgba(147,51,234,0.9)",
-    borderColor: "#A855F7",
+    backgroundColor: "rgba(147,51,234,0.5)",
+    borderColor: "rgba(168,85,247,0.6)",
   },
   mapOverlayBtnText: {
     fontSize: 11,
