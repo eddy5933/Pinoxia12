@@ -1208,29 +1208,6 @@ export default function MapScreenExport() {
         </TouchableOpacity>
       )}
 
-      {friends.length > 0 && (closeFriendSharingEnabled || familySharingEnabled) && (
-        <View style={styles.sharingToColumn}>
-          <View style={styles.sharingToLabelRow}>
-            <View style={styles.sharingToDot} />
-            <Text style={styles.sharingToLabel}>Sharing location to:</Text>
-          </View>
-          <View style={styles.sharingToChips}>
-            {closeFriendSharingEnabled && (
-              <View style={styles.sharingToChip}>
-                <Users size={11} color="#93C5FD" />
-                <Text style={styles.sharingToChipText}>Close Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}</Text>
-              </View>
-            )}
-            {familySharingEnabled && (
-              <View style={styles.sharingToChipFamily}>
-                <Heart size={11} color="#D8B4FE" />
-                <Text style={styles.sharingToChipTextFamily}>Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-
       {friends.length > 0 && (
         <View style={styles.liveLocationSection}>
           <View style={styles.liveLocationGroup}>
@@ -2176,13 +2153,16 @@ const styles = StyleSheet.create({
   shareButton: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
+    justifyContent: "center" as const,
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    minWidth: 100,
+    height: 32,
   },
   shareButtonActiveBlue: {
     backgroundColor: "#2563EB",
@@ -2203,13 +2183,16 @@ const styles = StyleSheet.create({
   viewMapButton: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
+    justifyContent: "center" as const,
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+    minWidth: 100,
+    height: 32,
   },
   viewMapButtonActiveBlue: {
     backgroundColor: "rgba(59, 130, 246, 0.2)",
@@ -2275,69 +2258,7 @@ const styles = StyleSheet.create({
     borderColor: "#A855F7",
     zIndex: -2,
   },
-  sharingToColumn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "rgba(16, 185, 129, 0.06)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(16, 185, 129, 0.12)",
-  },
-  sharingToLabelRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginBottom: 4,
-  },
-  sharingToDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "#10B981",
-  },
-  sharingToLabel: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#10B981",
-    letterSpacing: 0.4,
-    textTransform: "uppercase" as const,
-  },
-  sharingToChips: {
-    flexDirection: "row" as const,
-    gap: 6,
-    flexWrap: "wrap" as const,
-  },
-  sharingToChip: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    backgroundColor: "rgba(59, 130, 246, 0.12)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(59, 130, 246, 0.25)",
-  },
-  sharingToChipText: {
-    fontSize: 10,
-    fontWeight: "600" as const,
-    color: "#93C5FD",
-  },
-  sharingToChipFamily: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    backgroundColor: "rgba(168, 85, 247, 0.12)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.25)",
-  },
-  sharingToChipTextFamily: {
-    fontSize: 10,
-    fontWeight: "600" as const,
-    color: "#D8B4FE",
-  },
+
   liveDotBlue: {
     width: 7,
     height: 7,
