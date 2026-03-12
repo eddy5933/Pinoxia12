@@ -218,14 +218,18 @@ function FriendMarkerWrapper({
   return (
     <Marker
       coordinate={{ latitude: friend.latitude, longitude: friend.longitude }}
-      tracksViewChanges={trackChanges}
+      tracksViewChanges={Platform.OS === 'android' ? false : trackChanges}
+      pinColor={Platform.OS === 'android' ? '#3B82F6' : undefined}
+      title={Platform.OS === 'android' ? friend.name : undefined}
       onPress={() => {
         console.log("[MapScreen] Friend marker tapped:", friend.name);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         if (onPress) onPress(friend);
       }}
     >
-      <FriendMarkerView friend={friend} onLoad={handleLoad} />
+      {Platform.OS === 'ios' ? (
+        <FriendMarkerView friend={friend} onLoad={handleLoad} />
+      ) : null}
       <Callout tooltip onPress={() => {
         console.log("[MapScreen] Friend callout tapped:", friend.name);
         if (onPress) onPress(friend);
@@ -412,77 +416,56 @@ function NativeMapView({
         <Marker
           key={r.id}
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
-          tracksViewChanges={false}
+          tracksViewChanges={Platform.OS === 'android' ? false : false}
           onPress={() => {
             console.log("[MapScreen] Marker tapped:", r.name, r.id);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push(`/restaurant/${r.id}`);
           }}
+          pinColor={isSearchResult ? '#2563EB' : isFocused ? '#F59E0B' : Colors.primary}
         >
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              console.log("[MapScreen] Marker view tapped:", r.name, r.id);
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push(`/restaurant/${r.id}`);
-            }}
-            style={markerStyles.touchable}
-          >
-            <View style={markerStyles.container}>
-              <View style={[
-                markerStyles.pin,
-                isFocused && markerStyles.pinFocused,
-                isSearchResult && markerStyles.pinSearchResult,
-              ]}>
-                <MapPin size={Platform.OS === 'android' ? 12 : 16} color={Colors.white} />
-              </View>
-              <View style={[
-                markerStyles.pinTail,
-                isSearchResult && markerStyles.pinTailSearch,
-              ]} />
-              <View style={[
-                markerStyles.labelContainer,
-                isSearchResult && markerStyles.labelContainerSearch,
-              ]}>
-                <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
-                {dist && (
-                  <Text style={[
-                    markerStyles.labelDistance,
-                    !isSearchResult && markerStyles.labelDistanceDefault,
-                  ]}>{dist}</Text>
-                )}
+          {Platform.OS === 'ios' ? (
+            <View style={markerStyles.touchable}>
+              <View style={markerStyles.container}>
+                <View style={[
+                  markerStyles.pin,
+                  isFocused && markerStyles.pinFocused,
+                  isSearchResult && markerStyles.pinSearchResult,
+                ]}>
+                  <MapPin size={16} color={Colors.white} />
+                </View>
+                <View style={[
+                  markerStyles.pinTail,
+                  isSearchResult && markerStyles.pinTailSearch,
+                ]} />
+                <View style={[
+                  markerStyles.labelContainer,
+                  isSearchResult && markerStyles.labelContainerSearch,
+                ]}>
+                  <Text style={markerStyles.labelText} numberOfLines={1}>{r.name}</Text>
+                  {dist && (
+                    <Text style={[
+                      markerStyles.labelDistance,
+                      !isSearchResult && markerStyles.labelDistanceDefault,
+                    ]}>{dist}</Text>
+                  )}
+                </View>
               </View>
             </View>
-          </TouchableOpacity>
-          <Callout tooltip>
+          ) : null}
+          <Callout tooltip onPress={() => {
+            console.log("[MapScreen] Callout pressed:", r.name);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push(`/restaurant/${r.id}`);
+          }}>
             <View style={markerStyles.calloutBox}>
               <Text style={markerStyles.calloutTitle} numberOfLines={1}>{r.name}</Text>
               <Text style={markerStyles.calloutSubtitle}>{r.cuisine ?? 'Place'}{dist ? ` · ${dist}` : ''}</Text>
               <View style={markerStyles.calloutButtons}>
-                <TouchableOpacity
-                  style={markerStyles.calloutBtnDetails}
-                  onPress={() => {
-                    console.log("[MapScreen] Callout details pressed:", r.name);
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push(`/restaurant/${r.id}`);
-                  }}
-                  activeOpacity={0.7}
-                >
+                <View style={markerStyles.calloutBtnDetails}>
                   <Eye size={12} color="#fff" />
-                  <Text style={markerStyles.calloutBtnText}>Details</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={markerStyles.calloutBtnNavigate}
-                  onPress={() => {
-                    console.log("[MapScreen] Callout navigate pressed:", r.name);
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    openNavigation(r.latitude, r.longitude, r.name);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Navigation size={12} color="#fff" />
-                  <Text style={markerStyles.calloutBtnText}>Navigate</Text>
-                </TouchableOpacity>
+                  <Text style={markerStyles.calloutBtnText}>View Details</Text>
+                </View>
               </View>
             </View>
             <View style={markerStyles.calloutArrowDown} />
