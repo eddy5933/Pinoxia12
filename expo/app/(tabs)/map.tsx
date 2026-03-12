@@ -10,6 +10,7 @@ import {
   Animated,
   TextInput,
   Image as RNImage,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -45,6 +46,37 @@ const DEFAULT_REGION = {
   latitudeDelta: 0.15,
   longitudeDelta: 0.15,
 };
+
+function openNavigation(latitude: number, longitude: number, name: string) {
+  const encodedName = encodeURIComponent(name);
+  console.log('[MapScreen] Opening navigation to:', name, latitude, longitude);
+  if (Platform.OS === 'ios') {
+    const appleMapsUrl = `maps:0,0?q=${encodedName}&ll=${latitude},${longitude}&dirflg=d`;
+    const googleMapsUrl = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
+    void Linking.canOpenURL(googleMapsUrl).then((supported) => {
+      if (supported) {
+        void Linking.openURL(googleMapsUrl);
+      } else {
+        void Linking.openURL(appleMapsUrl);
+      }
+    }).catch(() => {
+      void Linking.openURL(appleMapsUrl);
+    });
+  } else if (Platform.OS === 'android') {
+    const url = `google.navigation:q=${latitude},${longitude}`;
+    void Linking.canOpenURL(url).then((supported) => {
+      if (supported) {
+        void Linking.openURL(url);
+      } else {
+        void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&destination_place_id=${encodedName}`);
+      }
+    }).catch(() => {
+      void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`);
+    });
+  } else {
+    void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`);
+  }
+}
 
 
 
@@ -422,16 +454,38 @@ function NativeMapView({
               </View>
             </View>
           </TouchableOpacity>
-          <Callout onPress={() => {
-            console.log("[MapScreen] Callout pressed, navigating to:", r.name);
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push(`/restaurant/${r.id}`);
-          }}>
-            <View style={markerStyles.calloutContainer}>
+          <Callout tooltip>
+            <View style={markerStyles.calloutBox}>
               <Text style={markerStyles.calloutTitle} numberOfLines={1}>{r.name}</Text>
               <Text style={markerStyles.calloutSubtitle}>{r.cuisine ?? 'Place'}{dist ? ` · ${dist}` : ''}</Text>
-              <Text style={markerStyles.calloutAction}>Tap to view details →</Text>
+              <View style={markerStyles.calloutButtons}>
+                <TouchableOpacity
+                  style={markerStyles.calloutBtnDetails}
+                  onPress={() => {
+                    console.log("[MapScreen] Callout details pressed:", r.name);
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(`/restaurant/${r.id}`);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Eye size={12} color="#fff" />
+                  <Text style={markerStyles.calloutBtnText}>Details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={markerStyles.calloutBtnNavigate}
+                  onPress={() => {
+                    console.log("[MapScreen] Callout navigate pressed:", r.name);
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    openNavigation(r.latitude, r.longitude, r.name);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Navigation size={12} color="#fff" />
+                  <Text style={markerStyles.calloutBtnText}>Navigate</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+            <View style={markerStyles.calloutArrowDown} />
           </Callout>
         </Marker>
         );
@@ -1246,25 +1300,70 @@ const markerStyles = StyleSheet.create({
   labelDistanceDefault: {
     color: "#FFB4B4",
   },
-  calloutContainer: {
-    width: 180,
-    padding: 8,
+  calloutBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 10,
+    minWidth: 190,
+    maxWidth: 220,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
   },
   calloutTitle: {
     fontSize: 14,
     fontWeight: "700" as const,
-    color: "#1a1a1a",
+    color: Colors.white,
   },
   calloutSubtitle: {
     fontSize: 12,
-    color: "#666",
+    color: Colors.textSecondary,
     marginTop: 2,
   },
-  calloutAction: {
+  calloutButtons: {
+    flexDirection: "row" as const,
+    gap: 6,
+    marginTop: 8,
+  },
+  calloutBtnDetails: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 4,
+    backgroundColor: Colors.primary,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  calloutBtnNavigate: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 4,
+    backgroundColor: "#2563EB",
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  calloutBtnText: {
     fontSize: 11,
-    color: Colors.primary,
-    fontWeight: "600" as const,
-    marginTop: 4,
+    fontWeight: "700" as const,
+    color: "#fff",
+  },
+  calloutArrowDown: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: Colors.surface,
+    alignSelf: "center" as const,
   },
   calloutSimple: {
     backgroundColor: Colors.surface,
