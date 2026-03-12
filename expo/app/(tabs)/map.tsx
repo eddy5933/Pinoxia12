@@ -725,7 +725,7 @@ export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, sharingEnabled, setSharingEnabled } = useLocation();
-  const { friends, closeFriends, familyMembers } = useFriends();
+  const { friends } = useFriends();
 
   const [showFriendLocations, setShowFriendLocations] = useState(true);
   const [showFamilyLocations, setShowFamilyLocations] = useState(false);
@@ -1258,7 +1258,7 @@ export default function MapScreenExport() {
               styles.viewFriendsText,
               showFriendLocations && styles.viewFriendsTextActive,
             ]}>
-              Close Friends{visibleFriendLocations.length > 0 ? ` (${visibleFriendLocations.length})` : closeFriends.length > 0 ? ` (${closeFriends.length})` : ""}
+              Close Friends{friendLocations.length > 0 ? ` (${friendLocations.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
@@ -1278,7 +1278,7 @@ export default function MapScreenExport() {
               styles.familyText,
               showFamilyLocations && styles.familyTextActive,
             ]}>
-              Family{visibleFamilyLocations.length > 0 ? ` (${visibleFamilyLocations.length})` : familyMembers.length > 0 ? ` (${familyMembers.length})` : ""}
+              Family{familyLocations.length > 0 ? ` (${familyLocations.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
