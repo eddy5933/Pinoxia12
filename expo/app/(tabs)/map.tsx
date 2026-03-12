@@ -384,6 +384,11 @@ function NativeMapView({
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push(`/restaurant/${r.id}`);
           }}
+          onCalloutPress={() => {
+            console.log("[MapScreen] Callout pressed, navigating to:", r.name);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push(`/restaurant/${r.id}`);
+          }}
         >
           <View style={markerStyles.container}>
             <View style={[
@@ -410,16 +415,10 @@ function NativeMapView({
               )}
             </View>
           </View>
-          <Callout
-            tooltip
-            onPress={() => {
-              console.log("[MapScreen] Callout pressed, navigating to:", r.name);
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(`/restaurant/${r.id}`);
-            }}
-          >
+          <Callout tooltip>
             <View style={markerStyles.calloutSimple}>
               <Text style={markerStyles.calloutSimpleName} numberOfLines={1}>{r.name}</Text>
+              <Text style={markerStyles.calloutTapHint}>Tap to view details</Text>
             </View>
             <View style={markerStyles.calloutArrow} />
           </Callout>
@@ -1140,6 +1139,13 @@ const markerStyles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.white,
     textAlign: "center" as const,
+  },
+  calloutTapHint: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+    color: Colors.primary,
+    textAlign: "center" as const,
+    marginTop: 3,
   },
   calloutArrow: {
     width: 0,
