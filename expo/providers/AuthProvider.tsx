@@ -10,7 +10,24 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.warn("[Auth] Session error:", sessionError.message);
+          if (
+            sessionError.message?.toLowerCase().includes("refresh token") ||
+            sessionError.message?.toLowerCase().includes("invalid") ||
+            sessionError.message?.toLowerCase().includes("expired") ||
+            sessionError.code === "bad_jwt"
+          ) {
+            console.log("[Auth] Invalid session detected, signing out to clear tokens");
+            await supabase.auth.signOut();
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+        }
+
         console.log("[Auth] Session check:", session ? "found" : "none");
         if (session?.user) {
           const { data: profile } = await supabase
@@ -29,11 +46,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             };
             setUser(loadedUser);
             console.log("[Auth] Loaded profile:", profile.name);
-
           }
         }
-      } catch (e) {
-        console.warn("[Auth] Session load error:", e);
+      } catch (e: any) {
+        console.warn("[Auth] Session load error:", e?.message ?? e);
+        const msg = (e?.message ?? "").toLowerCase();
+        if (msg.includes("refresh token") || msg.includes("invalid") || msg.includes("bad_jwt")) {
+          console.log("[Auth] Clearing invalid session from catch block");
+          try {
+            await supabase.auth.signOut();
+          } catch (_) {}
+          setUser(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -43,6 +67,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("[Auth] Auth state changed:", event);
+        if (event === "TOKEN_REFRESHED") {
+          console.log("[Auth] Token refreshed successfully");
+        }
         if (event === "SIGNED_OUT" || !session?.user) {
           setUser(null);
           return;
@@ -229,7 +256,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const logout = useCallback(async () => {
     console.log("[Auth] Logging out");
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e: any) {
+      console.warn("[Auth] Signout error (clearing locally):", e?.message);
+    }
     setUser(null);
   }, []);
 
