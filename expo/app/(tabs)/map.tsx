@@ -38,10 +38,10 @@ import { useFriends } from "@/providers/FriendsProvider";
 import { Restaurant } from "@/types";
 
 const DEFAULT_REGION = {
-  latitude: 40.748,
-  longitude: -73.985,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
+  latitude: 25.2854,
+  longitude: 51.5310,
+  latitudeDelta: 0.15,
+  longitudeDelta: 0.15,
 };
 
 
