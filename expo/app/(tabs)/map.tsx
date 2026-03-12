@@ -1258,7 +1258,7 @@ export default function MapScreenExport() {
               styles.viewFriendsText,
               showFriendLocations && styles.viewFriendsTextActive,
             ]}>
-              Close Friends{closeFriends.length > 0 ? ` (${closeFriends.length})` : ""}
+              Close Friends{visibleFriendLocations.length > 0 ? ` (${visibleFriendLocations.length})` : closeFriends.length > 0 ? ` (${closeFriends.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
@@ -1278,23 +1278,12 @@ export default function MapScreenExport() {
               styles.familyText,
               showFamilyLocations && styles.familyTextActive,
             ]}>
-              Family{familyMembers.length > 0 ? ` (${familyMembers.length})` : ""}
+              Family{visibleFamilyLocations.length > 0 ? ` (${visibleFamilyLocations.length})` : familyMembers.length > 0 ? ` (${familyMembers.length})` : ""}
             </Text>
           </TouchableOpacity>
         )}
 
-        {showFriendLocations && visibleFriendLocations.length === 0 && friendLocations.length === 0 && friends.length > 0 && (
-          <Text style={styles.noFriendsText}>No friends sharing location</Text>
-        )}
-        {showFriendLocations && visibleFriendLocations.length > 0 && (
-          <Text style={styles.noFriendsText}>{visibleFriendLocations.length} friend{visibleFriendLocations.length !== 1 ? 's' : ''} on map</Text>
-        )}
-        {showFamilyLocations && visibleFamilyLocations.length === 0 && familyLocations.length === 0 && friends.length > 0 && (
-          <Text style={styles.noFriendsText}>No family sharing location</Text>
-        )}
-        {showFamilyLocations && visibleFamilyLocations.length > 0 && (
-          <Text style={styles.noFriendsText}>{visibleFamilyLocations.length} family on map</Text>
-        )}
+
       </View>
 
       {showFamilyLocations && visibleFamilyLocations.length > 0 && (
