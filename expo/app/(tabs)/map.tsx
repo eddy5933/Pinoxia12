@@ -449,14 +449,18 @@ function EventMarkerWrapper({
       {Platform.OS === 'ios' ? (
         <View style={eventMarkerStyles.touchable}>
           <View style={eventMarkerStyles.container}>
-            <View style={eventMarkerStyles.pin}>
-              <Calendar size={16} color="#fff" />
+            <View style={eventMarkerStyles.outerRing}>
+              <View style={eventMarkerStyles.pin}>
+                <Calendar size={14} color="#fff" />
+              </View>
             </View>
-            <View style={eventMarkerStyles.pinTail} />
+            <View style={eventMarkerStyles.stalk} />
+            <View style={eventMarkerStyles.pinShadow} />
             <View style={eventMarkerStyles.labelContainer}>
+              <View style={eventMarkerStyles.labelDot} />
               <Text style={eventMarkerStyles.labelText} numberOfLines={1}>{event.title}</Text>
-              <Text style={eventMarkerStyles.labelDate}>{dateLabel}</Text>
             </View>
+            <Text style={eventMarkerStyles.labelDate}>{dateLabel}</Text>
           </View>
         </View>
       ) : null}
@@ -2621,61 +2625,82 @@ const eventMarkerStyles = StyleSheet.create({
   container: {
     alignItems: "center",
   },
-  pin: {
-    width: Platform.OS === 'android' ? 30 : 40,
-    height: Platform.OS === 'android' ? 30 : 40,
-    borderRadius: Platform.OS === 'android' ? 15 : 20,
-    backgroundColor: "#F59E0B",
+  outerRing: {
+    width: Platform.OS === 'android' ? 38 : 48,
+    height: Platform.OS === 'android' ? 38 : 48,
+    borderRadius: Platform.OS === 'android' ? 19 : 24,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    borderWidth: Platform.OS === 'android' ? 2 : 3,
-    borderColor: "#FDE68A",
-    shadowColor: "#F59E0B",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: "rgba(239, 68, 68, 0.35)",
+    borderStyle: "dashed" as const,
   },
-  pinTail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: Platform.OS === 'android' ? 5 : 7,
-    borderRightWidth: Platform.OS === 'android' ? 5 : 7,
-    borderTopWidth: Platform.OS === 'android' ? 7 : 9,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#FDE68A",
+  pin: {
+    width: Platform.OS === 'android' ? 28 : 34,
+    height: Platform.OS === 'android' ? 28 : 34,
+    borderRadius: Platform.OS === 'android' ? 14 : 17,
+    backgroundColor: "#EF4444",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 2.5,
+    borderColor: "#fff",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  stalk: {
+    width: 2.5,
+    height: Platform.OS === 'android' ? 8 : 12,
+    backgroundColor: "#EF4444",
     marginTop: -1,
   },
+  pinShadow: {
+    width: Platform.OS === 'android' ? 14 : 18,
+    height: Platform.OS === 'android' ? 4 : 5,
+    borderRadius: Platform.OS === 'android' ? 7 : 9,
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
   labelContainer: {
-    backgroundColor: "#92400E",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "#1C1917",
     paddingHorizontal: Platform.OS === 'android' ? 6 : 10,
-    paddingVertical: Platform.OS === 'android' ? 2 : 4,
-    borderRadius: Platform.OS === 'android' ? 5 : 8,
-    marginTop: Platform.OS === 'android' ? 2 : 3,
-    maxWidth: Platform.OS === 'android' ? 100 : 140,
+    paddingVertical: Platform.OS === 'android' ? 3 : 5,
+    borderRadius: Platform.OS === 'android' ? 6 : 10,
+    marginTop: Platform.OS === 'android' ? 2 : 4,
+    maxWidth: Platform.OS === 'android' ? 110 : 150,
     alignSelf: "center" as const,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: "rgba(239, 68, 68, 0.5)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
     elevation: 8,
+  },
+  labelDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#EF4444",
+    marginRight: 5,
   },
   labelText: {
     fontSize: Platform.OS === 'android' ? 8 : 10,
-    fontWeight: "800" as const,
+    fontWeight: "700" as const,
     color: "#FFFFFF",
-    textAlign: "center" as const,
-    letterSpacing: 0.3,
+    flexShrink: 1,
+    letterSpacing: 0.2,
   },
   labelDate: {
     fontSize: Platform.OS === 'android' ? 7 : 9,
     fontWeight: "600" as const,
-    color: "#FDE68A",
+    color: "#FCA5A5",
     textAlign: "center" as const,
-    marginTop: 1,
+    marginTop: 2,
   },
   calloutBox: {
     backgroundColor: Colors.surface,
