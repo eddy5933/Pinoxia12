@@ -3,6 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useQuery } from "@tanstack/react-query";
 import { Restaurant, Review } from "@/types";
 import { MOCK_RESTAURANTS, MOCK_REVIEWS, MOCK_MALAYSIA_REVIEWS } from "@/mocks/restaurants";
+import { ALL_QATAR_PLACES } from "@/mocks/qatar-places";
 import { supabase } from "@/lib/supabase";
 
 export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
@@ -23,7 +24,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
         if (restRes.error) {
           console.warn("[RestaurantProvider] Supabase restaurants error:", restRes.error.message);
           console.log("[RestaurantProvider] Falling back to mock data (", MOCK_RESTAURANTS.length, "restaurants)");
-          return { restaurants: MOCK_RESTAURANTS, reviews: MOCK_REVIEWS };
+          return { restaurants: [...MOCK_RESTAURANTS, ...ALL_QATAR_PLACES], reviews: MOCK_REVIEWS };
         }
 
         let loadedRestaurants: Restaurant[] = (restRes.data ?? []).map((r: any) => ({
@@ -59,7 +60,8 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
 
         if (loadedRestaurants.length === 0) {
           console.log("[RestaurantProvider] No restaurants found in Supabase, seeding all mock data...");
-          const inserts = MOCK_RESTAURANTS.map((r) => ({
+          const allPlaces = [...MOCK_RESTAURANTS, ...ALL_QATAR_PLACES];
+          const inserts = allPlaces.map((r) => ({
             id: r.id,
             owner_id: r.ownerId,
             name: r.name,
@@ -73,13 +75,13 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
             phone: r.phone ?? null,
             rating: r.rating,
             review_count: r.reviewCount,
-            price_range: r.priceRange,
+            price_range: r.priceRange ?? null,
           }));
           const { error: seedError } = await supabase.from("restaurants").insert(inserts);
           if (seedError) {
             console.warn("[RestaurantProvider] Seed error:", seedError.message, "- using mock data directly");
           }
-          loadedRestaurants = MOCK_RESTAURANTS;
+          loadedRestaurants = allPlaces;
 
           const allReviews = [...MOCK_REVIEWS, ...MOCK_MALAYSIA_REVIEWS];
           const reviewInserts = allReviews.map((rv) => ({
@@ -96,6 +98,34 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
           }
           loadedReviews = allReviews;
         } else {
+          const hasQatarPlaces = loadedRestaurants.some((r) => r.id.startsWith("qa-"));
+          if (!hasQatarPlaces) {
+            console.log("[RestaurantProvider] Qatar places not found in Supabase, seeding...");
+            const qatarInserts = ALL_QATAR_PLACES.map((r) => ({
+              id: r.id,
+              owner_id: r.ownerId,
+              name: r.name,
+              description: r.description,
+              cuisine: r.cuisine ?? null,
+              photos: r.photos,
+              address: r.address,
+              latitude: r.latitude,
+              longitude: r.longitude,
+              opening_hours: r.openingHours,
+              phone: r.phone ?? null,
+              rating: r.rating,
+              review_count: r.reviewCount,
+              price_range: r.priceRange ?? null,
+            }));
+            const { error: qaSeedErr } = await supabase.from("restaurants").insert(qatarInserts);
+            if (qaSeedErr) {
+              console.warn("[RestaurantProvider] Qatar places seed error:", qaSeedErr.message);
+            } else {
+              console.log("[RestaurantProvider] Seeded", ALL_QATAR_PLACES.length, "Qatar places");
+            }
+            loadedRestaurants = [...loadedRestaurants, ...ALL_QATAR_PLACES];
+          }
+
           const hasMalaysia = loadedRestaurants.some((r) => r.id.startsWith("my-"));
           if (!hasMalaysia) {
             console.log("[RestaurantProvider] Malaysia places not found in Supabase, seeding...");
@@ -144,7 +174,7 @@ export const [RestaurantProvider, useRestaurants] = createContextHook(() => {
         return { restaurants: loadedRestaurants, reviews: loadedReviews };
       } catch (err) {
         console.warn("[RestaurantProvider] Network/Supabase error, falling back to mock data:", err);
-        return { restaurants: MOCK_RESTAURANTS, reviews: MOCK_REVIEWS };
+        return { restaurants: [...MOCK_RESTAURANTS, ...ALL_QATAR_PLACES], reviews: MOCK_REVIEWS };
       }
     },
     staleTime: 10000,
