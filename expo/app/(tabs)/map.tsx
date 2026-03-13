@@ -747,6 +747,7 @@ interface QuickEventCoord {
 }
 
 const QUICK_TIME_OPTIONS = [
+  { label: "In 10 min", minutes: 10 },
   { label: "In 30 min", minutes: 30 },
   { label: "In 1 hour", minutes: 60 },
   { label: "In 2 hours", minutes: 120 },
@@ -1999,19 +2000,20 @@ const qeStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 16,
+    paddingBottom: 80,
   },
   container: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === "ios" ? 34 : 24,
+    paddingBottom: 20,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -8 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 20,
