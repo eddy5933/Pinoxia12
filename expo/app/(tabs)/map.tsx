@@ -12,6 +12,10 @@ import {
   Image as RNImage,
   Linking,
   ActionSheetIOS,
+  Modal,
+  ScrollView,
+  Alert,
+  Dimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -30,6 +34,11 @@ import {
   Store,
   UtensilsCrossed,
   Radio,
+  Calendar,
+  Clock,
+  Check,
+  Send,
+  UserPlus,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -40,8 +49,9 @@ import { useLocation, getDistanceKm, formatDistance } from "@/providers/Location
 import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
 import { Heart } from "lucide-react-native";
 import { useFriends } from "@/providers/FriendsProvider";
+import { useEvents } from "@/providers/EventProvider";
 
-import { Restaurant } from "@/types";
+import { Restaurant, Friend } from "@/types";
 
 const DEFAULT_REGION = {
   latitude: 25.2854,
@@ -417,6 +427,8 @@ function NativeMapView({
   onFamilyMarkerPress,
   onMarkerPress,
   onMapPress,
+  onLongPress,
+  onLongPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -432,6 +444,7 @@ function NativeMapView({
   onFamilyMarkerPress?: (member: FriendLocation) => void;
   onMarkerPress?: (restaurantId: string) => void;
   onMapPress?: () => void;
+  onLongPress?: (coordinate: { latitude: number; longitude: number }) => void;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -576,6 +589,13 @@ function NativeMapView({
       onPress={() => {
         console.log("[MapScreen] Map background tapped, closing dropdown");
         if (onMapPress) onMapPress();
+      }}
+      onLongPress={(e: any) => {
+        const coord = e.nativeEvent?.coordinate;
+        if (coord && onLongPress) {
+          console.log("[MapScreen] Long press at:", coord.latitude, coord.longitude);
+          onLongPress({ latitude: coord.latitude, longitude: coord.longitude });
+        }
       }}
     >
       {restaurants.map((r) => {
@@ -722,11 +742,301 @@ function WebMapView({
   );
 }
 
+interface QuickEventCoord {
+  latitude: number;
+  longitude: number;
+}
+
+const QUICK_TIME_OPTIONS = [
+  { label: "In 30 min", minutes: 30 },
+  { label: "In 1 hour", minutes: 60 },
+  { label: "In 2 hours", minutes: 120 },
+  { label: "In 3 hours", minutes: 180 },
+  { label: "Tomorrow", minutes: 24 * 60 },
+];
+
+function QuickEventModal({
+  visible,
+  coordinate,
+  friends,
+  onClose,
+  onSubmit,
+  isCreating,
+}: {
+  visible: boolean;
+  coordinate: QuickEventCoord | null;
+  friends: Friend[];
+  onClose: () => void;
+  onSubmit: (params: {
+    title: string;
+    eventDate: string;
+    invitedFriends: { userId: string; name: string }[];
+    coordinate: QuickEventCoord;
+  }) => void;
+  isCreating: boolean;
+}) {
+  const [selectedTimeIdx, setSelectedTimeIdx] = useState(1);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedTimeIdx(1);
+      setSelectedFriendIds(new Set());
+      slideAnim.setValue(0);
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 65,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, slideAnim]);
+
+  const handleClose = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => onClose());
+  }, [slideAnim, onClose]);
+
+  const toggleFriend = useCallback((friendId: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedFriendIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(friendId)) {
+        next.delete(friendId);
+      } else {
+        next.add(friendId);
+      }
+      return next;
+    });
+  }, []);
+
+  const getEventDate = useCallback(() => {
+    const now = new Date();
+    const offset = QUICK_TIME_OPTIONS[selectedTimeIdx].minutes;
+    return new Date(now.getTime() + offset * 60 * 1000);
+  }, [selectedTimeIdx]);
+
+  const formattedDate = useMemo(() => {
+    const d = getEventDate();
+    const today = new Date();
+    const isTomorrow = d.getDate() !== today.getDate();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (isTomorrow) {
+      return `Tomorrow, ${timeStr}`;
+    }
+    return `Today, ${timeStr}`;
+  }, [getEventDate]);
+
+  const handleSubmit = useCallback(() => {
+    if (!coordinate) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const eventDate = getEventDate().toISOString();
+    const invitedFriends = friends
+      .filter((f) => selectedFriendIds.has(f.userId))
+      .map((f) => ({ userId: f.userId, name: f.name }));
+    console.log("[QuickEvent] Submitting:", { eventDate, invitedFriends: invitedFriends.length });
+    onSubmit({
+      title: "Let's meet here",
+      eventDate,
+      invitedFriends,
+      coordinate,
+    });
+  }, [coordinate, getEventDate, friends, selectedFriendIds, onSubmit]);
+
+  if (!visible || !coordinate) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <TouchableOpacity
+        style={qeStyles.backdrop}
+        activeOpacity={1}
+        onPress={handleClose}
+      >
+        <Animated.View
+          style={[
+            qeStyles.container,
+            {
+              opacity: slideAnim,
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [300, 0],
+                }),
+              }],
+            },
+          ]}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={qeStyles.handle} />
+
+            <View style={qeStyles.headerRow}>
+              <View style={qeStyles.headerIcon}>
+                <MapPin size={18} color={Colors.primary} />
+              </View>
+              <View style={qeStyles.headerInfo}>
+                <Text style={qeStyles.title}>Let's meet here</Text>
+                <Text style={qeStyles.subtitle}>
+                  {coordinate.latitude.toFixed(4)}, {coordinate.longitude.toFixed(4)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={qeStyles.closeBtn}
+                onPress={handleClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={qeStyles.section}>
+              <View style={qeStyles.sectionHeader}>
+                <Clock size={14} color={Colors.textSecondary} />
+                <Text style={qeStyles.sectionTitle}>When</Text>
+              </View>
+              <View style={qeStyles.timeGrid}>
+                {QUICK_TIME_OPTIONS.map((opt, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      qeStyles.timeChip,
+                      selectedTimeIdx === idx && qeStyles.timeChipActive,
+                    ]}
+                    onPress={() => {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedTimeIdx(idx);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        qeStyles.timeChipText,
+                        selectedTimeIdx === idx && qeStyles.timeChipTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={qeStyles.datePreview}>
+                <Calendar size={12} color={Colors.primary} />
+                <Text style={qeStyles.datePreviewText}>{formattedDate}</Text>
+              </View>
+            </View>
+
+            <View style={qeStyles.section}>
+              <View style={qeStyles.sectionHeader}>
+                <UserPlus size={14} color={Colors.textSecondary} />
+                <Text style={qeStyles.sectionTitle}>Invite Friends</Text>
+                {selectedFriendIds.size > 0 && (
+                  <View style={qeStyles.countBadge}>
+                    <Text style={qeStyles.countBadgeText}>{selectedFriendIds.size}</Text>
+                  </View>
+                )}
+              </View>
+              {friends.length === 0 ? (
+                <Text style={qeStyles.emptyText}>No friends yet. Add friends to invite them!</Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={qeStyles.friendsScroll}
+                >
+                  {friends.map((friend) => {
+                    const isSelected = selectedFriendIds.has(friend.userId);
+                    const initials = friend.name
+                      .split(" ")
+                      .map((w) => w[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+                    return (
+                      <TouchableOpacity
+                        key={friend.userId}
+                        style={[
+                          qeStyles.friendChip,
+                          isSelected && qeStyles.friendChipActive,
+                        ]}
+                        onPress={() => toggleFriend(friend.userId)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[
+                          qeStyles.friendAvatar,
+                          isSelected && qeStyles.friendAvatarActive,
+                        ]}>
+                          {friend.avatar ? (
+                            <RNImage
+                              source={{ uri: friend.avatar }}
+                              style={qeStyles.friendAvatarImg}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <Text style={qeStyles.friendInitials}>{initials}</Text>
+                          )}
+                          {isSelected && (
+                            <View style={qeStyles.checkBadge}>
+                              <Check size={8} color="#fff" />
+                            </View>
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            qeStyles.friendName,
+                            isSelected && qeStyles.friendNameActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {friend.name.split(" ")[0]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                qeStyles.createBtn,
+                isCreating && qeStyles.createBtnDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={isCreating}
+              activeOpacity={0.8}
+              testID="quick-event-create-btn"
+            >
+              {isCreating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Send size={16} color="#fff" />
+                  <Text style={qeStyles.createBtnText}>Create Event</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled } = useLocation();
   const { friends } = useFriends();
+  const { createEvent, isCreating } = useEvents();
 
   const [showFriendLocations, setShowFriendLocations] = useState(closeFriendSharingEnabled);
   const [showFamilyLocations, setShowFamilyLocations] = useState(familySharingEnabled);
@@ -737,6 +1047,9 @@ export default function MapScreenExport() {
 
   const friendListRef = useRef<FlatList>(null);
   const familyListRef = useRef<FlatList>(null);
+
+  const [quickEventCoord, setQuickEventCoord] = useState<QuickEventCoord | null>(null);
+  const [showQuickEvent, setShowQuickEvent] = useState(false);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -1014,6 +1327,49 @@ export default function MapScreenExport() {
     setSelectedPlace(null);
     router.push(`/restaurant/${place.id}`);
   }, [router]);
+
+  const handleMapLongPress = useCallback((coordinate: { latitude: number; longitude: number }) => {
+    console.log("[MapScreen] Long press detected at:", coordinate);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setQuickEventCoord(coordinate);
+    setShowQuickEvent(true);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
+  }, []);
+
+  const handleQuickEventClose = useCallback(() => {
+    console.log("[MapScreen] Quick event modal closed");
+    setShowQuickEvent(false);
+    setQuickEventCoord(null);
+  }, []);
+
+  const handleQuickEventSubmit = useCallback(async (params: {
+    title: string;
+    eventDate: string;
+    invitedFriends: { userId: string; name: string }[];
+    coordinate: QuickEventCoord;
+  }) => {
+    console.log("[MapScreen] Creating quick event:", params);
+    try {
+      await createEvent({
+        title: params.title,
+        description: "Quick meetup created from the map",
+        eventType: "dinner",
+        restaurantName: "Dropped Pin",
+        latitude: params.coordinate.latitude,
+        longitude: params.coordinate.longitude,
+        eventDate: params.eventDate,
+        invitedFriendIds: params.invitedFriends,
+      });
+      console.log("[MapScreen] Quick event created successfully");
+      setShowQuickEvent(false);
+      setQuickEventCoord(null);
+      Alert.alert("Event Created!", "Your meetup has been created and invitations sent.");
+    } catch (err: any) {
+      console.warn("[MapScreen] Quick event creation failed:", err?.message);
+      Alert.alert("Error", err?.message ?? "Failed to create event. Please try again.");
+    }
+  }, [createEvent]);
 
   const toggleList = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1471,6 +1827,7 @@ export default function MapScreenExport() {
             onFamilyMarkerPress={handleFocusFamily}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
+            onLongPress={handleMapLongPress}
           />
         )}
 
@@ -1624,9 +1981,241 @@ export default function MapScreenExport() {
           />
         )}
       </View>
+
+      <QuickEventModal
+        visible={showQuickEvent}
+        coordinate={quickEventCoord}
+        friends={friends}
+        onClose={handleQuickEventClose}
+        onSubmit={handleQuickEventSubmit}
+        isCreating={isCreating}
+      />
     </View>
   );
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const qeStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end" as const,
+  },
+  container: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 24,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.textMuted,
+    alignSelf: "center" as const,
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(230,57,70,0.15)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  section: {
+    marginBottom: 18,
+  },
+  sectionHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+    letterSpacing: 0.3,
+  },
+  timeGrid: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  timeChipActive: {
+    backgroundColor: "rgba(230,57,70,0.18)",
+    borderColor: Colors.primary,
+  },
+  timeChipText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  timeChipTextActive: {
+    color: Colors.primary,
+  },
+  datePreview: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  datePreviewText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: "500" as const,
+  },
+  countBadge: {
+    backgroundColor: Colors.primary,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginLeft: 4,
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+    color: "#fff",
+  },
+  emptyText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: "italic" as const,
+    paddingVertical: 8,
+  },
+  friendsScroll: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  friendChip: {
+    alignItems: "center" as const,
+    width: 62,
+    gap: 4,
+  },
+  friendChipActive: {},
+  friendAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: Colors.surfaceHighlight,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    overflow: "hidden" as const,
+  },
+  friendAvatarActive: {
+    borderColor: Colors.primary,
+    borderWidth: 2.5,
+  },
+  friendAvatarImg: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  friendInitials: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.textSecondary,
+  },
+  checkBadge: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.primary,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  friendName: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+  },
+  friendNameActive: {
+    color: Colors.white,
+    fontWeight: "600" as const,
+  },
+  createBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  createBtnDisabled: {
+    opacity: 0.6,
+  },
+  createBtnText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+});
 
 const brightMapStyle = [
   { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
