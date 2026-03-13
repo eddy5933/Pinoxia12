@@ -17,7 +17,6 @@ import {
   UserPlus,
   Search,
   X,
-  MessageCircle,
   UserMinus,
   Users,
   Clock,
@@ -33,7 +32,7 @@ import Colors from "@/constants/colors";
 import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useAuth } from "@/providers/AuthProvider";
 import { useFriends } from "@/providers/FriendsProvider";
-import { useChat } from "@/providers/ChatProvider";
+
 import { Friend } from "@/types";
 import { PublicUser } from "@/providers/FriendsProvider";
 
@@ -68,7 +67,6 @@ export default function FriendsScreen() {
     refetchUsers,
     isRefetching,
   } = useFriends();
-  const { getOrCreateConversation } = useChat();
 
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
@@ -266,20 +264,6 @@ export default function FriendsScreen() {
     [unfollowUser, showToast]
   );
 
-  const handleStartChat = useCallback(
-    async (friend: Friend) => {
-      if (!user) return;
-      try {
-        const convo = await getOrCreateConversation(user.id, user.name, friend.userId, friend.name);
-        console.log("[Friends] Navigating to chat:", convo.id);
-        router.push(`/chat/${convo.id}` as any);
-      } catch (err) {
-        console.warn("[Friends] Failed to start chat:", err);
-      }
-    },
-    [user, getOrCreateConversation, router]
-  );
-
   const closeFriendsCount = useMemo(() => friends.filter((f) => f.isCloseFriend).length, [friends]);
   const familyCount = useMemo(() => friends.filter((f) => f.isFamily).length, [friends]);
 
@@ -394,13 +378,6 @@ export default function FriendsScreen() {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.iconBtn, styles.iconBtnChat]}
-            onPress={() => void handleStartChat(item)}
-            activeOpacity={0.7}
-          >
-            <MessageCircle size={15} color={Colors.white} />
-          </TouchableOpacity>
-          <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => handleRemoveFriend(item)}
             activeOpacity={0.7}
@@ -410,7 +387,7 @@ export default function FriendsScreen() {
         </View>
       </View>
     ),
-    [handleStartChat, handleRemoveFriend, handleToggleCloseFriend, handleToggleFamily]
+    [handleRemoveFriend, handleToggleCloseFriend, handleToggleFamily]
   );
 
   const renderSearchItem = useCallback(
@@ -1094,9 +1071,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceHighlight,
     justifyContent: "center",
     alignItems: "center",
-  },
-  iconBtnChat: {
-    backgroundColor: "#1E88E5",
   },
   iconBtnCloseFriendActive: {
     backgroundColor: "rgba(59,130,246,0.15)",

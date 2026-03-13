@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { StyleSheet, Animated } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { AuthProvider } from "@/providers/AuthProvider";
@@ -132,11 +132,7 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
             contentFit="contain"
           />
         </Animated.View>
-        <View style={splashStyles.titleRow}>
-          <Text style={splashStyles.titlePino}>Pin</Text>
-          <Text style={splashStyles.titleXia}>oxia</Text>
-        </View>
-        <Text style={splashStyles.tagline}>Discover nearby spots</Text>
+
       </Animated.View>
     </Animated.View>
   );
@@ -159,27 +155,7 @@ const splashStyles = StyleSheet.create({
     height: 120,
     marginBottom: 4,
   },
-  titleRow: {
-    flexDirection: "row" as const,
-    alignItems: "baseline" as const,
-  },
-  titlePino: {
-    fontSize: 42,
-    fontWeight: "800" as const,
-    color: "#E63946",
-    letterSpacing: -1,
-  },
-  titleXia: {
-    fontSize: 42,
-    fontWeight: "800" as const,
-    color: Colors.white,
-    letterSpacing: -1,
-  },
-  tagline: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    marginTop: -4,
-  },
+
 });
 
 export default function RootLayout() {
