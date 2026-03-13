@@ -298,20 +298,46 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       const q = query.trim();
       if (!q) return [];
       console.log("[Friends] Searching:", q);
+
+      const pattern = `%${q}%`;
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .neq("id", userId)
-        .or(`name.ilike.*${q}*,email.ilike.*${q}*`)
+        .or(`name.ilike.${pattern},email.ilike.${pattern}`)
         .limit(50);
+
       if (error) {
-        console.warn("[Friends] Search error:", error.message);
-        return [];
+        console.warn("[Friends] Search error:", error.message, error.code, error.details);
+
+        console.log("[Friends] Falling back to name-only search");
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("profiles")
+          .select("*")
+          .neq("id", userId)
+          .ilike("name", pattern)
+          .limit(50);
+
+        if (fallbackError) {
+          console.warn("[Friends] Fallback search error:", fallbackError.message);
+          return [];
+        }
+
+        console.log("[Friends] Fallback results:", fallbackData?.length ?? 0);
+        return (fallbackData ?? []).map((p: any) => ({
+          id: p.id,
+          email: p.email ?? "",
+          name: p.name ?? "Unknown",
+          role: p.role ?? "customer",
+          avatar: p.avatar ?? undefined,
+        }));
       }
+
+      console.log("[Friends] Search results:", data?.length ?? 0);
       return (data ?? []).map((p: any) => ({
         id: p.id,
-        email: p.email,
-        name: p.name,
+        email: p.email ?? "",
+        name: p.name ?? "Unknown",
         role: p.role ?? "customer",
         avatar: p.avatar ?? undefined,
       }));
