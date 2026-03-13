@@ -418,6 +418,32 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         return true;
       }
 
+      if (Platform.OS === 'ios') {
+        console.log('[LocationProvider] iOS: Always attempting background permission request');
+        try {
+          const { status } = await Location.requestBackgroundPermissionsAsync();
+          console.log('[LocationProvider] iOS background permission result:', status);
+          if (status === 'granted') {
+            setBackgroundPermissionGranted(true);
+            await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+            return true;
+          }
+        } catch (iosErr) {
+          console.log('[LocationProvider] iOS background permission request error:', iosErr);
+        }
+
+        console.log('[LocationProvider] iOS: Background permission not granted, directing to settings');
+        Alert.alert(
+          'Allow "Always" Location',
+          'To keep GPS active when the app is closed, open Settings and set Location to "Always".',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]
+        );
+        return false;
+      }
+
       if (bgPerm.canAskAgain || bgPerm.status === 'undetermined') {
         console.log('[LocationProvider] Requesting background permission via system dialog');
         const { status } = await Location.requestBackgroundPermissionsAsync();
@@ -431,10 +457,8 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
       console.log('[LocationProvider] Background permission not granted, directing to settings');
       Alert.alert(
-        'Background Location Required',
-        Platform.OS === 'ios'
-          ? 'To enable background GPS tracking, go to Settings > Privacy & Security > Location Services > Pinoxia and select "Always".'
-          : 'To enable background GPS tracking, go to Settings > Apps > Pinoxia > Permissions > Location and select "Allow all the time".',
+        'Allow "Always" Location',
+        'To keep GPS active when the app is closed, go to Settings > Apps > Pinoxia > Permissions > Location and select "Allow all the time".',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => void Linking.openSettings() },
