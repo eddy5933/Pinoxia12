@@ -132,6 +132,9 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
             contentFit="contain"
           />
         </Animated.View>
+        <Animated.Text style={[splashStyles.tagline, { opacity: iconScaleAnim }]}>
+          Discover nearby places
+        </Animated.Text>
 
       </Animated.View>
     </Animated.View>
@@ -154,6 +157,13 @@ const splashStyles = StyleSheet.create({
     width: 120,
     height: 120,
     marginBottom: 4,
+  },
+  tagline: {
+    color: '#A0A0A0',
+    fontSize: 15,
+    fontWeight: '500' as const,
+    letterSpacing: 0.5,
+    marginTop: 8,
   },
 
 });
