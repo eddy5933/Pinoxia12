@@ -823,7 +823,7 @@ function QuickEventModal({
   const formattedDate = useMemo(() => {
     const d = getEventDate();
     const today = new Date();
-    const isTomorrow = d.getDate() !== today.getDate();
+    const isTomorrow = d.getFullYear() !== today.getFullYear() || d.getMonth() !== today.getMonth() || d.getDate() !== today.getDate();
     const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     if (isTomorrow) {
       return `Tomorrow, ${timeStr}`;
