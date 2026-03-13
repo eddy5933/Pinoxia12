@@ -127,7 +127,7 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
       <Animated.View style={[splashStyles.content, { transform: [{ scale: scaleAnim }] }]}>
         <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
           <Image
-            source={require("@/assets/images/pinoxia-logo.png")}
+            source={{ uri: "https://r2-pub.rork.com/generated-images/11676682-2f75-48b8-9275-fdd9534abb9e.png" }}
             style={splashStyles.splashLogo}
             contentFit="contain"
           />

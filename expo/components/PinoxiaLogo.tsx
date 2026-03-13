@@ -15,7 +15,7 @@ export default function PinoxiaLogo({ size = "medium", showText = true }: Pinoxi
   return (
     <View style={styles.row}>
       <Image
-        source={require("@/assets/images/pinoxia-logo.png")}
+        source={{ uri: "https://r2-pub.rork.com/generated-images/11676682-2f75-48b8-9275-fdd9534abb9e.png" }}
         style={{ width: imageSize, height: imageSize }}
         contentFit="contain"
       />
