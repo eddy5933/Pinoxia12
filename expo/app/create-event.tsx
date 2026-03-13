@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -31,7 +31,9 @@ import {
   UtensilsCrossed,
   Plus,
   Navigation,
+  Move,
 } from "lucide-react-native";
+import MapView, { Marker, Region } from "react-native-maps";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -84,8 +86,9 @@ export default function CreateEventScreen() {
   const [showPlacePicker, setShowPlacePicker] = useState(false);
   const [showAddCustomPlace, setShowAddCustomPlace] = useState(false);
   const [customPlaceName, setCustomPlaceName] = useState("");
-  const [customLat, setCustomLat] = useState("");
-  const [customLng, setCustomLng] = useState("");
+  const [mapMarker, setMapMarker] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const mapRef = useRef<MapView>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -152,42 +155,57 @@ export default function CreateEventScreen() {
   }, []);
 
   const handleAddCustomPlace = useCallback(() => {
-    const lat = parseFloat(customLat);
-    const lng = parseFloat(customLng);
     if (!customPlaceName.trim()) {
       Alert.alert("Missing Name", "Please enter a place name");
       return;
     }
-    if (isNaN(lat) || isNaN(lng)) {
-      Alert.alert("Invalid Coordinates", "Please enter valid latitude and longitude");
+    if (!mapMarker) {
+      Alert.alert("Missing Location", "Please tap on the map to drop a pin");
       return;
     }
     setSelectedPlace({
       name: customPlaceName.trim(),
-      latitude: lat,
-      longitude: lng,
+      latitude: mapMarker.latitude,
+      longitude: mapMarker.longitude,
     });
     setShowAddCustomPlace(false);
+    setShowMapPicker(false);
     setShowPlacePicker(false);
     setCustomPlaceName("");
-    setCustomLat("");
-    setCustomLng("");
+    setMapMarker(null);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [customPlaceName, customLat, customLng]);
+  }, [customPlaceName, mapMarker]);
+
+  const handleMapPress = useCallback((e: any) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    console.log("[CreateEvent] Map marker dropped at:", latitude, longitude);
+    setMapMarker({ latitude, longitude });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
 
   const handleUseCurrentLocation = useCallback(() => {
     if (!userLocation) {
       Alert.alert("Location Unavailable", "Your current location is not available.");
       return;
     }
-    if (!customPlaceName.trim()) {
-      Alert.alert("Missing Name", "Please enter a place name first");
-      return;
+    setMapMarker({ latitude: userLocation.latitude, longitude: userLocation.longitude });
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 500);
     }
-    setCustomLat(userLocation.latitude.toFixed(6));
-    setCustomLng(userLocation.longitude.toFixed(6));
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [userLocation, customPlaceName]);
+  }, [userLocation]);
+
+  const defaultMapRegion: Region = useMemo(() => ({
+    latitude: userLocation?.latitude ?? 25.2854,
+    longitude: userLocation?.longitude ?? 51.5310,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  }), [userLocation]);
 
   const handleCreate = useCallback(async () => {
     if (!user || !canSubmit || !selectedPlace || !eventType) return;
@@ -446,7 +464,7 @@ export default function CreateEventScreen() {
                   )}
                 </ScrollView>
               </>
-            ) : (
+            ) : !showMapPicker ? (
               <View style={styles.customPlaceForm}>
                 <Text style={styles.customFormTitle}>Add New Place</Text>
 
@@ -462,57 +480,131 @@ export default function CreateEventScreen() {
                   />
                 </View>
 
-                <View style={styles.row}>
-                  <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.label}>Latitude</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="25.2854"
-                      placeholderTextColor={Colors.textMuted}
-                      value={customLat}
-                      onChangeText={setCustomLat}
-                      keyboardType="decimal-pad"
-                    />
+                <TouchableOpacity
+                  style={styles.mapPickerButton}
+                  onPress={() => setShowMapPicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.mapPickerIconWrap}>
+                    <MapPin size={20} color={Colors.primary} />
                   </View>
-                  <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={styles.label}>Longitude</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="51.5310"
-                      placeholderTextColor={Colors.textMuted}
-                      value={customLng}
-                      onChangeText={setCustomLng}
-                      keyboardType="decimal-pad"
-                    />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.mapPickerButtonTitle}>
+                      {mapMarker ? "Location Selected" : "Pick Location on Map"}
+                    </Text>
+                    {mapMarker ? (
+                      <Text style={styles.mapPickerCoords}>
+                        {mapMarker.latitude.toFixed(5)}, {mapMarker.longitude.toFixed(5)}
+                      </Text>
+                    ) : (
+                      <Text style={styles.mapPickerHint}>Tap to open map and drop a pin</Text>
+                    )}
                   </View>
-                </View>
-
-                {userLocation && (
-                  <TouchableOpacity
-                    style={styles.useLocationButton}
-                    onPress={handleUseCurrentLocation}
-                    activeOpacity={0.7}
-                  >
-                    <Navigation size={16} color={Colors.primary} />
-                    <Text style={styles.useLocationText}>Use my current location</Text>
-                  </TouchableOpacity>
-                )}
+                  {mapMarker && (
+                    <View style={styles.mapPickerCheckmark}>
+                      <Check size={16} color={Colors.white} />
+                    </View>
+                  )}
+                </TouchableOpacity>
 
                 <View style={styles.customFormActions}>
                   <TouchableOpacity
                     style={styles.customCancelButton}
-                    onPress={() => setShowAddCustomPlace(false)}
+                    onPress={() => { setShowAddCustomPlace(false); setMapMarker(null); }}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.customCancelText}>Back</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.customConfirmButton}
+                    style={[styles.customConfirmButton, (!customPlaceName.trim() || !mapMarker) && { opacity: 0.4 }]}
                     onPress={handleAddCustomPlace}
                     activeOpacity={0.8}
                   >
                     <Check size={18} color={Colors.white} />
                     <Text style={styles.customConfirmText}>Add Place</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.mapPickerContainer}>
+                <View style={styles.mapPickerHeader}>
+                  <TouchableOpacity
+                    onPress={() => setShowMapPicker(false)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <X size={22} color={Colors.white} />
+                  </TouchableOpacity>
+                  <Text style={styles.mapPickerTitle}>Drop a Pin</Text>
+                  <View style={{ width: 22 }} />
+                </View>
+
+                <Text style={styles.mapPickerInstruction}>Tap on the map to place your marker</Text>
+
+                {Platform.OS !== "web" ? (
+                  <View style={styles.mapContainer}>
+                    <MapView
+                      ref={mapRef}
+                      style={styles.map}
+                      initialRegion={mapMarker ? {
+                        latitude: mapMarker.latitude,
+                        longitude: mapMarker.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      } : defaultMapRegion}
+                      onPress={handleMapPress}
+                      showsUserLocation
+                      showsMyLocationButton={false}
+                    >
+                      {mapMarker && (
+                        <Marker
+                          coordinate={mapMarker}
+                          draggable
+                          onDragEnd={handleMapPress}
+                        />
+                      )}
+                    </MapView>
+
+                    {mapMarker && (
+                      <View style={styles.mapCoordsBanner}>
+                        <MapPin size={14} color={Colors.primary} />
+                        <Text style={styles.mapCoordsText}>
+                          {mapMarker.latitude.toFixed(5)}, {mapMarker.longitude.toFixed(5)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.webMapFallback}>
+                    <Move size={32} color={Colors.textMuted} />
+                    <Text style={styles.webMapText}>Map picker is available on mobile devices</Text>
+                    <Text style={styles.webMapSubtext}>Please use the mobile app to pick a location on the map</Text>
+                  </View>
+                )}
+
+                <View style={styles.mapPickerActions}>
+                  {userLocation && (
+                    <TouchableOpacity
+                      style={styles.useLocationButton}
+                      onPress={handleUseCurrentLocation}
+                      activeOpacity={0.7}
+                    >
+                      <Navigation size={16} color={Colors.primary} />
+                      <Text style={styles.useLocationText}>Use my current location</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.mapConfirmButton, !mapMarker && { opacity: 0.4 }]}
+                    onPress={() => {
+                      if (mapMarker) {
+                        setShowMapPicker(false);
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      }
+                    }}
+                    disabled={!mapMarker}
+                    activeOpacity={0.8}
+                  >
+                    <Check size={18} color={Colors.white} />
+                    <Text style={styles.mapConfirmText}>Confirm Location</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -948,6 +1040,136 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.primary,
     fontWeight: "600" as const,
+  },
+  mapPickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 14,
+    marginBottom: 20,
+  },
+  mapPickerIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: "rgba(230,57,70,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapPickerButtonTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  mapPickerCoords: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  mapPickerHint: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  mapPickerCheckmark: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.success,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapPickerContainer: {
+    flex: 1,
+    paddingHorizontal: 0,
+  },
+  mapPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  mapPickerTitle: {
+    fontSize: 17,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  mapPickerInstruction: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  mapContainer: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginHorizontal: 16,
+  },
+  map: {
+    flex: 1,
+    minHeight: 350,
+  },
+  mapCoordsBanner: {
+    position: "absolute" as const,
+    bottom: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(13,13,13,0.88)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  mapCoordsText: {
+    fontSize: 13,
+    color: Colors.white,
+    fontWeight: "500" as const,
+  },
+  webMapFallback: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 16,
+    minHeight: 300,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    gap: 10,
+  },
+  webMapText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: "600" as const,
+  },
+  webMapSubtext: {
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  mapPickerActions: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  mapConfirmButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  mapConfirmText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.white,
   },
   customFormActions: {
     flexDirection: "row",

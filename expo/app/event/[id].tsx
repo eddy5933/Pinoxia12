@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Linking,
+  Platform,
+  ActionSheetIOS,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import {
@@ -28,6 +31,7 @@ import {
   Dumbbell,
   Sun,
   Sunrise,
+  ExternalLink,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -93,6 +97,61 @@ export default function EventDetailScreen() {
     );
     return formatDistance(km);
   }, [userLocation, event]);
+
+  const canNavigate = useMemo(() => {
+    if (!event || !myInvitation) return isHost;
+    return myInvitation.status === "accepted" || isHost;
+  }, [event, myInvitation, isHost]);
+
+  const handleNavigate = useCallback(() => {
+    if (!event) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const { latitude, longitude, restaurantName } = event;
+    const encodedName = encodeURIComponent(restaurantName);
+    const googleMapsWeb = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&destination_place_id=&travelmode=driving`;
+    const appleMapsUrl = `maps:0,0?q=${encodedName}&ll=${latitude},${longitude}&dirflg=d`;
+    const googleMapsApp = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
+    const wazeUrl = `waze://?ll=${latitude},${longitude}&navigate=yes`;
+
+    if (Platform.OS === "web") {
+      void Linking.openURL(googleMapsWeb);
+      return;
+    }
+
+    if (Platform.OS === "ios") {
+      const checkApps = async () => {
+        const options: string[] = ["Apple Maps"];
+        const urls: string[] = [appleMapsUrl];
+        try {
+          if (await Linking.canOpenURL(googleMapsApp)) {
+            options.push("Google Maps");
+            urls.push(googleMapsApp);
+          }
+        } catch (e) { console.log("[Event] Google Maps check:", e); }
+        try {
+          if (await Linking.canOpenURL(wazeUrl)) {
+            options.push("Waze");
+            urls.push(wazeUrl);
+          }
+        } catch (e) { console.log("[Event] Waze check:", e); }
+        options.push("Cancel");
+        ActionSheetIOS.showActionSheetWithOptions(
+          { options, cancelButtonIndex: options.length - 1, title: `Navigate to ${restaurantName}` },
+          (idx) => {
+            if (idx < urls.length) void Linking.openURL(urls[idx]);
+          }
+        );
+      };
+      void checkApps();
+    } else {
+      Alert.alert(`Navigate to ${restaurantName}`, "Choose navigation app", [
+        { text: "Google Maps", onPress: () => void Linking.openURL(googleMapsWeb) },
+        { text: "Waze", onPress: () => void Linking.openURL(wazeUrl) },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    }
+  }, [event]);
 
   const eventDateFormatted = useMemo(() => {
     if (!event) return "";
@@ -253,6 +312,24 @@ export default function EventDetailScreen() {
             </>
           )}
         </View>
+
+        {canNavigate && (
+          <TouchableOpacity
+            style={styles.navigateButton}
+            onPress={handleNavigate}
+            activeOpacity={0.8}
+            testID="navigate-button"
+          >
+            <View style={styles.navigateIconWrap}>
+              <Navigation size={20} color={Colors.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.navigateButtonText}>Navigate to {event.restaurantName}</Text>
+              <Text style={styles.navigateButtonSub}>Open in maps app</Text>
+            </View>
+            <ExternalLink size={18} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Guest List</Text>
@@ -636,5 +713,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: "#FF3B30",
+  },
+  navigateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: "#1B8A4A",
+    gap: 14,
+  },
+  navigateIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  navigateButtonText: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  navigateButtonSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
   },
 });
