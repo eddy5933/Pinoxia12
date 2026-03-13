@@ -412,6 +412,36 @@ function FamilyMarkerWrapper({
   );
 }
 
+function EventMarkerView({ event }: { event: EventWithInvitations }) {
+  const eventDate = new Date(event.eventDate);
+  const now = new Date();
+  const timeStr = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isToday = eventDate.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = eventDate.toDateString() === tomorrow.toDateString();
+  const dateLabel = isToday ? `Today, ${timeStr}` : isTomorrow ? `Tomorrow, ${timeStr}` : `${eventDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+
+  return (
+    <View style={eventMarkerStyles.wrapper}>
+      <View style={eventMarkerStyles.banner}>
+        <View style={eventMarkerStyles.bannerIconWrap}>
+          <Calendar size={10} color="#fff" />
+        </View>
+        <Text style={eventMarkerStyles.bannerTitle} numberOfLines={1}>{event.title}</Text>
+      </View>
+      <View style={eventMarkerStyles.bannerArrow} />
+      <View style={eventMarkerStyles.pinOuter}>
+        <View style={eventMarkerStyles.pinInner}>
+          <Calendar size={14} color="#fff" />
+        </View>
+      </View>
+      <View style={eventMarkerStyles.pulseRing} />
+      <Text style={eventMarkerStyles.dateTag}>{dateLabel}</Text>
+    </View>
+  );
+}
+
 function EventMarkerWrapper({
   event,
   Marker,
@@ -423,6 +453,15 @@ function EventMarkerWrapper({
   Callout: any;
   onPress?: (event: EventWithInvitations) => void;
 }) {
+  const [trackChanges, setTrackChanges] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTrackChanges(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const eventDate = new Date(event.eventDate);
   const now = new Date();
   const isPast = eventDate.getTime() < now.getTime();
@@ -435,10 +474,15 @@ function EventMarkerWrapper({
 
   if (isPast) return null;
 
+  console.log('[MapScreen] Rendering event marker:', event.title, 'at', event.latitude, event.longitude);
+
   return (
     <Marker
       coordinate={{ latitude: event.latitude, longitude: event.longitude }}
-      tracksViewChanges={false}
+      tracksViewChanges={Platform.OS === 'android' ? false : trackChanges}
+      pinColor={Platform.OS === 'android' ? '#10B981' : undefined}
+      title={Platform.OS === 'android' ? `${event.title}` : undefined}
+      description={Platform.OS === 'android' ? `${event.restaurantName} - ${dateLabel}` : undefined}
       zIndex={500}
       onPress={() => {
         console.log('[MapScreen] Event marker tapped:', event.title, event.id);
@@ -446,28 +490,23 @@ function EventMarkerWrapper({
         if (onPress) onPress(event);
       }}
     >
-      <View style={eventMarkerStyles.touchable}>
-        <View style={eventMarkerStyles.container}>
-          <View style={eventMarkerStyles.flagPole}>
-            <View style={eventMarkerStyles.flag}>
-              <Calendar size={12} color="#fff" />
-              <Text style={eventMarkerStyles.flagText} numberOfLines={1}>{event.title}</Text>
-            </View>
-            <View style={eventMarkerStyles.pole} />
-          </View>
-          <View style={eventMarkerStyles.baseCircle}>
-            <View style={eventMarkerStyles.baseDot} />
-          </View>
-          <Text style={eventMarkerStyles.dateTag}>{dateLabel}</Text>
-        </View>
-      </View>
+      {Platform.OS === 'ios' ? (
+        <EventMarkerView event={event} />
+      ) : null}
       <Callout tooltip onPress={() => {
         console.log('[MapScreen] Event callout tapped:', event.title);
         if (onPress) onPress(event);
       }}>
         <View style={eventMarkerStyles.calloutBox}>
-          <Text style={eventMarkerStyles.calloutTitle} numberOfLines={1}>{event.title}</Text>
-          <Text style={eventMarkerStyles.calloutSubtitle}>{event.restaurantName}</Text>
+          <View style={eventMarkerStyles.calloutHeader}>
+            <View style={eventMarkerStyles.calloutIconWrap}>
+              <Calendar size={12} color="#10B981" />
+            </View>
+            <View style={eventMarkerStyles.calloutInfo}>
+              <Text style={eventMarkerStyles.calloutTitle} numberOfLines={1}>{event.title}</Text>
+              <Text style={eventMarkerStyles.calloutSubtitle}>{event.restaurantName}</Text>
+            </View>
+          </View>
           <Text style={eventMarkerStyles.calloutDate}>{dateLabel}</Text>
           <Text style={eventMarkerStyles.calloutHint}>Tap for details</Text>
         </View>
@@ -2616,75 +2655,98 @@ const markerStyles = StyleSheet.create({
 });
 
 const eventMarkerStyles = StyleSheet.create({
-  touchable: {
-    alignItems: "center",
-  },
-  container: {
-    alignItems: "center",
-  },
-  flagPole: {
+  wrapper: {
     alignItems: "center" as const,
+    width: 140,
   },
-  flag: {
+  banner: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    backgroundColor: "#F59E0B",
+    backgroundColor: "#10B981",
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    borderBottomRightRadius: 6,
-    borderBottomLeftRadius: 0,
+    paddingVertical: 4,
+    borderRadius: 10,
     maxWidth: 130,
-    shadowColor: "#F59E0B",
+    shadowColor: "#10B981",
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 10,
+    gap: 4,
+  },
+  bannerIconWrap: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  bannerTitle: {
+    fontSize: 10,
+    fontWeight: "800" as const,
+    color: "#fff",
+    flexShrink: 1,
+    letterSpacing: 0.2,
+  },
+  bannerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#10B981",
+    alignSelf: "center" as const,
+  },
+  pinOuter: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginTop: 2,
+  },
+  pinInner: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#10B981",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: 2.5,
+    borderColor: "#fff",
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.7,
     shadowRadius: 6,
     elevation: 8,
   },
-  flagText: {
-    fontSize: Platform.OS === 'android' ? 9 : 11,
-    fontWeight: "800" as const,
-    color: "#1C1917",
-    marginLeft: 4,
-    flexShrink: 1,
-  },
-  pole: {
-    width: 2.5,
-    height: Platform.OS === 'android' ? 14 : 18,
-    backgroundColor: "#F59E0B",
-    alignSelf: "flex-start" as const,
-    marginLeft: 0,
-  },
-  baseCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "rgba(245, 158, 11, 0.25)",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    alignSelf: "flex-start" as const,
-    marginTop: -1,
-    marginLeft: -5.5,
-  },
-  baseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#F59E0B",
+  pulseRing: {
+    position: "absolute" as const,
+    bottom: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+    alignSelf: "center" as const,
   },
   dateTag: {
-    fontSize: Platform.OS === 'android' ? 8 : 9,
+    fontSize: 8,
     fontWeight: "700" as const,
-    color: "#F59E0B",
+    color: "#10B981",
     textAlign: "center" as const,
-    marginTop: 3,
-    backgroundColor: "rgba(28, 25, 23, 0.85)",
-    paddingHorizontal: 5,
+    marginTop: 2,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     overflow: "hidden" as const,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.25)",
   },
   calloutBox: {
     backgroundColor: Colors.surface,
@@ -2692,13 +2754,29 @@ const eventMarkerStyles = StyleSheet.create({
     padding: 10,
     minWidth: 180,
     maxWidth: 220,
-    borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderWidth: 1.5,
+    borderColor: "#10B981",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 10,
+  },
+  calloutHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  calloutIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  calloutInfo: {
+    flex: 1,
   },
   calloutTitle: {
     fontSize: 14,
@@ -2708,18 +2786,18 @@ const eventMarkerStyles = StyleSheet.create({
   calloutSubtitle: {
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   calloutDate: {
     fontSize: 11,
-    color: "#F59E0B",
+    color: "#10B981",
     fontWeight: "600" as const,
-    marginTop: 3,
+    marginTop: 6,
   },
   calloutHint: {
     fontSize: 11,
     fontWeight: "500" as const,
-    color: "#F59E0B",
+    color: "#10B981",
     textAlign: "center" as const,
     marginTop: 4,
   },
