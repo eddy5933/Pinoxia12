@@ -8,6 +8,7 @@ import { useLocation, getDistanceKm } from "@/providers/LocationProvider";
 import {
   EventWithInvitations,
   EventRSVP,
+  EventType,
 } from "@/types";
 
 const PROXIMITY_THRESHOLD_KM = 0.5;
@@ -44,10 +45,10 @@ async function fetchUserEvents(userId: string): Promise<EventWithInvitations[]> 
       hostName: row.host_name,
       title: row.title,
       description: row.description ?? "",
+      eventType: (row.event_type as EventType) ?? "dinner",
       restaurantName: row.restaurant_name,
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
-      address: row.address ?? "",
       eventDate: row.event_date,
       createdAt: row.created_at,
       invitations: [],
@@ -64,10 +65,10 @@ async function fetchUserEvents(userId: string): Promise<EventWithInvitations[]> 
         hostName: evt.host_name,
         title: evt.title,
         description: evt.description ?? "",
+        eventType: (evt.event_type as EventType) ?? "dinner",
         restaurantName: evt.restaurant_name,
         latitude: Number(evt.latitude),
         longitude: Number(evt.longitude),
-        address: evt.address ?? "",
         eventDate: evt.event_date,
         createdAt: evt.created_at,
         invitations: [],
@@ -201,10 +202,10 @@ export const [EventProvider, useEvents] = createContextHook(() => {
     mutationFn: async (params: {
       title: string;
       description: string;
+      eventType: EventType;
       restaurantName: string;
       latitude: number;
       longitude: number;
-      address: string;
       eventDate: string;
       invitedFriendIds: { userId: string; name: string }[];
     }) => {
@@ -218,10 +219,10 @@ export const [EventProvider, useEvents] = createContextHook(() => {
           host_name: user.name,
           title: params.title,
           description: params.description,
+          event_type: params.eventType,
           restaurant_name: params.restaurantName,
           latitude: params.latitude,
           longitude: params.longitude,
-          address: params.address,
           event_date: params.eventDate,
         })
         .select()

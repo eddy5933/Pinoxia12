@@ -50,16 +50,18 @@ export type OnlineVisibility = "hidden" | "friends_only" | "everyone";
 
 export type EventRSVP = "pending" | "accepted" | "declined";
 
+export type EventType = "breakfast" | "lunch" | "dinner" | "coffee" | "shopping" | "picnic" | "sport";
+
 export interface DinnerEvent {
   id: string;
   hostId: string;
   hostName: string;
   title: string;
   description: string;
+  eventType: EventType;
   restaurantName: string;
   latitude: number;
   longitude: number;
-  address: string;
   eventDate: string;
   createdAt: string;
 }
