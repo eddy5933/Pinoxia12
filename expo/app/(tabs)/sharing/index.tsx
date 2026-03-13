@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -28,16 +28,36 @@ import type { Friend } from "@/types";
 
 type Tab = "viewing" | "sharing";
 
+function useTickEvery(ms: number) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return tick;
+}
+
+function computeTimeAgo(updatedAt: string): string {
+  const diff = Date.now() - new Date(updatedAt).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 function SharingUserCard({
   friend,
-  distance,
   type,
+  userLocation,
 }: {
   friend: FriendLocation;
-  distance: string | null;
   type: "close_friend" | "family";
+  userLocation: { latitude: number; longitude: number } | null;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const tick = useTickEvery(5000);
   const initials = friend.name
     .split(" ")
     .map((w) => w[0])
@@ -56,15 +76,14 @@ function SharingUserCard({
     Animated.spring(scaleAnim, { toValue: 1, friction: 3, useNativeDriver: true }).start();
   }, [scaleAnim]);
 
-  const timeAgo = useMemo(() => {
-    const diff = Date.now() - new Date(friend.updatedAt).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-  }, [friend.updatedAt]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const distance = useMemo(() => {
+    if (!userLocation) return null;
+    return formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, friend.latitude, friend.longitude));
+  }, [userLocation, friend.latitude, friend.longitude, tick]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const timeAgo = useMemo(() => computeTimeAgo(friend.updatedAt), [friend.updatedAt, tick]);
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -243,24 +262,15 @@ export default function SharingScreen() {
   }, [tabIndicatorAnim]);
 
   const viewingData = useMemo(() => {
-    const items: { friend: FriendLocation; type: "close_friend" | "family"; distance: string | null }[] = [];
+    const items: { friend: FriendLocation; type: "close_friend" | "family" }[] = [];
     for (const fl of friendLocations) {
-      const dist = userLocation
-        ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, fl.latitude, fl.longitude))
-        : null;
-      items.push({ friend: fl, type: "close_friend", distance: dist });
+      items.push({ friend: fl, type: "close_friend" });
     }
     for (const fl of familyLocations) {
-      items.push({
-        friend: fl,
-        type: "family",
-        distance: userLocation
-          ? formatDistance(getDistanceKm(userLocation.latitude, userLocation.longitude, fl.latitude, fl.longitude))
-          : null,
-      });
+      items.push({ friend: fl, type: "family" });
     }
     return items;
-  }, [friendLocations, familyLocations, userLocation]);
+  }, [friendLocations, familyLocations]);
 
   const sharingToData = useMemo(() => {
     const items: { friend: Friend; type: "close_friend" | "family"; isActive: boolean }[] = [];
@@ -373,8 +383,8 @@ export default function SharingScreen() {
                     <SharingUserCard
                       key={`view-cf-${d.friend.userId}`}
                       friend={d.friend}
-                      distance={d.distance}
                       type={d.type}
+                      userLocation={userLocation}
                     />
                   ))}
               </View>
@@ -396,8 +406,8 @@ export default function SharingScreen() {
                     <SharingUserCard
                       key={`view-fam-${d.friend.userId}`}
                       friend={d.friend}
-                      distance={d.distance}
                       type={d.type}
+                      userLocation={userLocation}
                     />
                   ))}
               </View>
