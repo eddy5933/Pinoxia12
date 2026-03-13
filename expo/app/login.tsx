@@ -235,11 +235,12 @@ const styles = StyleSheet.create({
   brandSection: {
     marginTop: 40,
     marginBottom: 40,
+    alignItems: "center" as const,
   },
   brandLogo: {
-    width: 96,
-    height: 96,
-    marginBottom: 8,
+    width: 140,
+    height: 140,
+    marginBottom: 12,
   },
   brandTitleRow: {
     flexDirection: "row" as const,
@@ -261,6 +262,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.textSecondary,
     marginTop: 8,
+    textAlign: "center" as const,
   },
   form: {
     gap: 14,

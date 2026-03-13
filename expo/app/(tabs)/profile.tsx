@@ -270,21 +270,26 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Events</Text>
-            <TouchableOpacity
-              style={styles.createEventBtn}
-              onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/create-event");
-              }}
-              activeOpacity={0.7}
-              testID="create-event"
-            >
-              <CalendarPlus size={16} color={Colors.primary} />
-              <Text style={styles.createEventText}>New Event</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.sectionTitle}>Events</Text>
+
+          <TouchableOpacity
+            style={styles.createEventBtn}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/create-event");
+            }}
+            activeOpacity={0.8}
+            testID="create-event"
+          >
+            <View style={styles.createEventIconWrap}>
+              <CalendarPlus size={22} color="#fff" />
+            </View>
+            <View style={styles.createEventTextWrap}>
+              <Text style={styles.createEventTitle}>Create New Event</Text>
+              <Text style={styles.createEventSubtitle}>Plan a meal with friends</Text>
+            </View>
+            <ChevronRight size={18} color={Colors.primary} />
+          </TouchableOpacity>
 
           {pendingInvitations.length > 0 && (
             <TouchableOpacity
@@ -647,16 +652,36 @@ const styles = StyleSheet.create({
   createEventBtn: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 6,
-    backgroundColor: "rgba(230,57,70,0.1)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    gap: 14,
+    backgroundColor: "rgba(230,57,70,0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(230,57,70,0.25)",
+    borderStyle: "dashed" as const,
+    marginBottom: 12,
   },
-  createEventText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.primary,
+  createEventIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  createEventTextWrap: {
+    flex: 1,
+  },
+  createEventTitle: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  createEventSubtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   pendingBanner: {
     flexDirection: "row" as const,
