@@ -428,7 +428,6 @@ function NativeMapView({
   onMarkerPress,
   onMapPress,
   onLongPress,
-  onLongPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
