@@ -1222,6 +1222,9 @@ export default function MapScreenExport() {
   const [centerTrigger, setCenterTrigger] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<Restaurant | null>(null);
   const selectedPlaceAnim = useRef(new Animated.Value(0)).current;
+  const [selectedUser, setSelectedUser] = useState<FriendLocation | null>(null);
+  const [selectedUserType, setSelectedUserType] = useState<'friend' | 'family'>('friend');
+  const selectedUserAnim = useRef(new Animated.Value(0)).current;
 
   const focusedRestaurant = useMemo(
     () => (focus ? restaurants.find((r) => r.id === focus) ?? null : null),
@@ -1408,6 +1411,16 @@ export default function MapScreenExport() {
     setFocusFriendLocation(friend);
     setFocusFriendTrigger((prev) => prev + 1);
     setShowFriendLocations(true);
+    setSelectedPlace(null);
+    setSelectedUser(friend);
+    setSelectedUserType('friend');
+    selectedUserAnim.setValue(0);
+    Animated.spring(selectedUserAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 65,
+      useNativeDriver: true,
+    }).start();
     console.log("[MapScreen] Focusing on friend:", friend.name, friend.latitude, friend.longitude);
     const idx = visibleFriendLocations.findIndex((f) => f.userId === friend.userId);
     if (idx >= 0 && friendListRef.current) {
@@ -1418,7 +1431,7 @@ export default function MapScreenExport() {
         friendListRef.current.scrollToOffset({ offset: idx * 78, animated: true });
       }
     }
-  }, [visibleFriendLocations]);
+  }, [visibleFriendLocations, selectedUserAnim]);
 
   const handleFocusFamily = useCallback((member: FriendLocation) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1427,6 +1440,16 @@ export default function MapScreenExport() {
     setFocusFriendLocation(member);
     setFocusFriendTrigger((prev) => prev + 1);
     setShowFamilyLocations(true);
+    setSelectedPlace(null);
+    setSelectedUser(member);
+    setSelectedUserType('family');
+    selectedUserAnim.setValue(0);
+    Animated.spring(selectedUserAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 65,
+      useNativeDriver: true,
+    }).start();
     console.log("[MapScreen] Focusing on family member:", member.name, member.latitude, member.longitude);
     const idx = visibleFamilyLocations.findIndex((f) => f.userId === member.userId);
     if (idx >= 0 && familyListRef.current) {
@@ -1437,7 +1460,7 @@ export default function MapScreenExport() {
         familyListRef.current.scrollToOffset({ offset: idx * 78, animated: true });
       }
     }
-  }, [visibleFamilyLocations]);
+  }, [visibleFamilyLocations, selectedUserAnim]);
 
   const handleMapPress = useCallback(() => {
     console.log("[MapScreen] Map pressed, closing dropdown");
@@ -1451,6 +1474,7 @@ export default function MapScreenExport() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setShowSuggestions(false);
       searchInputRef.current?.blur();
+      setSelectedUser(null);
       const place = restaurants.find((r) => r.id === restaurantId) ?? null;
       setSelectedPlace(place);
       if (place) {
@@ -1473,6 +1497,26 @@ export default function MapScreenExport() {
       useNativeDriver: true,
     }).start(() => setSelectedPlace(null));
   }, [selectedPlaceAnim]);
+
+  const handleDismissSelectedUser = useCallback(() => {
+    Animated.timing(selectedUserAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => setSelectedUser(null));
+  }, [selectedUserAnim]);
+
+  const handleNavigateToUser = useCallback((user: FriendLocation) => {
+    console.log("[MapScreen] Navigate to user:", user.name, user.latitude, user.longitude);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    openNavigation(user.latitude, user.longitude, user.name);
+  }, []);
+
+  const getUserDistance = useCallback((user: FriendLocation) => {
+    if (!userLocation) return null;
+    const km = getDistanceKm(userLocation.latitude, userLocation.longitude, user.latitude, user.longitude);
+    return formatDistance(km);
+  }, [userLocation]);
 
   const handleNavigateToPlace = useCallback((place: Restaurant) => {
     console.log("[MapScreen] Navigate to place:", place.name);
@@ -2054,6 +2098,96 @@ export default function MapScreenExport() {
           </View>
         )}
       </View>
+
+      {selectedUser && (
+        <Animated.View
+          style={[
+            userCardStyles.overlay,
+            {
+              opacity: selectedUserAnim,
+              transform: [{
+                translateY: selectedUserAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [120, 0],
+                }),
+              }],
+            },
+          ]}
+        >
+          <View style={userCardStyles.card}>
+            <TouchableOpacity
+              style={userCardStyles.closeBtn}
+              onPress={handleDismissSelectedUser}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              testID="dismiss-selected-user"
+            >
+              <X size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={userCardStyles.header}>
+              <View style={[
+                userCardStyles.avatarRing,
+                selectedUserType === 'family' ? userCardStyles.avatarRingFamily : userCardStyles.avatarRingFriend,
+              ]}>
+                {selectedUser.avatar ? (
+                  <RNImage
+                    source={{ uri: selectedUser.avatar }}
+                    style={userCardStyles.avatar}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[
+                    userCardStyles.avatarFallback,
+                    selectedUserType === 'family' ? userCardStyles.avatarFallbackFamily : userCardStyles.avatarFallbackFriend,
+                  ]}>
+                    <Text style={userCardStyles.initials}>
+                      {selectedUser.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                    </Text>
+                  </View>
+                )}
+                <View style={userCardStyles.onlineDot} />
+              </View>
+              <View style={userCardStyles.info}>
+                <Text style={userCardStyles.name} numberOfLines={1}>{selectedUser.name}</Text>
+                <View style={userCardStyles.meta}>
+                  <View style={[
+                    userCardStyles.typeBadge,
+                    selectedUserType === 'family' ? userCardStyles.typeBadgeFamily : userCardStyles.typeBadgeFriend,
+                  ]}>
+                    <Text style={[
+                      userCardStyles.typeBadgeText,
+                      selectedUserType === 'family' ? userCardStyles.typeBadgeTextFamily : userCardStyles.typeBadgeTextFriend,
+                    ]}>
+                      {selectedUserType === 'family' ? 'Family' : 'Close Friend'}
+                    </Text>
+                  </View>
+                  {getUserDistance(selectedUser) && (
+                    <>
+                      <View style={userCardStyles.dot} />
+                      <Navigation size={11} color={selectedUserType === 'family' ? '#A855F7' : '#3B82F6'} />
+                      <Text style={[
+                        userCardStyles.distance,
+                        selectedUserType === 'family' ? { color: '#A855F7' } : { color: '#3B82F6' },
+                      ]}>{getUserDistance(selectedUser)}</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[
+                userCardStyles.navigateBtn,
+                selectedUserType === 'family' ? userCardStyles.navigateBtnFamily : userCardStyles.navigateBtnFriend,
+              ]}
+              onPress={() => handleNavigateToUser(selectedUser)}
+              activeOpacity={0.8}
+              testID="selected-user-navigate"
+            >
+              <Navigation size={16} color="#fff" />
+              <Text style={userCardStyles.navigateBtnText}>Navigate to {selectedUser.name.split(' ')[0]}</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
 
       {selectedPlace && (
         <Animated.View
@@ -3773,6 +3907,161 @@ const selectedCardStyles = StyleSheet.create({
   },
   btnText: {
     fontSize: 14,
+    fontWeight: "700" as const,
+    color: "#fff",
+  },
+});
+
+const userCardStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute" as const,
+    bottom: 70,
+    left: 12,
+    right: 12,
+    zIndex: 1000,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 15,
+  },
+  closeBtn: {
+    position: "absolute" as const,
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  header: {
+    flexDirection: "row" as const,
+    gap: 12,
+    alignItems: "center" as const,
+  },
+  avatarRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    overflow: "hidden" as const,
+  },
+  avatarRingFriend: {
+    borderColor: "#3B82F6",
+  },
+  avatarRingFamily: {
+    borderColor: "#A855F7",
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  avatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  avatarFallbackFriend: {
+    backgroundColor: "#1E40AF",
+  },
+  avatarFallbackFamily: {
+    backgroundColor: "#7E22CE",
+  },
+  initials: {
+    fontSize: 18,
+    fontWeight: "800" as const,
+    color: Colors.white,
+  },
+  onlineDot: {
+    position: "absolute" as const,
+    bottom: 1,
+    right: 1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  info: {
+    flex: 1,
+    justifyContent: "center" as const,
+  },
+  name: {
+    fontSize: 17,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    paddingRight: 24,
+  },
+  meta: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 4,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  typeBadgeFriend: {
+    backgroundColor: "rgba(59,130,246,0.15)",
+  },
+  typeBadgeFamily: {
+    backgroundColor: "rgba(168,85,247,0.15)",
+  },
+  typeBadgeText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  typeBadgeTextFriend: {
+    color: "#60A5FA",
+  },
+  typeBadgeTextFamily: {
+    color: "#C084FC",
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+  distance: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+  },
+  navigateBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  navigateBtnFriend: {
+    backgroundColor: "#2563EB",
+  },
+  navigateBtnFamily: {
+    backgroundColor: "#9333EA",
+  },
+  navigateBtnText: {
+    fontSize: 15,
     fontWeight: "700" as const,
     color: "#fff",
   },
