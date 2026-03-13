@@ -190,6 +190,15 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
 
   useEffect(() => {
     void requestLocation();
+
+    const locationRefreshInterval = setInterval(() => {
+      console.log("[LocationProvider] Periodic location refresh triggered");
+      void requestLocation();
+    }, 15000);
+
+    return () => {
+      clearInterval(locationRefreshInterval);
+    };
   }, [requestLocation]);
 
   const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
