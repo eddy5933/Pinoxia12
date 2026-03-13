@@ -12,6 +12,7 @@ import { FriendsProvider } from "@/providers/FriendsProvider";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { OnlineStatusProvider } from "@/providers/OnlineStatusProvider";
 import { NotificationProvider, NotificationToast } from "@/providers/NotificationProvider";
+import { EventProvider } from "@/providers/EventProvider";
 import StatusPickerModal from "@/components/StatusPickerModal";
 import UserSync from "@/components/UserSync";
 import PushNotificationSetup from "@/components/PushNotificationSetup";
@@ -69,6 +70,23 @@ function RootLayoutNav() {
         options={{
           headerShown: false,
           presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="create-event"
+        options={{
+          title: "Create Event",
+          presentation: "modal",
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.white,
+        }}
+      />
+      <Stack.Screen
+        name="event/[id]"
+        options={{
+          title: "Event Details",
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.white,
         }}
       />
     </Stack>
@@ -181,11 +199,13 @@ export default function RootLayout() {
                 <ChatProvider>
                 <OnlineStatusProvider>
                   <NotificationProvider>
-                    <UserSync />
-                    <PushNotificationSetup />
-                    <RootLayoutNav />
-                    <StatusPickerModal />
-                    <NotificationToast />
+                    <EventProvider>
+                      <UserSync />
+                      <PushNotificationSetup />
+                      <RootLayoutNav />
+                      <StatusPickerModal />
+                      <NotificationToast />
+                    </EventProvider>
                   </NotificationProvider>
                 </OnlineStatusProvider>
                 </ChatProvider>

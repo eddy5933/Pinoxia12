@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,12 @@ import {
   Mail,
   Eye,
   Trash2,
+  UtensilsCrossed,
+  CalendarPlus,
+  Clock,
+  CheckCircle,
+  XCircle,
+  CircleDot,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -25,6 +31,7 @@ import Colors from "@/constants/colors";
 import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useAuth } from "@/providers/AuthProvider";
 import { useOnlineStatus } from "@/providers/OnlineStatusProvider";
+import { useEvents } from "@/providers/EventProvider";
 import { OnlineVisibility } from "@/types";
 
 export default function ProfileScreen() {
@@ -32,6 +39,28 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, isLoading, logout, deleteAccount, toggleRole } = useAuth();
   const { visibility, openStatusPicker } = useOnlineStatus();
+  const { myEvents, pendingInvitations, myInvitations } = useEvents();
+
+  const upcomingEvents = useMemo(() => {
+    const now = new Date();
+    return [...myEvents, ...myInvitations]
+      .filter((e) => new Date(e.eventDate) >= now)
+      .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime())
+      .slice(0, 5);
+  }, [myEvents, myInvitations]);
+
+  const formatEventDate = useCallback((dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }, []);
+
+  const formatEventTime = useCallback((dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }, []);
 
   const visibilityLabel: Record<OnlineVisibility, string> = {
     hidden: "Invisible",
@@ -237,6 +266,146 @@ export default function ProfileScreen() {
                 <ChevronRight size={18} color={Colors.textMuted} />
               </TouchableOpacity>
             </>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Events</Text>
+            <TouchableOpacity
+              style={styles.createEventBtn}
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/create-event");
+              }}
+              activeOpacity={0.7}
+              testID="create-event"
+            >
+              <CalendarPlus size={16} color={Colors.primary} />
+              <Text style={styles.createEventText}>New Event</Text>
+            </TouchableOpacity>
+          </View>
+
+          {pendingInvitations.length > 0 && (
+            <TouchableOpacity
+              style={styles.pendingBanner}
+              onPress={() => {
+                if (pendingInvitations[0]) {
+                  router.push(`/event/${pendingInvitations[0].id}`);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.pendingDot} />
+              <Text style={styles.pendingText}>
+                {pendingInvitations.length} pending invitation{pendingInvitations.length > 1 ? "s" : ""}
+              </Text>
+              <ChevronRight size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+
+          {upcomingEvents.length === 0 ? (
+            <View style={styles.emptyEvents}>
+              <UtensilsCrossed size={24} color={Colors.textMuted} />
+              <Text style={styles.emptyEventsText}>No upcoming events</Text>
+              <Text style={styles.emptyEventsSubtext}>
+                Plan a dinner with your friends!
+              </Text>
+            </View>
+          ) : (
+            upcomingEvents.map((event) => {
+              const isHost = event.hostId === user.id;
+              const accepted = event.invitations.filter((i) => i.status === "accepted").length;
+              const myInvite = event.invitations.find((i) => i.invitedUserId === user.id);
+              return (
+                <TouchableOpacity
+                  key={event.id}
+                  style={styles.eventCard}
+                  onPress={() => router.push(`/event/${event.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.eventCardLeft}>
+                    <View style={styles.eventDateBox}>
+                      <Text style={styles.eventDateDay}>
+                        {new Date(event.eventDate).getDate()}
+                      </Text>
+                      <Text style={styles.eventDateMonth}>
+                        {new Date(event.eventDate).toLocaleDateString("en-US", { month: "short" })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.eventCardContent}>
+                    <Text style={styles.eventCardTitle} numberOfLines={1}>
+                      {event.title}
+                    </Text>
+                    <View style={styles.eventCardMeta}>
+                      <UtensilsCrossed size={12} color={Colors.textMuted} />
+                      <Text style={styles.eventCardMetaText} numberOfLines={1}>
+                        {event.restaurantName}
+                      </Text>
+                    </View>
+                    <View style={styles.eventCardMeta}>
+                      <Clock size={12} color={Colors.textMuted} />
+                      <Text style={styles.eventCardMetaText}>
+                        {formatEventDate(event.eventDate)} at {formatEventTime(event.eventDate)}
+                      </Text>
+                    </View>
+                    <View style={styles.eventCardFooter}>
+                      {isHost ? (
+                        <View style={styles.hostBadge}>
+                          <Text style={styles.hostBadgeText}>Host</Text>
+                        </View>
+                      ) : myInvite ? (
+                        <View
+                          style={[
+                            styles.rsvpMini,
+                            {
+                              backgroundColor:
+                                myInvite.status === "accepted"
+                                  ? "rgba(76,175,80,0.12)"
+                                  : myInvite.status === "declined"
+                                  ? "rgba(255,107,107,0.12)"
+                                  : "rgba(255,184,0,0.12)",
+                            },
+                          ]}
+                        >
+                          {myInvite.status === "accepted" ? (
+                            <CheckCircle size={12} color="#4CAF50" />
+                          ) : myInvite.status === "declined" ? (
+                            <XCircle size={12} color="#FF6B6B" />
+                          ) : (
+                            <CircleDot size={12} color="#FFB800" />
+                          )}
+                          <Text
+                            style={[
+                              styles.rsvpMiniText,
+                              {
+                                color:
+                                  myInvite.status === "accepted"
+                                    ? "#4CAF50"
+                                    : myInvite.status === "declined"
+                                    ? "#FF6B6B"
+                                    : "#FFB800",
+                              },
+                            ]}
+                          >
+                            {myInvite.status === "accepted"
+                              ? "Going"
+                              : myInvite.status === "declined"
+                              ? "Declined"
+                              : "Pending"}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text style={styles.attendeeCount}>
+                        {accepted} attending
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
 
@@ -468,5 +637,148 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: "#FF3B30",
+  },
+  sectionHeader: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: 12,
+  },
+  createEventBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    backgroundColor: "rgba(230,57,70,0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  createEventText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+  },
+  pendingBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "rgba(230,57,70,0.08)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(230,57,70,0.2)",
+  },
+  pendingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  pendingText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+  },
+  emptyEvents: {
+    alignItems: "center" as const,
+    paddingVertical: 24,
+    gap: 8,
+  },
+  emptyEventsText: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  emptyEventsSubtext: {
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  eventCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  eventCardLeft: {
+    alignItems: "center" as const,
+  },
+  eventDateBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "rgba(230,57,70,0.12)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  eventDateDay: {
+    fontSize: 18,
+    fontWeight: "800" as const,
+    color: Colors.primary,
+    lineHeight: 22,
+  },
+  eventDateMonth: {
+    fontSize: 10,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+    textTransform: "uppercase" as const,
+  },
+  eventCardContent: {
+    flex: 1,
+    gap: 3,
+  },
+  eventCardTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  eventCardMeta: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+  },
+  eventCardMetaText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  eventCardFooter: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginTop: 4,
+  },
+  hostBadge: {
+    backgroundColor: "rgba(230,57,70,0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  hostBadgeText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+  },
+  rsvpMini: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  rsvpMiniText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+  },
+  attendeeCount: {
+    fontSize: 11,
+    color: Colors.textMuted,
   },
 });

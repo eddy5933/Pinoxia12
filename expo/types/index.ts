@@ -48,6 +48,35 @@ export interface Review {
 
 export type OnlineVisibility = "hidden" | "friends_only" | "everyone";
 
+export type EventRSVP = "pending" | "accepted" | "declined";
+
+export interface DinnerEvent {
+  id: string;
+  hostId: string;
+  hostName: string;
+  title: string;
+  description: string;
+  restaurantName: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  eventDate: string;
+  createdAt: string;
+}
+
+export interface EventInvitation {
+  id: string;
+  eventId: string;
+  invitedUserId: string;
+  invitedUserName: string;
+  status: EventRSVP;
+  respondedAt?: string;
+}
+
+export interface EventWithInvitations extends DinnerEvent {
+  invitations: EventInvitation[];
+}
+
 export type FriendStatus = "pending" | "accepted" | "rejected";
 
 export interface FriendRequest {
