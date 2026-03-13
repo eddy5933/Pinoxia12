@@ -492,9 +492,7 @@ function EventMarkerWrapper({
         if (onPress) onPress(event);
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <EventMarkerView event={event} />
-      ) : null}
+      <EventMarkerView event={event} />
       <Callout tooltip onPress={() => {
         console.log('[MapScreen] Event callout tapped:', event.title);
         if (onPress) onPress(event);
