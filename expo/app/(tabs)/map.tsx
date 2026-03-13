@@ -38,6 +38,10 @@ import {
   Check,
   Send,
   UserPlus,
+  Locate,
+  Timer,
+  Power,
+  Shield,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -45,7 +49,7 @@ import Colors from "@/constants/colors";
 import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
-import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
+import type { UserLocation, FriendLocation, LiveLocationDuration } from "@/providers/LocationProvider";
 import { Heart } from "lucide-react-native";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useEvents } from "@/providers/EventProvider";
@@ -892,6 +896,287 @@ interface QuickEventCoord {
   longitude: number;
 }
 
+interface LongPressCoord {
+  latitude: number;
+  longitude: number;
+}
+
+const LIVE_DURATION_OPTIONS: { label: string; value: LiveLocationDuration; icon: string }[] = [
+  { label: "15 minutes", value: 15, icon: "timer" },
+  { label: "30 minutes", value: 30, icon: "timer" },
+  { label: "1 hour", value: 60, icon: "timer" },
+  { label: "2 hours", value: 120, icon: "timer" },
+  { label: "Always on", value: "always", icon: "power" },
+];
+
+function LongPressActionModal({
+  visible,
+  coordinate,
+  onClose,
+  onNavigateHere,
+  onSwitchLiveLocation,
+  onCreateEvent,
+  liveLocationActive,
+  liveLocationRemainingLabel,
+  onStopLiveLocation,
+  onRequestAlwaysGPS,
+  backgroundPermissionGranted,
+}: {
+  visible: boolean;
+  coordinate: LongPressCoord | null;
+  onClose: () => void;
+  onNavigateHere: () => void;
+  onSwitchLiveLocation: (duration: LiveLocationDuration) => void;
+  onCreateEvent: () => void;
+  liveLocationActive: boolean;
+  liveLocationRemainingLabel: string | null;
+  onStopLiveLocation: () => void;
+  onRequestAlwaysGPS: () => void;
+  backgroundPermissionGranted: boolean;
+}) {
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setShowDurationPicker(false);
+      slideAnim.setValue(0);
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 65,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, slideAnim]);
+
+  const handleClose = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowDurationPicker(false);
+      onClose();
+    });
+  }, [slideAnim, onClose]);
+
+  if (!visible || !coordinate) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <TouchableOpacity
+        style={lpStyles.backdrop}
+        activeOpacity={1}
+        onPress={handleClose}
+      >
+        <Animated.View
+          style={[
+            lpStyles.container,
+            {
+              opacity: slideAnim,
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [300, 0],
+                }),
+              }],
+            },
+          ]}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={lpStyles.handle} />
+
+            <View style={lpStyles.headerRow}>
+              <View style={lpStyles.headerIcon}>
+                <MapPin size={18} color={Colors.primary} />
+              </View>
+              <View style={lpStyles.headerInfo}>
+                <Text style={lpStyles.title}>Dropped Pin</Text>
+                <Text style={lpStyles.subtitle}>
+                  {coordinate.latitude.toFixed(5)}, {coordinate.longitude.toFixed(5)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={lpStyles.closeBtn}
+                onPress={handleClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {!showDurationPicker ? (
+              <View style={lpStyles.optionsList}>
+                <TouchableOpacity
+                  style={lpStyles.optionRow}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    handleClose();
+                    setTimeout(() => onNavigateHere(), 300);
+                  }}
+                  activeOpacity={0.7}
+                  testID="lp-navigate-here"
+                >
+                  <View style={[lpStyles.optionIcon, { backgroundColor: 'rgba(37,99,235,0.15)' }]}>
+                    <Navigation size={18} color="#3B82F6" />
+                  </View>
+                  <View style={lpStyles.optionInfo}>
+                    <Text style={lpStyles.optionTitle}>Navigate Here</Text>
+                    <Text style={lpStyles.optionDesc}>Open directions in maps app</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={lpStyles.separator} />
+
+                <TouchableOpacity
+                  style={lpStyles.optionRow}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (liveLocationActive) {
+                      onStopLiveLocation();
+                      handleClose();
+                    } else {
+                      setShowDurationPicker(true);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                  testID="lp-live-location"
+                >
+                  <View style={[
+                    lpStyles.optionIcon,
+                    liveLocationActive
+                      ? { backgroundColor: 'rgba(16,185,129,0.15)' }
+                      : { backgroundColor: 'rgba(245,158,11,0.15)' },
+                  ]}>
+                    <Locate size={18} color={liveLocationActive ? '#10B981' : '#F59E0B'} />
+                  </View>
+                  <View style={lpStyles.optionInfo}>
+                    <Text style={lpStyles.optionTitle}>
+                      {liveLocationActive ? 'Stop Live Location' : 'Switch On Live Location'}
+                    </Text>
+                    <Text style={lpStyles.optionDesc}>
+                      {liveLocationActive && liveLocationRemainingLabel
+                        ? liveLocationRemainingLabel
+                        : 'Share your real-time location'}
+                    </Text>
+                  </View>
+                  {liveLocationActive && (
+                    <View style={lpStyles.activeBadge}>
+                      <View style={lpStyles.activeDot} />
+                      <Text style={lpStyles.activeBadgeText}>ON</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={lpStyles.separator} />
+
+                <TouchableOpacity
+                  style={lpStyles.optionRow}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    handleClose();
+                    setTimeout(() => onRequestAlwaysGPS(), 300);
+                  }}
+                  activeOpacity={0.7}
+                  testID="lp-always-gps"
+                >
+                  <View style={[
+                    lpStyles.optionIcon,
+                    backgroundPermissionGranted
+                      ? { backgroundColor: 'rgba(16,185,129,0.15)' }
+                      : { backgroundColor: 'rgba(168,85,247,0.15)' },
+                  ]}>
+                    <Shield size={18} color={backgroundPermissionGranted ? '#10B981' : '#A855F7'} />
+                  </View>
+                  <View style={lpStyles.optionInfo}>
+                    <Text style={lpStyles.optionTitle}>Always Use GPS</Text>
+                    <Text style={lpStyles.optionDesc}>
+                      {backgroundPermissionGranted
+                        ? 'Background location is enabled'
+                        : 'Allow GPS even when app is closed'}
+                    </Text>
+                  </View>
+                  {backgroundPermissionGranted && (
+                    <View style={[lpStyles.activeBadge, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                      <Check size={12} color="#10B981" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={lpStyles.separator} />
+
+                <TouchableOpacity
+                  style={lpStyles.optionRow}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    handleClose();
+                    setTimeout(() => onCreateEvent(), 300);
+                  }}
+                  activeOpacity={0.7}
+                  testID="lp-create-event"
+                >
+                  <View style={[lpStyles.optionIcon, { backgroundColor: 'rgba(230,57,70,0.15)' }]}>
+                    <Calendar size={18} color={Colors.primary} />
+                  </View>
+                  <View style={lpStyles.optionInfo}>
+                    <Text style={lpStyles.optionTitle}>Create Quick Event</Text>
+                    <Text style={lpStyles.optionDesc}>Invite friends to meet here</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={lpStyles.durationSection}>
+                <View style={lpStyles.durationHeader}>
+                  <TouchableOpacity
+                    onPress={() => setShowDurationPicker(false)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={lpStyles.durationBack}>← Back</Text>
+                  </TouchableOpacity>
+                  <Text style={lpStyles.durationTitle}>Live Location Duration</Text>
+                </View>
+                {LIVE_DURATION_OPTIONS.map((opt, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={lpStyles.durationRow}
+                    onPress={() => {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      onSwitchLiveLocation(opt.value);
+                      handleClose();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      lpStyles.durationIcon,
+                      opt.value === 'always'
+                        ? { backgroundColor: 'rgba(16,185,129,0.15)' }
+                        : { backgroundColor: 'rgba(245,158,11,0.15)' },
+                    ]}>
+                      {opt.value === 'always' ? (
+                        <Power size={16} color="#10B981" />
+                      ) : (
+                        <Timer size={16} color="#F59E0B" />
+                      )}
+                    </View>
+                    <Text style={lpStyles.durationLabel}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 const QUICK_TIME_OPTIONS = [
   { label: "In 10 min", minutes: 10 },
   { label: "In 30 min", minutes: 30 },
@@ -1180,7 +1465,7 @@ function QuickEventModal({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, liveLocationActive, liveLocationRemainingLabel, backgroundPermissionGranted, startLiveLocation, stopLiveLocation, requestBackgroundPermission } = useLocation();
   const { friends } = useFriends();
   const { createEvent, isCreating, events } = useEvents();
 
@@ -1196,6 +1481,8 @@ export default function MapScreenExport() {
 
   const [quickEventCoord, setQuickEventCoord] = useState<QuickEventCoord | null>(null);
   const [showQuickEvent, setShowQuickEvent] = useState(false);
+  const [longPressCoord, setLongPressCoord] = useState<LongPressCoord | null>(null);
+  const [showLongPressActions, setShowLongPressActions] = useState(false);
 
   const distanceMap = useMemo(() => {
     if (!userLocation) return new Map<string, string>();
@@ -1546,11 +1833,44 @@ export default function MapScreenExport() {
   const handleMapLongPress = useCallback((coordinate: { latitude: number; longitude: number }) => {
     console.log("[MapScreen] Long press detected at:", coordinate);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setQuickEventCoord(coordinate);
-    setShowQuickEvent(true);
+    setLongPressCoord(coordinate);
+    setShowLongPressActions(true);
     setShowSuggestions(false);
     searchInputRef.current?.blur();
   }, []);
+
+  const handleLongPressClose = useCallback(() => {
+    console.log("[MapScreen] Long press action modal closed");
+    setShowLongPressActions(false);
+  }, []);
+
+  const handleLongPressNavigate = useCallback(() => {
+    if (!longPressCoord) return;
+    console.log("[MapScreen] Navigate to long press location:", longPressCoord);
+    openNavigation(longPressCoord.latitude, longPressCoord.longitude, "Dropped Pin");
+  }, [longPressCoord]);
+
+  const handleLongPressSwitchLive = useCallback((duration: LiveLocationDuration) => {
+    console.log("[MapScreen] Switch on live location:", duration);
+    void startLiveLocation(duration);
+  }, [startLiveLocation]);
+
+  const handleLongPressCreateEvent = useCallback(() => {
+    if (!longPressCoord) return;
+    console.log("[MapScreen] Opening quick event from long press");
+    setQuickEventCoord(longPressCoord);
+    setShowQuickEvent(true);
+  }, [longPressCoord]);
+
+  const handleLongPressStopLive = useCallback(() => {
+    console.log("[MapScreen] Stopping live location from long press");
+    void stopLiveLocation();
+  }, [stopLiveLocation]);
+
+  const handleRequestAlwaysGPS = useCallback(() => {
+    console.log("[MapScreen] Requesting always GPS permission");
+    void requestBackgroundPermission();
+  }, [requestBackgroundPermission]);
 
   const handleQuickEventClose = useCallback(() => {
     console.log("[MapScreen] Quick event modal closed");
@@ -2291,6 +2611,20 @@ export default function MapScreenExport() {
         )}
       </View>
 
+      <LongPressActionModal
+        visible={showLongPressActions}
+        coordinate={longPressCoord}
+        onClose={handleLongPressClose}
+        onNavigateHere={handleLongPressNavigate}
+        onSwitchLiveLocation={handleLongPressSwitchLive}
+        onCreateEvent={handleLongPressCreateEvent}
+        liveLocationActive={liveLocationActive}
+        liveLocationRemainingLabel={liveLocationRemainingLabel}
+        onStopLiveLocation={handleLongPressStopLive}
+        onRequestAlwaysGPS={handleRequestAlwaysGPS}
+        backgroundPermissionGranted={backgroundPermissionGranted}
+      />
+
       <QuickEventModal
         visible={showQuickEvent}
         coordinate={quickEventCoord}
@@ -2302,6 +2636,166 @@ export default function MapScreenExport() {
     </View>
   );
 }
+
+const lpStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end" as const,
+  },
+  container: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderBottomWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.textMuted,
+    alignSelf: "center" as const,
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(230,57,70,0.15)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  optionsList: {
+    gap: 0,
+  },
+  optionRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 14,
+    paddingVertical: 14,
+  },
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  optionInfo: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+  optionDesc: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  activeBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    backgroundColor: "rgba(16,185,129,0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#10B981",
+  },
+  activeBadgeText: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#10B981",
+  },
+  durationSection: {
+    gap: 4,
+  },
+  durationHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    marginBottom: 12,
+  },
+  durationBack: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.primary,
+  },
+  durationTitle: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  durationRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 14,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  durationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  durationLabel: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.white,
+  },
+});
 
 const qeStyles = StyleSheet.create({
   backdrop: {

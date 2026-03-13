@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { Platform } from "react-native";
+import { Platform, Alert, Linking } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -56,6 +57,11 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
   return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 }
 
+export type LiveLocationDuration = 15 | 30 | 60 | 120 | 'always' | null;
+
+const LIVE_LOC_STORAGE_KEY = 'pinoxia_live_location';
+const BG_PERM_STORAGE_KEY = 'pinoxia_bg_location_granted';
+
 export const [LocationProvider, useLocation] = createContextHook(() => {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -65,6 +71,14 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const [closeFriendSharingEnabled, setCloseFriendSharingEnabled] = useState(true);
   const [familySharingEnabled, setFamilySharingEnabled] = useState(true);
   const shareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [liveLocationActive, setLiveLocationActive] = useState(false);
+  const [liveLocationDuration, setLiveLocationDuration] = useState<LiveLocationDuration>(null);
+  const [liveLocationEndTime, setLiveLocationEndTime] = useState<number | null>(null);
+  const [liveLocationRemainingLabel, setLiveLocationRemainingLabel] = useState<string | null>(null);
+  const [backgroundPermissionGranted, setBackgroundPermissionGranted] = useState(false);
+  const liveLocationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveLocationRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const requestLocation = useCallback(async () => {
     console.log("[LocationProvider] Requesting user location...");
@@ -200,6 +214,161 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       clearInterval(locationRefreshInterval);
     };
   }, [requestLocation]);
+
+  useEffect(() => {
+    const loadLiveLocationState = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(LIVE_LOC_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          console.log('[LocationProvider] Restored live location state:', parsed);
+          if (parsed.duration === 'always') {
+            setLiveLocationActive(true);
+            setLiveLocationDuration('always');
+            setLiveLocationEndTime(null);
+          } else if (parsed.endTime && parsed.endTime > Date.now()) {
+            setLiveLocationActive(true);
+            setLiveLocationDuration(parsed.duration);
+            setLiveLocationEndTime(parsed.endTime);
+          } else {
+            await AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+          }
+        }
+        const bgPerm = await AsyncStorage.getItem(BG_PERM_STORAGE_KEY);
+        if (bgPerm === 'true') {
+          setBackgroundPermissionGranted(true);
+        }
+      } catch (err) {
+        console.log('[LocationProvider] Failed to restore live location state:', err);
+      }
+    };
+    void loadLiveLocationState();
+  }, []);
+
+  useEffect(() => {
+    if (!liveLocationActive) {
+      if (liveLocationTimerRef.current) {
+        clearInterval(liveLocationTimerRef.current);
+        liveLocationTimerRef.current = null;
+      }
+      if (liveLocationRefreshRef.current) {
+        clearInterval(liveLocationRefreshRef.current);
+        liveLocationRefreshRef.current = null;
+      }
+      setLiveLocationRemainingLabel(null);
+      return;
+    }
+
+    if (liveLocationDuration !== 'always' && liveLocationEndTime) {
+      const updateRemaining = () => {
+        const remaining = liveLocationEndTime - Date.now();
+        if (remaining <= 0) {
+          console.log('[LocationProvider] Live location timer expired');
+          setLiveLocationActive(false);
+          setLiveLocationDuration(null);
+          setLiveLocationEndTime(null);
+          setLiveLocationRemainingLabel(null);
+          void AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+          return;
+        }
+        const mins = Math.ceil(remaining / 60000);
+        if (mins >= 60) {
+          const hrs = Math.floor(mins / 60);
+          const m = mins % 60;
+          setLiveLocationRemainingLabel(`${hrs}h ${m}m remaining`);
+        } else {
+          setLiveLocationRemainingLabel(`${mins}m remaining`);
+        }
+      };
+      updateRemaining();
+      liveLocationTimerRef.current = setInterval(updateRemaining, 30000);
+    } else if (liveLocationDuration === 'always') {
+      setLiveLocationRemainingLabel('Always on');
+    }
+
+    liveLocationRefreshRef.current = setInterval(() => {
+      console.log('[LocationProvider] Live location fast refresh');
+      void requestLocation();
+    }, 5000);
+
+    return () => {
+      if (liveLocationTimerRef.current) {
+        clearInterval(liveLocationTimerRef.current);
+        liveLocationTimerRef.current = null;
+      }
+      if (liveLocationRefreshRef.current) {
+        clearInterval(liveLocationRefreshRef.current);
+        liveLocationRefreshRef.current = null;
+      }
+    };
+  }, [liveLocationActive, liveLocationDuration, liveLocationEndTime, requestLocation]);
+
+  const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      console.log('[LocationProvider] Background location not supported on web');
+      return false;
+    }
+    try {
+      const Location = require('expo-location') as typeof import('expo-location');
+      const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+      if (fgStatus !== 'granted') {
+        console.log('[LocationProvider] Foreground permission denied, cannot request background');
+        Alert.alert('Permission Required', 'Please allow foreground location access first.');
+        return false;
+      }
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      console.log('[LocationProvider] Background permission status:', status);
+      if (status === 'granted') {
+        setBackgroundPermissionGranted(true);
+        await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+        return true;
+      } else {
+        Alert.alert(
+          'Background Location',
+          'To keep GPS active when the app is closed, please go to Settings and set location access to "Always".',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]
+        );
+        return false;
+      }
+    } catch (err) {
+      console.log('[LocationProvider] Background permission error:', err);
+      return false;
+    }
+  }, []);
+
+  const startLiveLocation = useCallback(async (duration: LiveLocationDuration) => {
+    if (!duration) return;
+    console.log('[LocationProvider] Starting live location with duration:', duration);
+
+    const bgGranted = await requestBackgroundPermission();
+    console.log('[LocationProvider] Background permission for live location:', bgGranted);
+
+    setLiveLocationActive(true);
+    setLiveLocationDuration(duration);
+
+    if (duration === 'always') {
+      setLiveLocationEndTime(null);
+      await AsyncStorage.setItem(LIVE_LOC_STORAGE_KEY, JSON.stringify({ duration: 'always' }));
+    } else {
+      const endTime = Date.now() + duration * 60 * 1000;
+      setLiveLocationEndTime(endTime);
+      await AsyncStorage.setItem(LIVE_LOC_STORAGE_KEY, JSON.stringify({ duration, endTime }));
+    }
+
+    void requestLocation();
+  }, [requestBackgroundPermission, requestLocation]);
+
+  const stopLiveLocation = useCallback(async () => {
+    console.log('[LocationProvider] Stopping live location');
+    setLiveLocationActive(false);
+    setLiveLocationDuration(null);
+    setLiveLocationEndTime(null);
+    setLiveLocationRemainingLabel(null);
+    await AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+  }, []);
 
   const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
     try {
@@ -492,8 +661,15 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       familyLocations,
       friendLocationsLoading: friendLocationsQuery.isLoading,
       familyLocationsLoading: familyLocationsQuery.isLoading,
+      liveLocationActive,
+      liveLocationDuration,
+      liveLocationRemainingLabel,
+      backgroundPermissionGranted,
+      startLiveLocation,
+      stopLiveLocation,
+      requestBackgroundPermission,
     }),
-    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, closeFriendSharingEnabled, familySharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading]
+    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, closeFriendSharingEnabled, familySharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading, liveLocationActive, liveLocationDuration, liveLocationRemainingLabel, backgroundPermissionGranted, startLiveLocation, stopLiveLocation, requestBackgroundPermission]
   );
 });
 
