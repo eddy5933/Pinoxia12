@@ -160,13 +160,19 @@ export default function FriendsScreen() {
   const handleFollowBack = useCallback(
     async (follower: Friend) => {
       if (!user) return;
-      const success = await followBack(follower.userId);
-      if (success) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Followed back! You are now friends", follower.name, "success");
-      } else {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already following", follower.name, "info");
+      try {
+        const success = await followBack(follower.userId);
+        if (success) {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showToast("Followed back! You are now friends", follower.name, "success");
+        } else {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          showToast("Already following", follower.name, "info");
+        }
+      } catch (err: any) {
+        console.warn("[Friends] handleFollowBack error:", err?.message);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showToast(err?.message ?? "Failed to follow back", follower.name, "error");
       }
     },
     [user, followBack, showToast]
@@ -175,13 +181,22 @@ export default function FriendsScreen() {
   const handleFollow = useCallback(
     async (toUser: PublicUser) => {
       if (!user) return;
-      const success = await sendFriendRequest(user, toUser);
-      if (success) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast("Now following!", toUser.name, "success");
-      } else {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        showToast("Already following", toUser.name, "info");
+      try {
+        const result = await sendFriendRequest(user, toUser);
+        if (result.success) {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showToast("Now following!", toUser.name, "success");
+        } else if (result.reason === "already_following") {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          showToast("Already following", toUser.name, "info");
+        } else {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          showToast(result.error ?? "Failed to follow", toUser.name, "error");
+        }
+      } catch (err: any) {
+        console.warn("[Friends] handleFollow error:", err?.message);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showToast("Something went wrong", toUser.name, "error");
       }
     },
     [user, sendFriendRequest, showToast]

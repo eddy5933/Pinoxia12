@@ -321,36 +321,57 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
 
   const sendFollowMutation = useMutation({
     mutationFn: async ({ fromUser, toUser }: { fromUser: User; toUser: PublicUser }) => {
-      const { data: existing } = await supabase
+      console.log("[Friends] Attempting to follow:", toUser.name, "(", toUser.id, ") from:", fromUser.name, "(", fromUser.id, ")");
+
+      const { data: existing, error: checkError } = await supabase
         .from("friends")
         .select("id")
         .eq("user_id", fromUser.id)
         .eq("friend_id", toUser.id)
         .maybeSingle();
 
-      if (existing) {
-        console.log("[Friends] Already following:", toUser.name);
-        return false;
+      if (checkError) {
+        console.warn("[Friends] Check existing follow error:", checkError.message, checkError.code, checkError.details);
+        throw new Error(`Failed to check follow status: ${checkError.message}`);
       }
 
-      const { error } = await supabase.from("friends").insert({
+      if (existing) {
+        console.log("[Friends] Already following:", toUser.name);
+        return { success: false, reason: "already_following" as const };
+      }
+
+      const insertPayload = {
         user_id: fromUser.id,
         friend_id: toUser.id,
         friend_name: toUser.name,
         friend_email: toUser.email,
-      });
+        friend_avatar: toUser.avatar ?? null,
+      };
+      console.log("[Friends] Inserting follow:", JSON.stringify(insertPayload));
+
+      const { data: insertData, error } = await supabase
+        .from("friends")
+        .insert(insertPayload)
+        .select("id")
+        .single();
 
       if (error) {
-        console.warn("[Friends] Follow error:", error.message);
-        return false;
+        console.warn("[Friends] Follow insert error:", error.message, error.code, error.details, error.hint);
+        throw new Error(`Failed to follow: ${error.message}`);
       }
 
-      console.log("[Friends] Now following:", toUser.name);
+      console.log("[Friends] Now following:", toUser.name, "row id:", insertData?.id);
 
-      void sendPushToUser(toUser.id, "New Follower", `${fromUser.name} started following you`, {
-        type: "follow",
-        userId: fromUser.id,
-      });
+      try {
+        await sendPushToUser(toUser.id, "New Follower", `${fromUser.name} started following you`, {
+          type: "follow",
+          userId: fromUser.id,
+          userName: fromUser.name,
+        });
+        console.log("[Friends] Push notification sent to:", toUser.name);
+      } catch (pushErr) {
+        console.warn("[Friends] Push notification failed (non-critical):", pushErr);
+      }
 
       const { data: theyFollowMe } = await supabase
         .from("friends")
@@ -364,24 +385,34 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         await ensureConversation(fromUser.id, fromUser.name, toUser.id, toUser.name);
       }
 
-      return true;
+      return { success: true, reason: "followed" as const };
     },
     onSuccess: () => {
       invalidate();
       delayedInvalidate(2000);
     },
+    onError: (error) => {
+      console.warn("[Friends] Follow mutation error:", error.message);
+    },
   });
 
   const followBackMutation = useMutation({
     mutationFn: async (followerUserId: string) => {
-      if (!currentUserId) return false;
+      if (!currentUserId) throw new Error("Not logged in");
 
-      const { data: existing } = await supabase
+      console.log("[Friends] Attempting follow back for:", followerUserId);
+
+      const { data: existing, error: checkError } = await supabase
         .from("friends")
         .select("id")
         .eq("user_id", currentUserId)
         .eq("friend_id", followerUserId)
         .maybeSingle();
+
+      if (checkError) {
+        console.warn("[Friends] Check follow back error:", checkError.message);
+        throw new Error(`Failed to check follow status: ${checkError.message}`);
+      }
 
       if (existing) {
         console.log("[Friends] Already following back");
@@ -401,15 +432,11 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
       });
 
       if (error) {
-        console.warn("[Friends] Follow back error:", error.message);
-        return false;
+        console.warn("[Friends] Follow back insert error:", error.message, error.code, error.details);
+        throw new Error(`Failed to follow back: ${error.message}`);
       }
 
       console.log("[Friends] Followed back:", name);
-
-      void sendPushToUser(followerUserId, "New Follower", `Someone followed you back!`, {
-        type: "follow_back",
-      });
 
       const { data: myProfile } = await supabase
         .from("profiles")
@@ -417,18 +444,39 @@ export const [FriendsProvider, useFriends] = createContextHook(() => {
         .eq("id", currentUserId)
         .maybeSingle();
 
-      await ensureConversation(currentUserId, myProfile?.name ?? "", followerUserId, name);
+      const myName = myProfile?.name ?? "";
+
+      try {
+        await sendPushToUser(followerUserId, "New Friend!", `${myName} followed you back! You are now friends.`, {
+          type: "follow_back",
+          userId: currentUserId,
+          userName: myName,
+        });
+      } catch (pushErr) {
+        console.warn("[Friends] Push for follow back failed (non-critical):", pushErr);
+      }
+
+      await ensureConversation(currentUserId, myName, followerUserId, name);
       return true;
     },
     onSuccess: () => {
       invalidate();
       delayedInvalidate(2000);
     },
+    onError: (error) => {
+      console.warn("[Friends] Follow back mutation error:", error.message);
+    },
   });
 
   const sendFriendRequest = useCallback(
-    async (fromUser: User, toUser: PublicUser) => {
-      return sendFollowMutation.mutateAsync({ fromUser, toUser });
+    async (fromUser: User, toUser: PublicUser): Promise<{ success: boolean; reason: string; error?: string }> => {
+      try {
+        const result = await sendFollowMutation.mutateAsync({ fromUser, toUser });
+        return { success: result.success, reason: result.reason };
+      } catch (err: any) {
+        console.warn("[Friends] sendFriendRequest caught error:", err?.message);
+        return { success: false, reason: "error", error: err?.message ?? "Unknown error" };
+      }
     },
     [sendFollowMutation]
   );

@@ -28,7 +28,7 @@ const NOTIFICATION_DURATION = 4000;
 
 export const [NotificationProvider, useNotifications] = createContextHook(() => {
   const { user } = useAuth();
-  const { requests } = useFriends();
+  const { requests, followers } = useFriends();
   const { messages, conversations } = useChat();
   const insets = useSafeAreaInsets();
 
@@ -40,14 +40,18 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
 
   const prevRequestCountRef = useRef<number | null>(null);
   const prevMessageCountRef = useRef<number | null>(null);
+  const prevFollowerCountRef = useRef<number | null>(null);
   const seenRequestIdsRef = useRef<Set<string>>(new Set());
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const seenFollowerIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     prevRequestCountRef.current = null;
     prevMessageCountRef.current = null;
+    prevFollowerCountRef.current = null;
     seenRequestIdsRef.current = new Set();
     seenMessageIdsRef.current = new Set();
+    seenFollowerIdsRef.current = new Set();
     console.log("[Notification] Reset seen refs for user:", user?.id ?? "none");
   }, [user?.id]);
 
@@ -133,6 +137,38 @@ export const [NotificationProvider, useNotifications] = createContextHook(() => 
     prevRequestCountRef.current = pendingForMe.length;
     pendingForMe.forEach((r) => seenRequestIdsRef.current.add(r.id));
   }, [requests, user, showNotification]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    if (prevFollowerCountRef.current === null) {
+      prevFollowerCountRef.current = followers.length;
+      followers.forEach((f) => seenFollowerIdsRef.current.add(f.userId));
+      console.log("[Notification] Initial followers count:", followers.length);
+      return;
+    }
+
+    const newFollowers = followers.filter(
+      (f) => !seenFollowerIdsRef.current.has(f.userId)
+    );
+
+    if (newFollowers.length > 0) {
+      const latest = newFollowers[0];
+      seenFollowerIdsRef.current.add(latest.userId);
+
+      showNotification({
+        id: `notif_follow_${latest.userId}_${Date.now()}`,
+        type: "friend_request",
+        title: "New Follower",
+        body: `${latest.name} started following you`,
+        timestamp: Date.now(),
+      });
+      console.log("[Notification] New follower detected:", latest.name);
+    }
+
+    prevFollowerCountRef.current = followers.length;
+    followers.forEach((f) => seenFollowerIdsRef.current.add(f.userId));
+  }, [followers, user, showNotification]);
 
   useEffect(() => {
     if (!user) return;
