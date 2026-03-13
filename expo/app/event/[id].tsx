@@ -382,7 +382,7 @@ export default function EventDetailScreen() {
           <View style={styles.rsvpSection}>
             <Text style={styles.rsvpTitle}>You're Invited!</Text>
             <Text style={styles.rsvpSubtitle}>
-              Will you be joining this dinner?
+              Will you be joining this event?
             </Text>
             <View style={styles.rsvpButtons}>
               <TouchableOpacity
@@ -419,7 +419,7 @@ export default function EventDetailScreen() {
           <View style={styles.respondedCard}>
             <Text style={styles.respondedText}>
               {myInvitation.status === "accepted"
-                ? "You're attending this dinner! 🎉"
+                ? "You're attending this event! 🎉"
                 : "You've declined this invitation."}
             </Text>
             {myInvitation.status === "accepted" && (

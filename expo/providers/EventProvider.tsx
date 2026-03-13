@@ -13,6 +13,8 @@ import {
 
 const PROXIMITY_THRESHOLD_KM = 0.5;
 const PROXIMITY_CHECK_INTERVAL = 15000;
+const PRE_EVENT_REMINDER_MINUTES = 15;
+const PRE_EVENT_CHECK_INTERVAL = 30000;
 
 async function fetchUserEvents(userId: string): Promise<EventWithInvitations[]> {
   console.log("[Events] Fetching events for user:", userId);
@@ -147,6 +149,47 @@ export const [EventProvider, useEvents] = createContextHook(() => {
     };
   }, [user?.id, invalidate]);
 
+  const preEventNotifiedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const checkPreEventReminders = () => {
+      const now = new Date();
+      for (const event of events) {
+        const myInvite = event.invitations.find(
+          (inv) => inv.invitedUserId === user.id && inv.status === "accepted"
+        );
+        const isAttending = myInvite || event.hostId === user.id;
+        if (!isAttending) continue;
+
+        const eventDate = new Date(event.eventDate);
+        const minutesUntilEvent = (eventDate.getTime() - now.getTime()) / (1000 * 60);
+        const reminderKey = `${event.id}_${user.id}_prereminder`;
+
+        if (
+          minutesUntilEvent > 0 &&
+          minutesUntilEvent <= PRE_EVENT_REMINDER_MINUTES &&
+          !preEventNotifiedRef.current.has(reminderKey)
+        ) {
+          preEventNotifiedRef.current.add(reminderKey);
+          console.log("[Events] Pre-event reminder for:", event.title, "in", Math.round(minutesUntilEvent), "min");
+
+          void sendPushToUser(
+            user.id,
+            `${event.title} starts soon!`,
+            `Your event at ${event.restaurantName} starts in ${Math.round(minutesUntilEvent)} minutes. Allow live location sharing so attendees can find you.`,
+            { type: "event_location_reminder", eventId: event.id }
+          );
+        }
+      }
+    };
+
+    checkPreEventReminders();
+    const interval = setInterval(checkPreEventReminders, PRE_EVENT_CHECK_INTERVAL);
+    return () => clearInterval(interval);
+  }, [user, events]);
+
   useEffect(() => {
     if (!user?.id || !userLocation) return;
 
@@ -267,7 +310,7 @@ export const [EventProvider, useEvents] = createContextHook(() => {
         for (const friend of params.invitedFriendIds) {
           void sendPushToUser(
             friend.userId,
-            "Dinner Invitation!",
+            "Event Invitation!",
             `${user.name} invited you to "${params.title}" at ${params.restaurantName}`,
             { type: "event_invite", eventId: eventRow.id }
           );
