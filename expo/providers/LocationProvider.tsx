@@ -419,29 +419,58 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       }
 
       if (Platform.OS === 'ios') {
-        console.log('[LocationProvider] iOS: Always attempting background permission request');
-        try {
-          const { status } = await Location.requestBackgroundPermissionsAsync();
-          console.log('[LocationProvider] iOS background permission result:', status);
-          if (status === 'granted') {
-            setBackgroundPermissionGranted(true);
-            await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
-            return true;
-          }
-        } catch (iosErr) {
-          console.log('[LocationProvider] iOS background permission request error:', iosErr);
-        }
+        if (bgPerm.canAskAgain || bgPerm.status === 'undetermined') {
+          console.log('[LocationProvider] iOS: Can ask for background permission, showing pre-prompt');
+          const userConfirmed = await new Promise<boolean>((resolve) => {
+            Alert.alert(
+              'Keep GPS Active in Background',
+              'Pinoxia needs "Always" location access to track your location even when the app is closed.\n\nOn the next prompt, please select "Allow While Using App" first, then when iOS asks again, choose "Change to Always Allow".',
+              [
+                { text: 'Not Now', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Continue', onPress: () => resolve(true) },
+              ]
+            );
+          });
 
-        console.log('[LocationProvider] iOS: Background permission not granted, directing to settings');
-        Alert.alert(
-          'Allow "Always" Location',
-          'To keep GPS active when the app is closed, open Settings and set Location to "Always".',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-          ]
-        );
-        return false;
+          if (!userConfirmed) {
+            console.log('[LocationProvider] iOS: User cancelled pre-prompt');
+            return false;
+          }
+
+          try {
+            const { status } = await Location.requestBackgroundPermissionsAsync();
+            console.log('[LocationProvider] iOS background permission result:', status);
+            if (status === 'granted') {
+              setBackgroundPermissionGranted(true);
+              await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+              return true;
+            }
+          } catch (iosErr) {
+            console.log('[LocationProvider] iOS background permission request error:', iosErr);
+          }
+
+          console.log('[LocationProvider] iOS: Background permission not granted after prompt, directing to settings');
+          Alert.alert(
+            'Enable "Always" Location',
+            'iOS may not show the permission prompt again. To enable background GPS:\n\n1. Open Settings\n2. Scroll to Pinoxia\n3. Tap Location\n4. Select "Always"',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+            ]
+          );
+          return false;
+        } else {
+          console.log('[LocationProvider] iOS: Cannot ask again, directing to settings');
+          Alert.alert(
+            'Enable "Always" Location',
+            'To keep GPS active when the app is closed, you need to manually enable it:\n\n1. Open Settings\n2. Scroll to Pinoxia\n3. Tap Location\n4. Select "Always"',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+            ]
+          );
+          return false;
+        }
       }
 
       if (bgPerm.canAskAgain || bgPerm.status === 'undetermined') {
