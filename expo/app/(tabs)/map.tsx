@@ -1322,7 +1322,7 @@ function QuickEventModal({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, backgroundPermissionGranted, toggleBackgroundGps } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, locationPermissionLevel, toggleBackgroundGps, requestBackgroundPermission } = useLocation();
   const { friends } = useFriends();
   const { createEvent, isCreating, events } = useEvents();
 
@@ -1715,9 +1715,33 @@ export default function MapScreenExport() {
   }, [longPressCoord]);
 
   const handleToggleGPS = useCallback(() => {
-    console.log("[MapScreen] Toggling GPS, current state:", backgroundPermissionGranted);
-    void toggleBackgroundGps();
-  }, [toggleBackgroundGps, backgroundPermissionGranted]);
+    console.log("[MapScreen] Toggling GPS, current level:", locationPermissionLevel);
+    if (Platform.OS === 'ios') {
+      if (locationPermissionLevel === 'always') {
+        Alert.alert(
+          'Location Access',
+          'Your location is set to "Always". To change this, go to Settings.',
+          [
+            { text: 'Keep Always', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]
+        );
+      } else if (locationPermissionLevel === 'while-using') {
+        Alert.alert(
+          'Location Access',
+          'Your location is set to "While Using the App". To track your location in the background, change to "Always" in Settings.',
+          [
+            { text: 'Keep Current', style: 'cancel' },
+            { text: 'Change to Always', onPress: () => void requestBackgroundPermission() },
+          ]
+        );
+      } else {
+        void toggleBackgroundGps();
+      }
+    } else {
+      void toggleBackgroundGps();
+    }
+  }, [toggleBackgroundGps, locationPermissionLevel, requestBackgroundPermission]);
 
   const handleQuickEventClose = useCallback(() => {
     console.log("[MapScreen] Quick event modal closed");
@@ -2021,20 +2045,23 @@ export default function MapScreenExport() {
               <TouchableOpacity
                 style={[
                   styles.gpsButton,
-                  backgroundPermissionGranted && styles.gpsButtonActive,
+                  locationPermissionLevel === 'always' && styles.gpsButtonActive,
+                  locationPermissionLevel === 'while-using' && { borderColor: '#FF9500', backgroundColor: 'rgba(255,149,0,0.1)' },
                 ]}
                 onPress={handleToggleGPS}
                 activeOpacity={0.7}
                 testID="always-gps-button"
               >
-                <Shield size={12} color={backgroundPermissionGranted ? Colors.white : Colors.textSecondary} />
+                <Shield size={12} color={locationPermissionLevel === 'always' ? Colors.white : locationPermissionLevel === 'while-using' ? '#FF9500' : Colors.textSecondary} />
                 <Text style={[
                   styles.gpsButtonText,
-                  backgroundPermissionGranted && styles.gpsButtonTextActive,
+                  locationPermissionLevel === 'always' && styles.gpsButtonTextActive,
+                  locationPermissionLevel === 'while-using' && { color: '#FF9500' },
                 ]}>
-                  {backgroundPermissionGranted ? 'Always On' : 'Always Off'}
+                  {locationPermissionLevel === 'always' ? 'Always' : locationPermissionLevel === 'while-using' ? 'While Using' : 'Off'}
                 </Text>
-                {backgroundPermissionGranted && <View style={styles.liveDotGreen} />}
+                {locationPermissionLevel === 'always' && <View style={styles.liveDotGreen} />}
+                {locationPermissionLevel === 'while-using' && <View style={[styles.liveDotGreen, { backgroundColor: '#FF9500' }]} />}
               </TouchableOpacity>
 
               <View style={styles.pulseButtonWrapper}>
