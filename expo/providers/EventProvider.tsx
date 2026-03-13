@@ -45,7 +45,7 @@ async function fetchUserEvents(userId: string): Promise<EventWithInvitations[]> 
       hostName: row.host_name,
       title: row.title,
       description: row.description ?? "",
-      eventType: (row.event_type as EventType) ?? "dinner",
+      eventType: ((row as any).event_type as EventType) ?? "dinner",
       restaurantName: row.restaurant_name,
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
@@ -61,11 +61,11 @@ async function fetchUserEvents(userId: string): Promise<EventWithInvitations[]> 
     if (!eventMap.has(evt.id)) {
       eventMap.set(evt.id, {
         id: evt.id,
-        hostId: evt.host_id,
-        hostName: evt.host_name,
-        title: evt.title,
-        description: evt.description ?? "",
-        eventType: (evt.event_type as EventType) ?? "dinner",
+        hostId: (evt as any).host_id,
+        hostName: (evt as any).host_name,
+        title: (evt as any).title,
+        description: (evt as any).description ?? "",
+        eventType: ((evt as any).event_type as EventType) ?? "dinner",
         restaurantName: evt.restaurant_name,
         latitude: Number(evt.latitude),
         longitude: Number(evt.longitude),
@@ -212,21 +212,34 @@ export const [EventProvider, useEvents] = createContextHook(() => {
       if (!user) throw new Error("Not logged in");
       console.log("[Events] Creating event:", params.title);
 
-      const { data: eventRow, error: eventErr } = await supabase
-        .from("dinner_events")
-        .insert({
+      const insertPayload: Record<string, any> = {
           host_id: user.id,
           host_name: user.name,
           title: params.title,
           description: params.description,
-          event_type: params.eventType,
           restaurant_name: params.restaurantName,
           latitude: params.latitude,
           longitude: params.longitude,
           event_date: params.eventDate,
-        })
+        };
+
+      // Try with event_type first, fall back without it if column doesn't exist
+      let { data: eventRow, error: eventErr } = await supabase
+        .from("dinner_events")
+        .insert({ ...insertPayload, event_type: params.eventType })
         .select()
         .single();
+
+      if (eventErr?.message?.includes("event_type")) {
+        console.warn("[Events] event_type column missing, retrying without it");
+        const retry = await supabase
+          .from("dinner_events")
+          .insert(insertPayload)
+          .select()
+          .single();
+        eventRow = retry.data;
+        eventErr = retry.error;
+      }
 
       if (eventErr || !eventRow) {
         console.warn("[Events] Create event error:", eventErr?.message);
