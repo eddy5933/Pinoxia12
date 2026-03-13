@@ -277,13 +277,22 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         console.log('[LocationProvider] AppState resume bg permission check:', status);
         if (status === 'granted') {
           if (!backgroundPermissionGranted) {
+            console.log('[LocationProvider] Background permission newly granted after settings, enabling');
             setBackgroundPermissionGranted(true);
             await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+            try {
+              await startBackgroundLocationUpdates();
+              console.log('[LocationProvider] Background location updates started after settings return');
+            } catch (startErr) {
+              console.log('[LocationProvider] Failed to start bg updates after settings:', startErr);
+            }
           }
         } else {
           if (backgroundPermissionGranted) {
+            console.log('[LocationProvider] Background permission revoked after settings');
             setBackgroundPermissionGranted(false);
             await AsyncStorage.removeItem(BG_PERM_STORAGE_KEY);
+            await stopBackgroundLocationUpdates();
           }
         }
       } catch (e) {
@@ -364,23 +373,53 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     }
     try {
       const Location = require('expo-location') as typeof import('expo-location');
-      const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
-      if (fgStatus !== 'granted') {
-        console.log('[LocationProvider] Foreground permission denied, cannot request background');
-        Alert.alert('Permission Required', 'Please allow foreground location access first.');
-        return false;
+
+      const fgPerm = await Location.getForegroundPermissionsAsync();
+      console.log('[LocationProvider] Foreground permission status:', fgPerm.status, 'canAskAgain:', fgPerm.canAskAgain);
+
+      if (fgPerm.status !== 'granted') {
+        if (fgPerm.canAskAgain || fgPerm.status === 'undetermined') {
+          const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+          if (fgStatus !== 'granted') {
+            console.log('[LocationProvider] Foreground permission denied');
+            Alert.alert(
+              'Location Permission Required',
+              'Please allow location access to enable background GPS.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+              ]
+            );
+            return false;
+          }
+        } else {
+          console.log('[LocationProvider] Foreground permission denied and cannot ask again');
+          Alert.alert(
+            'Location Permission Required',
+            Platform.OS === 'ios'
+              ? 'Location access is disabled. Go to Settings > Privacy & Security > Location Services > Pinoxia and select "While Using" or "Always".'
+              : 'Location access is disabled. Go to Settings > Apps > Pinoxia > Permissions > Location and allow access.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+            ]
+          );
+          return false;
+        }
       }
 
       const bgPerm = await Location.getBackgroundPermissionsAsync();
-      console.log('[LocationProvider] Current background permission:', bgPerm.status, 'canAskAgain:', bgPerm.canAskAgain);
+      console.log('[LocationProvider] Background permission status:', bgPerm.status, 'canAskAgain:', bgPerm.canAskAgain);
 
       if (bgPerm.status === 'granted') {
+        console.log('[LocationProvider] Background permission already granted');
         setBackgroundPermissionGranted(true);
         await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
         return true;
       }
 
-      if (bgPerm.canAskAgain) {
+      if (bgPerm.canAskAgain || bgPerm.status === 'undetermined') {
+        console.log('[LocationProvider] Requesting background permission via system dialog');
         const { status } = await Location.requestBackgroundPermissionsAsync();
         console.log('[LocationProvider] Background permission result:', status);
         if (status === 'granted') {
@@ -390,11 +429,12 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         }
       }
 
+      console.log('[LocationProvider] Background permission not granted, directing to settings');
       Alert.alert(
-        'Background Location',
+        'Background Location Required',
         Platform.OS === 'ios'
-          ? 'To enable GPS, go to Settings > Privacy > Location Services > Pinoxia and select "Always".'
-          : 'To enable GPS, go to Settings > Apps > Pinoxia > Permissions > Location and select "Allow all the time".',
+          ? 'To enable background GPS tracking, go to Settings > Privacy & Security > Location Services > Pinoxia and select "Always".'
+          : 'To enable background GPS tracking, go to Settings > Apps > Pinoxia > Permissions > Location and select "Allow all the time".',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => void Linking.openSettings() },

@@ -2032,7 +2032,7 @@ export default function MapScreenExport() {
                   styles.gpsButtonText,
                   backgroundPermissionGranted && styles.gpsButtonTextActive,
                 ]}>
-                  {backgroundPermissionGranted ? 'GPS On' : 'GPS'}
+                  {backgroundPermissionGranted ? 'BG GPS On' : 'BG GPS Off'}
                 </Text>
                 {backgroundPermissionGranted && <View style={styles.liveDotGreen} />}
               </TouchableOpacity>
