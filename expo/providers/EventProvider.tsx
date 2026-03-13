@@ -356,7 +356,26 @@ export const [EventProvider, useEvents] = createContextHook(() => {
 
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: string) => {
-      console.log("[Events] Deleting event:", eventId);
+      if (!user) throw new Error("Not logged in");
+      console.log("[Events] Cancelling event:", eventId);
+
+      const event = events.find((e) => e.id === eventId);
+      if (event) {
+        const acceptedUsers = event.invitations.filter(
+          (inv) => inv.status === "accepted"
+        );
+        console.log("[Events] Notifying", acceptedUsers.length, "accepted users about cancellation");
+
+        for (const inv of acceptedUsers) {
+          void sendPushToUser(
+            inv.invitedUserId,
+            "Event Cancelled",
+            `"${event.title}" at ${event.restaurantName} has been cancelled by ${user.name}.`,
+            { type: "event_cancelled", eventId: event.id }
+          );
+        }
+      }
+
       await supabase.from("event_invitations").delete().eq("event_id", eventId);
       const { error } = await supabase.from("dinner_events").delete().eq("id", eventId);
       if (error) {
