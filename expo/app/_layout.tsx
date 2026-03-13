@@ -127,7 +127,7 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
       <Animated.View style={[splashStyles.content, { transform: [{ scale: scaleAnim }] }]}>
         <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
           <Image
-            source={{ uri: "https://r2-pub.rork.com/generated-images/6064b95b-b2dd-425b-9b67-1cf31d1e8c5e.png" }}
+            source={{ uri: "https://r2-pub.rork.com/generated-images/85eda0a9-9b93-439f-8fab-b0524c91a5a3.png" }}
             style={splashStyles.splashLogo}
             contentFit="contain"
           />
