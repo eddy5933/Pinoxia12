@@ -446,24 +446,21 @@ function EventMarkerWrapper({
         if (onPress) onPress(event);
       }}
     >
-      {Platform.OS === 'ios' ? (
-        <View style={eventMarkerStyles.touchable}>
-          <View style={eventMarkerStyles.container}>
-            <View style={eventMarkerStyles.outerRing}>
-              <View style={eventMarkerStyles.pin}>
-                <Calendar size={14} color="#fff" />
-              </View>
+      <View style={eventMarkerStyles.touchable}>
+        <View style={eventMarkerStyles.container}>
+          <View style={eventMarkerStyles.flagPole}>
+            <View style={eventMarkerStyles.flag}>
+              <Calendar size={12} color="#fff" />
+              <Text style={eventMarkerStyles.flagText} numberOfLines={1}>{event.title}</Text>
             </View>
-            <View style={eventMarkerStyles.stalk} />
-            <View style={eventMarkerStyles.pinShadow} />
-            <View style={eventMarkerStyles.labelContainer}>
-              <View style={eventMarkerStyles.labelDot} />
-              <Text style={eventMarkerStyles.labelText} numberOfLines={1}>{event.title}</Text>
-            </View>
-            <Text style={eventMarkerStyles.labelDate}>{dateLabel}</Text>
+            <View style={eventMarkerStyles.pole} />
           </View>
+          <View style={eventMarkerStyles.baseCircle}>
+            <View style={eventMarkerStyles.baseDot} />
+          </View>
+          <Text style={eventMarkerStyles.dateTag}>{dateLabel}</Text>
         </View>
-      ) : null}
+      </View>
       <Callout tooltip onPress={() => {
         console.log('[MapScreen] Event callout tapped:', event.title);
         if (onPress) onPress(event);
@@ -2625,82 +2622,69 @@ const eventMarkerStyles = StyleSheet.create({
   container: {
     alignItems: "center",
   },
-  outerRing: {
-    width: Platform.OS === 'android' ? 38 : 48,
-    height: Platform.OS === 'android' ? 38 : 48,
-    borderRadius: Platform.OS === 'android' ? 19 : 24,
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    justifyContent: "center" as const,
+  flagPole: {
     alignItems: "center" as const,
-    borderWidth: 2,
-    borderColor: "rgba(239, 68, 68, 0.35)",
-    borderStyle: "dashed" as const,
   },
-  pin: {
-    width: Platform.OS === 'android' ? 28 : 34,
-    height: Platform.OS === 'android' ? 28 : 34,
-    borderRadius: Platform.OS === 'android' ? 14 : 17,
-    backgroundColor: "#EF4444",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    borderWidth: 2.5,
-    borderColor: "#fff",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  stalk: {
-    width: 2.5,
-    height: Platform.OS === 'android' ? 8 : 12,
-    backgroundColor: "#EF4444",
-    marginTop: -1,
-  },
-  pinShadow: {
-    width: Platform.OS === 'android' ? 14 : 18,
-    height: Platform.OS === 'android' ? 4 : 5,
-    borderRadius: Platform.OS === 'android' ? 7 : 9,
-    backgroundColor: "rgba(0,0,0,0.2)",
-  },
-  labelContainer: {
+  flag: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    backgroundColor: "#1C1917",
-    paddingHorizontal: Platform.OS === 'android' ? 6 : 10,
-    paddingVertical: Platform.OS === 'android' ? 3 : 5,
-    borderRadius: Platform.OS === 'android' ? 6 : 10,
-    marginTop: Platform.OS === 'android' ? 2 : 4,
-    maxWidth: Platform.OS === 'android' ? 110 : 150,
-    alignSelf: "center" as const,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.5)",
-    shadowColor: "#000",
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
+    borderBottomLeftRadius: 0,
+    maxWidth: 130,
+    shadowColor: "#F59E0B",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
-    shadowRadius: 5,
+    shadowRadius: 6,
     elevation: 8,
   },
-  labelDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: "#EF4444",
-    marginRight: 5,
-  },
-  labelText: {
-    fontSize: Platform.OS === 'android' ? 8 : 10,
-    fontWeight: "700" as const,
-    color: "#FFFFFF",
+  flagText: {
+    fontSize: Platform.OS === 'android' ? 9 : 11,
+    fontWeight: "800" as const,
+    color: "#1C1917",
+    marginLeft: 4,
     flexShrink: 1,
-    letterSpacing: 0.2,
   },
-  labelDate: {
-    fontSize: Platform.OS === 'android' ? 7 : 9,
-    fontWeight: "600" as const,
-    color: "#FCA5A5",
+  pole: {
+    width: 2.5,
+    height: Platform.OS === 'android' ? 14 : 18,
+    backgroundColor: "#F59E0B",
+    alignSelf: "flex-start" as const,
+    marginLeft: 0,
+  },
+  baseCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(245, 158, 11, 0.25)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    marginTop: -1,
+    marginLeft: -5.5,
+  },
+  baseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F59E0B",
+  },
+  dateTag: {
+    fontSize: Platform.OS === 'android' ? 8 : 9,
+    fontWeight: "700" as const,
+    color: "#F59E0B",
     textAlign: "center" as const,
-    marginTop: 2,
+    marginTop: 3,
+    backgroundColor: "rgba(28, 25, 23, 0.85)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: "hidden" as const,
   },
   calloutBox: {
     backgroundColor: Colors.surface,
