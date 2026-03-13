@@ -51,7 +51,7 @@ import { Heart } from "lucide-react-native";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useEvents } from "@/providers/EventProvider";
 
-import { Restaurant, Friend } from "@/types";
+import { Restaurant, Friend, EventWithInvitations } from "@/types";
 
 const DEFAULT_REGION = {
   latitude: 25.2854,
@@ -412,6 +412,70 @@ function FamilyMarkerWrapper({
   );
 }
 
+function EventMarkerWrapper({
+  event,
+  Marker,
+  Callout,
+  onPress,
+}: {
+  event: EventWithInvitations;
+  Marker: any;
+  Callout: any;
+  onPress?: (event: EventWithInvitations) => void;
+}) {
+  const eventDate = new Date(event.eventDate);
+  const now = new Date();
+  const isPast = eventDate.getTime() < now.getTime();
+  const timeStr = eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isToday = eventDate.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = eventDate.toDateString() === tomorrow.toDateString();
+  const dateLabel = isToday ? `Today, ${timeStr}` : isTomorrow ? `Tomorrow, ${timeStr}` : `${eventDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+
+  if (isPast) return null;
+
+  return (
+    <Marker
+      coordinate={{ latitude: event.latitude, longitude: event.longitude }}
+      tracksViewChanges={false}
+      zIndex={500}
+      onPress={() => {
+        console.log('[MapScreen] Event marker tapped:', event.title, event.id);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (onPress) onPress(event);
+      }}
+    >
+      {Platform.OS === 'ios' ? (
+        <View style={eventMarkerStyles.touchable}>
+          <View style={eventMarkerStyles.container}>
+            <View style={eventMarkerStyles.pin}>
+              <Calendar size={16} color="#fff" />
+            </View>
+            <View style={eventMarkerStyles.pinTail} />
+            <View style={eventMarkerStyles.labelContainer}>
+              <Text style={eventMarkerStyles.labelText} numberOfLines={1}>{event.title}</Text>
+              <Text style={eventMarkerStyles.labelDate}>{dateLabel}</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+      <Callout tooltip onPress={() => {
+        console.log('[MapScreen] Event callout tapped:', event.title);
+        if (onPress) onPress(event);
+      }}>
+        <View style={eventMarkerStyles.calloutBox}>
+          <Text style={eventMarkerStyles.calloutTitle} numberOfLines={1}>{event.title}</Text>
+          <Text style={eventMarkerStyles.calloutSubtitle}>{event.restaurantName}</Text>
+          <Text style={eventMarkerStyles.calloutDate}>{dateLabel}</Text>
+          <Text style={eventMarkerStyles.calloutHint}>Tap for details</Text>
+        </View>
+        <View style={eventMarkerStyles.calloutArrow} />
+      </Callout>
+    </Marker>
+  );
+}
+
 function NativeMapView({
   restaurants,
   userLocation,
@@ -423,11 +487,13 @@ function NativeMapView({
   familyLocations,
   focusFriendLocation,
   focusFriendTrigger,
+  events,
   onFriendMarkerPress,
   onFamilyMarkerPress,
   onMarkerPress,
   onMapPress,
   onLongPress,
+  onEventMarkerPress,
 }: {
   restaurants: Restaurant[];
   userLocation: UserLocation | null;
@@ -439,11 +505,13 @@ function NativeMapView({
   familyLocations: FriendLocation[];
   focusFriendLocation: FriendLocation | null;
   focusFriendTrigger: number;
+  events: EventWithInvitations[];
   onFriendMarkerPress?: (friend: FriendLocation) => void;
   onFamilyMarkerPress?: (member: FriendLocation) => void;
   onMarkerPress?: (restaurantId: string) => void;
   onMapPress?: () => void;
   onLongPress?: (coordinate: { latitude: number; longitude: number }) => void;
+  onEventMarkerPress?: (event: EventWithInvitations) => void;
 }) {
   const MapView =
     require("react-native-maps").default as typeof import("react-native-maps").default;
@@ -669,6 +737,9 @@ function NativeMapView({
       ))}
       {familyLocations.map((fl) => (
         <FamilyMarkerWrapper key={`family-${fl.userId}`} member={fl} Marker={Marker} Callout={Callout} onPress={onFamilyMarkerPress} />
+      ))}
+      {events.map((evt) => (
+        <EventMarkerWrapper key={`event-${evt.id}`} event={evt} Marker={Marker} Callout={Callout} onPress={onEventMarkerPress} />
       ))}
     </MapView>
   );
@@ -1036,7 +1107,7 @@ export default function MapScreenExport() {
   const { restaurants } = useRestaurants();
   const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled } = useLocation();
   const { friends } = useFriends();
-  const { createEvent, isCreating } = useEvents();
+  const { createEvent, isCreating, events } = useEvents();
 
   const [showFriendLocations, setShowFriendLocations] = useState(closeFriendSharingEnabled);
   const [showFamilyLocations, setShowFamilyLocations] = useState(familySharingEnabled);
@@ -1326,6 +1397,14 @@ export default function MapScreenExport() {
     searchInputRef.current?.blur();
     setSelectedPlace(null);
     router.push(`/restaurant/${place.id}`);
+  }, [router]);
+
+  const handleEventMarkerPress = useCallback((event: EventWithInvitations) => {
+    console.log('[MapScreen] Event marker pressed:', event.id);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowSuggestions(false);
+    searchInputRef.current?.blur();
+    router.push(`/event/${event.id}`);
   }, [router]);
 
   const handleMapLongPress = useCallback((coordinate: { latitude: number; longitude: number }) => {
@@ -1823,11 +1902,13 @@ export default function MapScreenExport() {
             familyLocations={visibleFamilyLocations}
             focusFriendLocation={focusFriendLocation}
             focusFriendTrigger={focusFriendTrigger}
+            events={events}
             onFriendMarkerPress={handleFocusFriend}
             onFamilyMarkerPress={handleFocusFamily}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
             onLongPress={handleMapLongPress}
+            onEventMarkerPress={handleEventMarkerPress}
           />
         )}
 
@@ -2481,6 +2562,119 @@ const markerStyles = StyleSheet.create({
     color: Colors.primary,
     textAlign: "center" as const,
     marginTop: 3,
+  },
+  calloutArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: Colors.surface,
+    alignSelf: "center" as const,
+  },
+});
+
+const eventMarkerStyles = StyleSheet.create({
+  touchable: {
+    alignItems: "center",
+  },
+  container: {
+    alignItems: "center",
+  },
+  pin: {
+    width: Platform.OS === 'android' ? 30 : 40,
+    height: Platform.OS === 'android' ? 30 : 40,
+    borderRadius: Platform.OS === 'android' ? 15 : 20,
+    backgroundColor: "#F59E0B",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderWidth: Platform.OS === 'android' ? 2 : 3,
+    borderColor: "#FDE68A",
+    shadowColor: "#F59E0B",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  pinTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: Platform.OS === 'android' ? 5 : 7,
+    borderRightWidth: Platform.OS === 'android' ? 5 : 7,
+    borderTopWidth: Platform.OS === 'android' ? 7 : 9,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#FDE68A",
+    marginTop: -1,
+  },
+  labelContainer: {
+    backgroundColor: "#92400E",
+    paddingHorizontal: Platform.OS === 'android' ? 6 : 10,
+    paddingVertical: Platform.OS === 'android' ? 2 : 4,
+    borderRadius: Platform.OS === 'android' ? 5 : 8,
+    marginTop: Platform.OS === 'android' ? 2 : 3,
+    maxWidth: Platform.OS === 'android' ? 100 : 140,
+    alignSelf: "center" as const,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  labelText: {
+    fontSize: Platform.OS === 'android' ? 8 : 10,
+    fontWeight: "800" as const,
+    color: "#FFFFFF",
+    textAlign: "center" as const,
+    letterSpacing: 0.3,
+  },
+  labelDate: {
+    fontSize: Platform.OS === 'android' ? 7 : 9,
+    fontWeight: "600" as const,
+    color: "#FDE68A",
+    textAlign: "center" as const,
+    marginTop: 1,
+  },
+  calloutBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 10,
+    minWidth: 180,
+    maxWidth: 220,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  calloutTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.white,
+  },
+  calloutSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  calloutDate: {
+    fontSize: 11,
+    color: "#F59E0B",
+    fontWeight: "600" as const,
+    marginTop: 3,
+  },
+  calloutHint: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+    color: "#F59E0B",
+    textAlign: "center" as const,
+    marginTop: 4,
   },
   calloutArrow: {
     width: 0,
