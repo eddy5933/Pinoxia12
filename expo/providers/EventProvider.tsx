@@ -354,6 +354,74 @@ export const [EventProvider, useEvents] = createContextHook(() => {
     onSuccess: () => invalidate(),
   });
 
+  const addGuestMutation = useMutation({
+    mutationFn: async (params: { eventId: string; guests: { userId: string; name: string }[] }) => {
+      if (!user) throw new Error("Not logged in");
+      console.log("[Events] Adding guests to event:", params.eventId, params.guests.length);
+
+      const event = events.find((e) => e.id === params.eventId);
+      if (!event) throw new Error("Event not found");
+      if (event.hostId !== user.id) throw new Error("Only the host can add guests");
+
+      const existingUserIds = new Set(event.invitations.map((inv) => inv.invitedUserId));
+      const newGuests = params.guests.filter((g) => !existingUserIds.has(g.userId));
+
+      if (newGuests.length === 0) {
+        console.log("[Events] All guests already invited");
+        return;
+      }
+
+      const invRows = newGuests.map((g) => ({
+        event_id: params.eventId,
+        invited_user_id: g.userId,
+        invited_user_name: g.name,
+        status: "pending",
+      }));
+
+      const { error } = await supabase.from("event_invitations").insert(invRows);
+      if (error) {
+        console.warn("[Events] Add guests error:", error.message);
+        throw new Error(error.message);
+      }
+
+      for (const guest of newGuests) {
+        void sendPushToUser(
+          guest.userId,
+          "Event Invitation!",
+          `${user.name} invited you to "${event.title}" at ${event.restaurantName}`,
+          { type: "event_invite", eventId: params.eventId }
+        );
+      }
+
+      console.log("[Events] Added", newGuests.length, "guests");
+    },
+    onSuccess: () => invalidate(),
+  });
+
+  const removeGuestMutation = useMutation({
+    mutationFn: async (params: { eventId: string; invitationId: string; guestName: string }) => {
+      if (!user) throw new Error("Not logged in");
+      console.log("[Events] Removing guest:", params.invitationId, "from event:", params.eventId);
+
+      const event = events.find((e) => e.id === params.eventId);
+      if (!event) throw new Error("Event not found");
+      if (event.hostId !== user.id) throw new Error("Only the host can remove guests");
+
+      const { error } = await supabase
+        .from("event_invitations")
+        .delete()
+        .eq("id", params.invitationId);
+
+      if (error) {
+        console.warn("[Events] Remove guest error:", error.message);
+        throw new Error(error.message);
+      }
+
+      console.log("[Events] Removed guest:", params.guestName);
+    },
+    onSuccess: () => invalidate(),
+  });
+
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: string) => {
       if (!user) throw new Error("Not logged in");
@@ -419,6 +487,10 @@ export const [EventProvider, useEvents] = createContextHook(() => {
       isResponding: respondToInviteMutation.isPending,
       deleteEvent: deleteEventMutation.mutateAsync,
       isDeleting: deleteEventMutation.isPending,
+      addGuests: addGuestMutation.mutateAsync,
+      isAddingGuests: addGuestMutation.isPending,
+      removeGuest: removeGuestMutation.mutateAsync,
+      isRemovingGuest: removeGuestMutation.isPending,
       refetch: eventsQuery.refetch,
     }),
     [
@@ -427,6 +499,8 @@ export const [EventProvider, useEvents] = createContextHook(() => {
       createEventMutation.mutateAsync, createEventMutation.isPending,
       respondToInviteMutation.mutateAsync, respondToInviteMutation.isPending,
       deleteEventMutation.mutateAsync, deleteEventMutation.isPending,
+      addGuestMutation.mutateAsync, addGuestMutation.isPending,
+      removeGuestMutation.mutateAsync, removeGuestMutation.isPending,
       eventsQuery.refetch,
     ]
   );
