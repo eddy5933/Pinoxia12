@@ -1322,7 +1322,7 @@ function QuickEventModal({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, backgroundPermissionGranted, requestBackgroundPermission } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, backgroundPermissionGranted, toggleBackgroundGps } = useLocation();
   const { friends } = useFriends();
   const { createEvent, isCreating, events } = useEvents();
 
@@ -1714,10 +1714,10 @@ export default function MapScreenExport() {
     setShowQuickEvent(true);
   }, [longPressCoord]);
 
-  const handleRequestAlwaysGPS = useCallback(() => {
-    console.log("[MapScreen] Requesting always GPS permission");
-    void requestBackgroundPermission();
-  }, [requestBackgroundPermission]);
+  const handleToggleGPS = useCallback(() => {
+    console.log("[MapScreen] Toggling GPS, current state:", backgroundPermissionGranted);
+    void toggleBackgroundGps();
+  }, [toggleBackgroundGps, backgroundPermissionGranted]);
 
   const handleQuickEventClose = useCallback(() => {
     console.log("[MapScreen] Quick event modal closed");
@@ -2023,7 +2023,7 @@ export default function MapScreenExport() {
                   styles.gpsButton,
                   backgroundPermissionGranted && styles.gpsButtonActive,
                 ]}
-                onPress={handleRequestAlwaysGPS}
+                onPress={handleToggleGPS}
                 activeOpacity={0.7}
                 testID="always-gps-button"
               >

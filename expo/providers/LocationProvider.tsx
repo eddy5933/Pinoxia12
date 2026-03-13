@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { Platform, Alert, Linking } from "react-native";
+import { Platform, Alert, Linking, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { supabase } from "@/lib/supabase";
@@ -244,7 +244,22 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         }
         const bgPerm = await AsyncStorage.getItem(BG_PERM_STORAGE_KEY);
         if (bgPerm === 'true') {
-          setBackgroundPermissionGranted(true);
+          if (Platform.OS !== 'web') {
+            try {
+              const Location = require('expo-location') as typeof import('expo-location');
+              const { status } = await Location.getBackgroundPermissionsAsync();
+              if (status === 'granted') {
+                setBackgroundPermissionGranted(true);
+              } else {
+                console.log('[LocationProvider] Stored bg perm but actual permission revoked');
+                setBackgroundPermissionGranted(false);
+                await AsyncStorage.removeItem(BG_PERM_STORAGE_KEY);
+              }
+            } catch (e) {
+              console.log('[LocationProvider] Error checking bg perm on load:', e);
+              setBackgroundPermissionGranted(true);
+            }
+          }
         }
       } catch (err) {
         console.log('[LocationProvider] Failed to restore live location state:', err);
@@ -252,6 +267,36 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     };
     void loadLiveLocationState();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const checkPermissionOnResume = async () => {
+      try {
+        const Location = require('expo-location') as typeof import('expo-location');
+        const { status } = await Location.getBackgroundPermissionsAsync();
+        console.log('[LocationProvider] AppState resume bg permission check:', status);
+        if (status === 'granted') {
+          if (!backgroundPermissionGranted) {
+            setBackgroundPermissionGranted(true);
+            await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+          }
+        } else {
+          if (backgroundPermissionGranted) {
+            setBackgroundPermissionGranted(false);
+            await AsyncStorage.removeItem(BG_PERM_STORAGE_KEY);
+          }
+        }
+      } catch (e) {
+        console.log('[LocationProvider] AppState permission check error:', e);
+      }
+    };
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void checkPermissionOnResume();
+      }
+    });
+    return () => sub.remove();
+  }, [backgroundPermissionGranted]);
 
   useEffect(() => {
     if (!liveLocationActive) {
@@ -325,28 +370,68 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
         Alert.alert('Permission Required', 'Please allow foreground location access first.');
         return false;
       }
-      const { status } = await Location.requestBackgroundPermissionsAsync();
-      console.log('[LocationProvider] Background permission status:', status);
-      if (status === 'granted') {
+
+      const bgPerm = await Location.getBackgroundPermissionsAsync();
+      console.log('[LocationProvider] Current background permission:', bgPerm.status, 'canAskAgain:', bgPerm.canAskAgain);
+
+      if (bgPerm.status === 'granted') {
         setBackgroundPermissionGranted(true);
         await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
         return true;
-      } else {
-        Alert.alert(
-          'Background Location',
-          'To keep GPS active when the app is closed, please go to Settings and set location access to "Always".',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-          ]
-        );
-        return false;
       }
+
+      if (bgPerm.canAskAgain) {
+        const { status } = await Location.requestBackgroundPermissionsAsync();
+        console.log('[LocationProvider] Background permission result:', status);
+        if (status === 'granted') {
+          setBackgroundPermissionGranted(true);
+          await AsyncStorage.setItem(BG_PERM_STORAGE_KEY, 'true');
+          return true;
+        }
+      }
+
+      Alert.alert(
+        'Background Location',
+        Platform.OS === 'ios'
+          ? 'To enable GPS, go to Settings > Privacy > Location Services > Pinoxia and select "Always".'
+          : 'To enable GPS, go to Settings > Apps > Pinoxia > Permissions > Location and select "Allow all the time".',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]
+      );
+      return false;
     } catch (err) {
       console.log('[LocationProvider] Background permission error:', err);
       return false;
     }
   }, []);
+
+  const disableBackgroundGps = useCallback(async () => {
+    console.log('[LocationProvider] Disabling background GPS');
+    setBackgroundPermissionGranted(false);
+    await AsyncStorage.removeItem(BG_PERM_STORAGE_KEY);
+    await stopBackgroundLocationUpdates();
+    if (liveLocationActive) {
+      setLiveLocationActive(false);
+      setLiveLocationDuration(null);
+      setLiveLocationEndTime(null);
+      setLiveLocationRemainingLabel(null);
+      await AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+    }
+  }, [liveLocationActive]);
+
+  const toggleBackgroundGps = useCallback(async () => {
+    console.log('[LocationProvider] Toggle GPS, current state:', backgroundPermissionGranted);
+    if (backgroundPermissionGranted) {
+      await disableBackgroundGps();
+    } else {
+      const granted = await requestBackgroundPermission();
+      if (granted) {
+        await startBackgroundLocationUpdates();
+      }
+    }
+  }, [backgroundPermissionGranted, disableBackgroundGps, requestBackgroundPermission]);
 
   const startLiveLocation = useCallback(async (duration: LiveLocationDuration) => {
     if (!duration) return;
@@ -688,8 +773,9 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       startLiveLocation,
       stopLiveLocation,
       requestBackgroundPermission,
+      toggleBackgroundGps,
     }),
-    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, closeFriendSharingEnabled, familySharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading, liveLocationActive, liveLocationDuration, liveLocationRemainingLabel, backgroundPermissionGranted, startLiveLocation, stopLiveLocation, requestBackgroundPermission]
+    [userLocation, locationLoading, locationError, requestLocation, setLocationUser, sharingEnabled, closeFriendSharingEnabled, familySharingEnabled, friendLocations, familyLocations, friendLocationsQuery.isLoading, familyLocationsQuery.isLoading, liveLocationActive, liveLocationDuration, liveLocationRemainingLabel, backgroundPermissionGranted, startLiveLocation, stopLiveLocation, requestBackgroundPermission, toggleBackgroundGps]
   );
 });
 
