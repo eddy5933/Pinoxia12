@@ -52,7 +52,9 @@ export default function ProfileScreen() {
   const formatEventDate = useCallback((dateStr: string) => {
     const d = new Date(dateStr);
     const now = new Date();
-    const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfEventDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startOfEventDay.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Tomorrow";
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
