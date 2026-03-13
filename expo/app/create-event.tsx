@@ -32,6 +32,7 @@ import {
   Plus,
   Navigation,
   Move,
+  CalendarPlus,
 } from "lucide-react-native";
 import MapView, { Marker, Region } from "react-native-maps";
 import * as Haptics from "expo-haptics";
@@ -274,7 +275,7 @@ export default function CreateEventScreen() {
             {selectedTypeOption ? (
               <View>{selectedTypeOption.icon}</View>
             ) : (
-              <UtensilsCrossed size={32} color={Colors.primary} />
+              <CalendarPlus size={32} color={Colors.primary} />
             )}
           </View>
           <Text style={styles.heroTitle}>New Event</Text>
