@@ -353,25 +353,7 @@ export const QATAR_ATTRACTIONS: Restaurant[] = [
     reviewCount: 1876,
     createdAt: "2024-01-01",
   },
-  {
-    id: "qa-att-18",
-    ownerId: "qatar-gov",
-    name: "Banana Island Resort",
-    description: "Luxurious island resort accessible by boat, featuring private beach, water sports, spa, and overwater villas.",
-    cuisine: "Attraction",
-    photos: [
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80",
-      "https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=800&q=80",
-    ],
-    address: "Banana Island, Doha",
-    latitude: 25.2625,
-    longitude: 51.5575,
-    openingHours: { ...attractionHours, monday: "Open 24 hours", tuesday: "Open 24 hours", wednesday: "Open 24 hours", thursday: "Open 24 hours", friday: "Open 24 hours", saturday: "Open 24 hours", sunday: "Open 24 hours" },
-    phone: "+974 4040 5050",
-    rating: 4.7,
-    reviewCount: 1567,
-    createdAt: "2024-01-01",
-  },
+
   {
     id: "qa-att-19",
     ownerId: "qatar-gov",
