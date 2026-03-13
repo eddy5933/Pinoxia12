@@ -16,7 +16,6 @@ import {
   MapPin,
   Calendar,
   Clock,
-  UtensilsCrossed,
   CheckCircle,
   XCircle,
   CircleDot,
@@ -25,12 +24,6 @@ import {
   UserCheck,
   UserX,
   HelpCircle,
-  Coffee,
-  ShoppingBag,
-  TreePine,
-  Dumbbell,
-  Sun,
-  Sunrise,
   ExternalLink,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
@@ -38,7 +31,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useEvents } from "@/providers/EventProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
-import { EventRSVP, EventType } from "@/types";
+import { EventRSVP } from "@/types";
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -54,18 +47,7 @@ export default function EventDetailScreen() {
 
   const isHost = event?.hostId === user?.id;
 
-  const eventTypeConfig: Record<EventType, { icon: typeof UtensilsCrossed; color: string; label: string }> = {
-    breakfast: { icon: Sunrise, color: "#FF9800", label: "Breakfast" },
-    lunch: { icon: Sun, color: "#FFC107", label: "Lunch" },
-    dinner: { icon: UtensilsCrossed, color: "#E63946", label: "Dinner" },
-    coffee: { icon: Coffee, color: "#8D6E63", label: "Coffee" },
-    shopping: { icon: ShoppingBag, color: "#AB47BC", label: "Shopping" },
-    picnic: { icon: TreePine, color: "#66BB6A", label: "Picnic" },
-    sport: { icon: Dumbbell, color: "#42A5F5", label: "Sport" },
-  };
 
-  const typeInfo = event ? eventTypeConfig[event.eventType] ?? eventTypeConfig.dinner : eventTypeConfig.dinner;
-  const TypeIcon = typeInfo.icon;
 
   const myInvitation = useMemo(
     () => event?.invitations.find((inv) => inv.invitedUserId === user?.id),
@@ -244,11 +226,8 @@ export default function EventDetailScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.eventHeader}>
-          <View style={[styles.eventIconWrap, { backgroundColor: typeInfo.color + "1A" }]}>
-            <TypeIcon size={28} color={typeInfo.color} />
-          </View>
-          <View style={[styles.eventTypeBadge, { backgroundColor: typeInfo.color + "18" }]}>
-            <Text style={[styles.eventTypeText, { color: typeInfo.color }]}>{typeInfo.label}</Text>
+          <View style={[styles.eventIconWrap, { backgroundColor: "rgba(69,183,209,0.12)" }]}>
+            <Calendar size={28} color="#45B7D1" />
           </View>
           <Text style={styles.eventTitle}>{event.title}</Text>
           <Text style={styles.hostText}>
@@ -483,16 +462,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
-  eventTypeBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  eventTypeText: {
-    fontSize: 13,
-    fontWeight: "700" as const,
-  },
+
   eventTitle: {
     fontSize: 24,
     fontWeight: "800" as const,
