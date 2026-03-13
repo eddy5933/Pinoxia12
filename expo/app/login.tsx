@@ -100,10 +100,6 @@ export default function LoginScreen() {
               style={styles.brandLogo}
               contentFit="contain"
             />
-            <View style={styles.brandTitleRow}>
-              <Text style={styles.brandTitleRed}>Pin</Text>
-              <Text style={styles.brandTitleWhite}>oxia</Text>
-            </View>
             <Text style={styles.brandSubtitle}>
               {isSignup
                 ? "Create your account"
