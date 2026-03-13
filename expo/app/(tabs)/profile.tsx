@@ -286,7 +286,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.createEventTextWrap}>
               <Text style={styles.createEventTitle}>Create New Event</Text>
-              <Text style={styles.createEventSubtitle}>Plan a meal with friends</Text>
+              <Text style={styles.createEventSubtitle}>Plan an event</Text>
             </View>
             <ChevronRight size={18} color={Colors.primary} />
           </TouchableOpacity>
@@ -314,7 +314,7 @@ export default function ProfileScreen() {
               <UtensilsCrossed size={24} color={Colors.textMuted} />
               <Text style={styles.emptyEventsText}>No upcoming events</Text>
               <Text style={styles.emptyEventsSubtext}>
-                Plan a dinner with your friends!
+                Plan an event
               </Text>
             </View>
           ) : (
