@@ -15,7 +15,6 @@ import {
   Modal,
   ScrollView,
   Alert,
-  Dimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -424,11 +423,15 @@ function EventMarkerView({ event }: { event: EventWithInvitations }) {
 
   return (
     <View style={eventMarkerStyles.wrapper}>
+      <View style={eventMarkerStyles.nameLabel}>
+        <Text style={eventMarkerStyles.nameLabelText} numberOfLines={1}>{event.title}</Text>
+      </View>
+      <View style={eventMarkerStyles.nameLabelArrow} />
       <View style={eventMarkerStyles.banner}>
         <View style={eventMarkerStyles.bannerIconWrap}>
           <Calendar size={10} color="#fff" />
         </View>
-        <Text style={eventMarkerStyles.bannerTitle} numberOfLines={1}>{event.title}</Text>
+        <Text style={eventMarkerStyles.bannerTitle} numberOfLines={1}>{dateLabel}</Text>
       </View>
       <View style={eventMarkerStyles.bannerArrow} />
       <View style={eventMarkerStyles.pinOuter}>
@@ -437,7 +440,6 @@ function EventMarkerView({ event }: { event: EventWithInvitations }) {
         </View>
       </View>
       <View style={eventMarkerStyles.pulseRing} />
-      <Text style={eventMarkerStyles.dateTag}>{dateLabel}</Text>
     </View>
   );
 }
@@ -2153,8 +2155,6 @@ export default function MapScreenExport() {
   );
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
 const qeStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -2657,7 +2657,41 @@ const markerStyles = StyleSheet.create({
 const eventMarkerStyles = StyleSheet.create({
   wrapper: {
     alignItems: "center" as const,
-    width: 140,
+    width: 150,
+  },
+  nameLabel: {
+    backgroundColor: "#065F46",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: 140,
+    alignSelf: "center" as const,
+    borderWidth: 1.5,
+    borderColor: "#10B981",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  nameLabelText: {
+    fontSize: 11,
+    fontWeight: "800" as const,
+    color: "#fff",
+    textAlign: "center" as const,
+    letterSpacing: 0.3,
+  },
+  nameLabelArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#065F46",
+    alignSelf: "center" as const,
+    marginBottom: 2,
   },
   banner: {
     flexDirection: "row" as const,
@@ -2734,20 +2768,7 @@ const eventMarkerStyles = StyleSheet.create({
     borderColor: "rgba(16, 185, 129, 0.3)",
     alignSelf: "center" as const,
   },
-  dateTag: {
-    fontSize: 8,
-    fontWeight: "700" as const,
-    color: "#10B981",
-    textAlign: "center" as const,
-    marginTop: 2,
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: "hidden" as const,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.25)",
-  },
+
   calloutBox: {
     backgroundColor: Colors.surface,
     borderRadius: 12,

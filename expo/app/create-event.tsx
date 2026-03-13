@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   Dimensions,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Stack } from "expo-router";
@@ -90,8 +91,11 @@ export default function CreateEventScreen() {
   const [mapMarker, setMapMarker] = useState<{ latitude: number; longitude: number } | null>(null);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const mapRef = useRef<MapView>(null);
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [selectedDateOption, setSelectedDateOption] = useState<string | null>(null);
+  const [customDate, setCustomDate] = useState("");
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [selectedMinute, setSelectedMinute] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<"AM" | "PM">("PM");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [placeSearch, setPlaceSearch] = useState("");
@@ -127,16 +131,75 @@ export default function CreateEventScreen() {
     [eventType]
   );
 
+  const dateValue = useMemo(() => {
+    if (selectedDateOption === "today") {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "tomorrow") {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "in2days") {
+      const d = new Date();
+      d.setDate(d.getDate() + 2);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "in3days") {
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "thisWeekend") {
+      const d = new Date();
+      const dayOfWeek = d.getDay();
+      const daysUntilSat = (6 - dayOfWeek + 7) % 7 || 7;
+      d.setDate(d.getDate() + daysUntilSat);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "nextWeek") {
+      const d = new Date();
+      const dayOfWeek = d.getDay();
+      const daysUntilMon = (8 - dayOfWeek) % 7 || 7;
+      d.setDate(d.getDate() + daysUntilMon);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    if (selectedDateOption === "custom" && customDate.trim()) {
+      return customDate.trim();
+    }
+    return "";
+  }, [selectedDateOption, customDate]);
+
+  const timeValue = useMemo(() => {
+    if (selectedHour === null || selectedMinute === null) return "";
+    let h = selectedHour;
+    if (selectedPeriod === "PM" && h !== 12) h += 12;
+    if (selectedPeriod === "AM" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${selectedMinute}`;
+  }, [selectedHour, selectedMinute, selectedPeriod]);
+
+  const dateDisplayLabel = useMemo(() => {
+    if (!dateValue) return "";
+    const d = new Date(dateValue + "T00:00:00");
+    return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  }, [dateValue]);
+
+  const timeDisplayLabel = useMemo(() => {
+    if (selectedHour === null || selectedMinute === null) return "";
+    return `${selectedHour}:${selectedMinute} ${selectedPeriod}`;
+  }, [selectedHour, selectedMinute, selectedPeriod]);
+
   const canSubmit = useMemo(() => {
     return (
       eventType !== null &&
       title.trim().length > 0 &&
       selectedPlace !== null &&
-      date.trim().length > 0 &&
-      time.trim().length > 0 &&
+      dateValue.length > 0 &&
+      timeValue.length > 0 &&
       selectedFriends.size > 0
     );
-  }, [eventType, title, selectedPlace, date, time, selectedFriends]);
+  }, [eventType, title, selectedPlace, dateValue, timeValue, selectedFriends]);
 
   const handleSelectType = useCallback((type: EventType) => {
     setEventType(type);
@@ -211,10 +274,10 @@ export default function CreateEventScreen() {
   const handleCreate = useCallback(async () => {
     if (!user || !canSubmit || !selectedPlace || !eventType) return;
 
-    const dateTimeStr = `${date.trim()}T${time.trim()}:00`;
+    const dateTimeStr = `${dateValue}T${timeValue}:00`;
     const eventDate = new Date(dateTimeStr);
     if (isNaN(eventDate.getTime())) {
-      Alert.alert("Invalid Date", "Please enter date as YYYY-MM-DD and time as HH:MM");
+      Alert.alert("Invalid Date", "Please check your date and time selections");
       return;
     }
 
@@ -243,7 +306,7 @@ export default function CreateEventScreen() {
       console.warn("[CreateEvent] Error:", err?.message);
       Alert.alert("Error", err?.message ?? "Failed to create event");
     }
-  }, [user, canSubmit, selectedPlace, eventType, date, time, title, description, selectedFriendsList, createEvent, router]);
+  }, [user, canSubmit, selectedPlace, eventType, dateValue, timeValue, title, description, selectedFriendsList, createEvent, router]);
 
   if (!user) {
     return (
@@ -256,8 +319,34 @@ export default function CreateEventScreen() {
     );
   }
 
+  const DATE_OPTIONS = useMemo(() => {
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const in2 = new Date();
+    in2.setDate(in2.getDate() + 2);
+    const in3 = new Date();
+    in3.setDate(in3.getDate() + 3);
+    return [
+      { key: "today", label: "Today", sub: today.toLocaleDateString([], { month: "short", day: "numeric" }) },
+      { key: "tomorrow", label: "Tomorrow", sub: tomorrow.toLocaleDateString([], { month: "short", day: "numeric" }) },
+      { key: "in2days", label: in2.toLocaleDateString([], { weekday: "short" }), sub: in2.toLocaleDateString([], { month: "short", day: "numeric" }) },
+      { key: "in3days", label: in3.toLocaleDateString([], { weekday: "short" }), sub: in3.toLocaleDateString([], { month: "short", day: "numeric" }) },
+      { key: "thisWeekend", label: "Weekend", sub: "Sat" },
+      { key: "nextWeek", label: "Next Week", sub: "Mon" },
+      { key: "custom", label: "Custom", sub: "Pick date" },
+    ];
+  }, []);
+
+  const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const MINUTES = ["00", "15", "30", "45"];
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
       <Stack.Screen
         options={{
           title: "Create Event",
@@ -613,36 +702,106 @@ export default function CreateEventScreen() {
           </View>
         </Modal>
 
-        {/* Date & Time */}
-        <View style={styles.row}>
-          <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.label}>Date</Text>
-            <View style={styles.inputRow}>
+        {/* Date */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateChipsScroll}>
+            {DATE_OPTIONS.map((opt) => {
+              const isActive = selectedDateOption === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.dateChip, isActive && styles.dateChipActive]}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedDateOption(opt.key);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.dateChipLabel, isActive && styles.dateChipLabelActive]}>{opt.label}</Text>
+                  <Text style={[styles.dateChipSub, isActive && styles.dateChipSubActive]}>{opt.sub}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          {selectedDateOption === "custom" && (
+            <View style={[styles.inputRow, { marginTop: 10 }]}>
               <Calendar size={16} color={Colors.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.inputWithIcon}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={Colors.textMuted}
-                value={date}
-                onChangeText={setDate}
-                testID="event-date-input"
+                value={customDate}
+                onChangeText={setCustomDate}
+                testID="event-custom-date-input"
               />
             </View>
-          </View>
-          <View style={[styles.section, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.label}>Time</Text>
-            <View style={styles.inputRow}>
-              <Clock size={16} color={Colors.primary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.inputWithIcon}
-                placeholder="HH:MM"
-                placeholderTextColor={Colors.textMuted}
-                value={time}
-                onChangeText={setTime}
-                testID="event-time-input"
-              />
+          )}
+          {dateDisplayLabel ? (
+            <View style={styles.datePreviewRow}>
+              <Calendar size={12} color={Colors.primary} />
+              <Text style={styles.datePreviewText}>{dateDisplayLabel}</Text>
             </View>
+          ) : null}
+        </View>
+
+        {/* Time */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Time</Text>
+          <View style={styles.timePeriodRow}>
+            <TouchableOpacity
+              style={[styles.periodChip, selectedPeriod === "AM" && styles.periodChipActive]}
+              onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedPeriod("AM"); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.periodChipText, selectedPeriod === "AM" && styles.periodChipTextActive]}>AM</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.periodChip, selectedPeriod === "PM" && styles.periodChipActive]}
+              onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedPeriod("PM"); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.periodChipText, selectedPeriod === "PM" && styles.periodChipTextActive]}>PM</Text>
+            </TouchableOpacity>
           </View>
+          <Text style={styles.timeSubLabel}>Hour</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeChipsScroll}>
+            {HOURS.map((h) => {
+              const isActive = selectedHour === h;
+              return (
+                <TouchableOpacity
+                  key={h}
+                  style={[styles.timeChip, isActive && styles.timeChipActive]}
+                  onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedHour(h); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.timeChipText, isActive && styles.timeChipTextActive]}>{h}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.timeSubLabel}>Minute</Text>
+          <View style={styles.minuteRow}>
+            {MINUTES.map((m) => {
+              const isActive = selectedMinute === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.timeChip, styles.minuteChip, isActive && styles.timeChipActive]}
+                  onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedMinute(m); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.timeChipText, isActive && styles.timeChipTextActive]}>:{m}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {timeDisplayLabel ? (
+            <View style={styles.datePreviewRow}>
+              <Clock size={12} color={Colors.primary} />
+              <Text style={styles.datePreviewText}>{timeDisplayLabel}</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Friends */}
@@ -745,7 +904,7 @@ export default function CreateEventScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1320,5 +1479,121 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.white,
+  },
+  dateChipsScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  dateChip: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center" as const,
+    minWidth: 70,
+  },
+  dateChipActive: {
+    backgroundColor: "rgba(230,57,70,0.18)",
+    borderColor: Colors.primary,
+  },
+  dateChipLabel: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  dateChipLabelActive: {
+    color: Colors.primary,
+  },
+  dateChipSub: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  dateChipSubActive: {
+    color: Colors.primary,
+  },
+  datePreviewRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  datePreviewText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: "500" as const,
+  },
+  timePeriodRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginBottom: 12,
+  },
+  periodChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center" as const,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  periodChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  periodChipText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  periodChipTextActive: {
+    color: Colors.white,
+    fontWeight: "700" as const,
+  },
+  timeSubLabel: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: Colors.textMuted,
+    marginBottom: 6,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.3,
+  },
+  timeChipsScroll: {
+    gap: 8,
+    paddingVertical: 2,
+    marginBottom: 12,
+  },
+  timeChip: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 48,
+    alignItems: "center" as const,
+  },
+  timeChipActive: {
+    backgroundColor: "rgba(230,57,70,0.18)",
+    borderColor: Colors.primary,
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  timeChipTextActive: {
+    color: Colors.primary,
+  },
+  minuteRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginBottom: 8,
+  },
+  minuteChip: {
+    flex: 1,
   },
 });
