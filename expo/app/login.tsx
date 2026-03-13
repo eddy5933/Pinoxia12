@@ -96,7 +96,7 @@ export default function LoginScreen() {
 
           <View style={styles.brandSection}>
             <Image
-              source={{ uri: "https://r2-pub.rork.com/generated-images/6064b95b-b2dd-425b-9b67-1cf31d1e8c5e.png" }}
+              source={{ uri: "https://r2-pub.rork.com/generated-images/85eda0a9-9b93-439f-8fab-b0524c91a5a3.png" }}
               style={styles.brandLogo}
               contentFit="contain"
             />
