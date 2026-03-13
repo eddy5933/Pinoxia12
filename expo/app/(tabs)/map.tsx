@@ -38,9 +38,6 @@ import {
   Check,
   Send,
   UserPlus,
-  Locate,
-  Timer,
-  Power,
   Shield,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -49,7 +46,7 @@ import Colors from "@/constants/colors";
 import PinoxiaLogo from "@/components/PinoxiaLogo";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation, getDistanceKm, formatDistance } from "@/providers/LocationProvider";
-import type { UserLocation, FriendLocation, LiveLocationDuration } from "@/providers/LocationProvider";
+import type { UserLocation, FriendLocation } from "@/providers/LocationProvider";
 import { Heart } from "lucide-react-native";
 import { useFriends } from "@/providers/FriendsProvider";
 import { useEvents } from "@/providers/EventProvider";
@@ -901,24 +898,12 @@ interface LongPressCoord {
   longitude: number;
 }
 
-const LIVE_DURATION_OPTIONS: { label: string; value: LiveLocationDuration; icon: string }[] = [
-  { label: "15 minutes", value: 15, icon: "timer" },
-  { label: "30 minutes", value: 30, icon: "timer" },
-  { label: "1 hour", value: 60, icon: "timer" },
-  { label: "2 hours", value: 120, icon: "timer" },
-  { label: "Always on", value: "always", icon: "power" },
-];
-
 function LongPressActionModal({
   visible,
   coordinate,
   onClose,
   onNavigateHere,
-  onSwitchLiveLocation,
   onCreateEvent,
-  liveLocationActive,
-  liveLocationRemainingLabel,
-  onStopLiveLocation,
   onRequestAlwaysGPS,
   backgroundPermissionGranted,
 }: {
@@ -926,20 +911,14 @@ function LongPressActionModal({
   coordinate: LongPressCoord | null;
   onClose: () => void;
   onNavigateHere: () => void;
-  onSwitchLiveLocation: (duration: LiveLocationDuration) => void;
   onCreateEvent: () => void;
-  liveLocationActive: boolean;
-  liveLocationRemainingLabel: string | null;
-  onStopLiveLocation: () => void;
   onRequestAlwaysGPS: () => void;
   backgroundPermissionGranted: boolean;
 }) {
-  const [showDurationPicker, setShowDurationPicker] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
-      setShowDurationPicker(false);
       slideAnim.setValue(0);
       Animated.spring(slideAnim, {
         toValue: 1,
@@ -956,7 +935,6 @@ function LongPressActionModal({
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      setShowDurationPicker(false);
       onClose();
     });
   }, [slideAnim, onClose]);
@@ -1012,7 +990,6 @@ function LongPressActionModal({
               </TouchableOpacity>
             </View>
 
-            {!showDurationPicker ? (
               <View style={lpStyles.optionsList}>
                 <TouchableOpacity
                   style={lpStyles.optionRow}
@@ -1031,48 +1008,6 @@ function LongPressActionModal({
                     <Text style={lpStyles.optionTitle}>Navigate Here</Text>
                     <Text style={lpStyles.optionDesc}>Open directions in maps app</Text>
                   </View>
-                </TouchableOpacity>
-
-                <View style={lpStyles.separator} />
-
-                <TouchableOpacity
-                  style={lpStyles.optionRow}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (liveLocationActive) {
-                      onStopLiveLocation();
-                      handleClose();
-                    } else {
-                      setShowDurationPicker(true);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                  testID="lp-live-location"
-                >
-                  <View style={[
-                    lpStyles.optionIcon,
-                    liveLocationActive
-                      ? { backgroundColor: 'rgba(16,185,129,0.15)' }
-                      : { backgroundColor: 'rgba(245,158,11,0.15)' },
-                  ]}>
-                    <Locate size={18} color={liveLocationActive ? '#10B981' : '#F59E0B'} />
-                  </View>
-                  <View style={lpStyles.optionInfo}>
-                    <Text style={lpStyles.optionTitle}>
-                      {liveLocationActive ? 'Stop Live Location' : 'Switch On Live Location'}
-                    </Text>
-                    <Text style={lpStyles.optionDesc}>
-                      {liveLocationActive && liveLocationRemainingLabel
-                        ? liveLocationRemainingLabel
-                        : 'Share your real-time location'}
-                    </Text>
-                  </View>
-                  {liveLocationActive && (
-                    <View style={lpStyles.activeBadge}>
-                      <View style={lpStyles.activeDot} />
-                      <Text style={lpStyles.activeBadgeText}>ON</Text>
-                    </View>
-                  )}
                 </TouchableOpacity>
 
                 <View style={lpStyles.separator} />
@@ -1131,45 +1066,6 @@ function LongPressActionModal({
                   </View>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={lpStyles.durationSection}>
-                <View style={lpStyles.durationHeader}>
-                  <TouchableOpacity
-                    onPress={() => setShowDurationPicker(false)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Text style={lpStyles.durationBack}>← Back</Text>
-                  </TouchableOpacity>
-                  <Text style={lpStyles.durationTitle}>Live Location Duration</Text>
-                </View>
-                {LIVE_DURATION_OPTIONS.map((opt, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={lpStyles.durationRow}
-                    onPress={() => {
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      onSwitchLiveLocation(opt.value);
-                      handleClose();
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[
-                      lpStyles.durationIcon,
-                      opt.value === 'always'
-                        ? { backgroundColor: 'rgba(16,185,129,0.15)' }
-                        : { backgroundColor: 'rgba(245,158,11,0.15)' },
-                    ]}>
-                      {opt.value === 'always' ? (
-                        <Power size={16} color="#10B981" />
-                      ) : (
-                        <Timer size={16} color="#F59E0B" />
-                      )}
-                    </View>
-                    <Text style={lpStyles.durationLabel}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
           </TouchableOpacity>
         </Animated.View>
       </TouchableOpacity>
@@ -1465,7 +1361,7 @@ function QuickEventModal({
 export default function MapScreenExport() {
   const insets = useSafeAreaInsets();
   const { restaurants } = useRestaurants();
-  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, liveLocationActive, liveLocationRemainingLabel, backgroundPermissionGranted, startLiveLocation, stopLiveLocation, requestBackgroundPermission } = useLocation();
+  const { userLocation, locationLoading, locationError, requestLocation, friendLocations, familyLocations, closeFriendSharingEnabled, setCloseFriendSharingEnabled, familySharingEnabled, setFamilySharingEnabled, backgroundPermissionGranted, requestBackgroundPermission } = useLocation();
   const { friends } = useFriends();
   const { createEvent, isCreating, events } = useEvents();
 
@@ -1850,22 +1746,12 @@ export default function MapScreenExport() {
     openNavigation(longPressCoord.latitude, longPressCoord.longitude, "Dropped Pin");
   }, [longPressCoord]);
 
-  const handleLongPressSwitchLive = useCallback((duration: LiveLocationDuration) => {
-    console.log("[MapScreen] Switch on live location:", duration);
-    void startLiveLocation(duration);
-  }, [startLiveLocation]);
-
   const handleLongPressCreateEvent = useCallback(() => {
     if (!longPressCoord) return;
     console.log("[MapScreen] Opening quick event from long press");
     setQuickEventCoord(longPressCoord);
     setShowQuickEvent(true);
   }, [longPressCoord]);
-
-  const handleLongPressStopLive = useCallback(() => {
-    console.log("[MapScreen] Stopping live location from long press");
-    void stopLiveLocation();
-  }, [stopLiveLocation]);
 
   const handleRequestAlwaysGPS = useCallback(() => {
     console.log("[MapScreen] Requesting always GPS permission");
@@ -2616,11 +2502,7 @@ export default function MapScreenExport() {
         coordinate={longPressCoord}
         onClose={handleLongPressClose}
         onNavigateHere={handleLongPressNavigate}
-        onSwitchLiveLocation={handleLongPressSwitchLive}
         onCreateEvent={handleLongPressCreateEvent}
-        liveLocationActive={liveLocationActive}
-        liveLocationRemainingLabel={liveLocationRemainingLabel}
-        onStopLiveLocation={handleLongPressStopLive}
         onRequestAlwaysGPS={handleRequestAlwaysGPS}
         backgroundPermissionGranted={backgroundPermissionGranted}
       />
