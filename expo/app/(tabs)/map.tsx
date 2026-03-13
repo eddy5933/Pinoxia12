@@ -478,14 +478,30 @@ function EventMarkerWrapper({
 
   console.log('[MapScreen] Rendering event marker:', event.title, 'at', event.latitude, event.longitude);
 
+  if (Platform.OS === 'android') {
+    return (
+      <Marker
+        coordinate={{ latitude: event.latitude, longitude: event.longitude }}
+        tracksViewChanges={false}
+        pinColor="#10B981"
+        title={event.title}
+        description={`${event.restaurantName} - ${dateLabel}`}
+        zIndex={500}
+        onPress={() => {
+          console.log('[MapScreen] Event marker tapped:', event.title, event.id);
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          if (onPress) onPress(event);
+        }}
+      />
+    );
+  }
+
   return (
     <Marker
       coordinate={{ latitude: event.latitude, longitude: event.longitude }}
-      tracksViewChanges={Platform.OS === 'android' ? false : trackChanges}
-      pinColor={Platform.OS === 'android' ? '#10B981' : undefined}
-      title={Platform.OS === 'android' ? `${event.title}` : undefined}
-      description={Platform.OS === 'android' ? `${event.restaurantName} - ${dateLabel}` : undefined}
+      tracksViewChanges={trackChanges}
       zIndex={500}
+      anchor={{ x: 0.5, y: 1 }}
       onPress={() => {
         console.log('[MapScreen] Event marker tapped:', event.title, event.id);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
