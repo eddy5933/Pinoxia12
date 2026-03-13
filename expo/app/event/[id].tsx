@@ -25,6 +25,7 @@ import {
   UserX,
   HelpCircle,
   ExternalLink,
+  Map,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -291,6 +292,25 @@ export default function EventDetailScreen() {
             </>
           )}
         </View>
+
+        <TouchableOpacity
+          style={styles.showOnMapButton}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push({ pathname: '/(tabs)/map', params: { eventFocus: event.id } });
+          }}
+          activeOpacity={0.8}
+          testID="show-on-map-button"
+        >
+          <View style={styles.showOnMapIconWrap}>
+            <Map size={20} color={Colors.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.showOnMapText}>Show on Map</Text>
+            <Text style={styles.showOnMapSub}>View event location on map</Text>
+          </View>
+          <MapPin size={18} color="rgba(255,255,255,0.5)" />
+        </TouchableOpacity>
 
         {canNavigate && (
           <TouchableOpacity
@@ -683,6 +703,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: "#FF3B30",
+  },
+  showOnMapButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: "#2563EB",
+    gap: 14,
+  },
+  showOnMapIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  showOnMapText: {
+    fontSize: 15,
+    fontWeight: "700" as const,
+    color: Colors.white,
+    marginBottom: 2,
+  },
+  showOnMapSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
   },
   navigateButton: {
     flexDirection: "row",

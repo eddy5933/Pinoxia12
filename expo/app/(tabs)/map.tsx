@@ -487,6 +487,8 @@ function NativeMapView({
   familyLocations,
   focusFriendLocation,
   focusFriendTrigger,
+  focusedEvent,
+  eventFocusTrigger,
   events,
   onFriendMarkerPress,
   onFamilyMarkerPress,
@@ -505,6 +507,8 @@ function NativeMapView({
   familyLocations: FriendLocation[];
   focusFriendLocation: FriendLocation | null;
   focusFriendTrigger: number;
+  focusedEvent: EventWithInvitations | null;
+  eventFocusTrigger: number;
   events: EventWithInvitations[];
   onFriendMarkerPress?: (friend: FriendLocation) => void;
   onFamilyMarkerPress?: (member: FriendLocation) => void;
@@ -604,6 +608,21 @@ function NativeMapView({
       );
     }
   }, [focusFriendLocation, focusFriendTrigger]);
+
+  useEffect(() => {
+    if (focusedEvent && mapRef.current) {
+      console.log("[MapScreen] Animating to focused event:", focusedEvent.title, focusedEvent.latitude, focusedEvent.longitude);
+      mapRef.current.animateToRegion(
+        {
+          latitude: focusedEvent.latitude,
+          longitude: focusedEvent.longitude,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008,
+        },
+        800
+      );
+    }
+  }, [focusedEvent, eventFocusTrigger]);
 
   useEffect(() => {
     if (searchQuery.trim().length > 0 && restaurants.length > 0 && mapRef.current && prevSearchRef.current !== searchQuery) {
@@ -1141,7 +1160,7 @@ export default function MapScreenExport() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const router = useRouter();
-  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const { focus, eventFocus } = useLocalSearchParams<{ focus?: string; eventFocus?: string }>();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const searchInputRef = useRef<TextInput>(null);
   const [centerTrigger, setCenterTrigger] = useState(0);
@@ -1153,6 +1172,13 @@ export default function MapScreenExport() {
     [focus, restaurants]
   );
 
+  const focusedEvent = useMemo(
+    () => (eventFocus ? events.find((e) => e.id === eventFocus) ?? null : null),
+    [eventFocus, events]
+  );
+
+  const [eventFocusTrigger, setEventFocusTrigger] = useState(0);
+
   useEffect(() => {
     if (focusedRestaurant) {
       console.log("[MapScreen] Focused on restaurant:", focusedRestaurant.name);
@@ -1162,6 +1188,16 @@ export default function MapScreenExport() {
       searchInputRef.current?.blur();
     }
   }, [focusedRestaurant]);
+
+  useEffect(() => {
+    if (focusedEvent) {
+      console.log("[MapScreen] Focused on event:", focusedEvent.title, focusedEvent.latitude, focusedEvent.longitude);
+      setShowSuggestions(false);
+      setSearchFocused(false);
+      searchInputRef.current?.blur();
+      setEventFocusTrigger((prev) => prev + 1);
+    }
+  }, [focusedEvent]);
 
   const filteredRestaurants = useMemo(() => {
     if (!searchQuery.trim()) return restaurants;
@@ -1902,6 +1938,8 @@ export default function MapScreenExport() {
             familyLocations={visibleFamilyLocations}
             focusFriendLocation={focusFriendLocation}
             focusFriendTrigger={focusFriendTrigger}
+            focusedEvent={focusedEvent}
+            eventFocusTrigger={eventFocusTrigger}
             events={events}
             onFriendMarkerPress={handleFocusFriend}
             onFamilyMarkerPress={handleFocusFamily}
