@@ -22,7 +22,7 @@ export interface Restaurant {
   phone?: string;
   rating: number;
   reviewCount: number;
-  priceRange: "$" | "$$" | "$$$";
+  priceRange?: "$" | "$$" | "$$$";
   createdAt: string;
 }
 

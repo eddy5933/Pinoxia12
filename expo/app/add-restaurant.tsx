@@ -23,12 +23,12 @@ import {
   Plus,
   Crosshair,
 } from "lucide-react-native";
+
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRestaurants } from "@/providers/RestaurantProvider";
 import { useLocation } from "@/providers/LocationProvider";
-import { CUISINE_TYPES } from "@/mocks/restaurants";
 import { OpeningHours } from "@/types";
 
 const DEFAULT_HOURS: OpeningHours = {
@@ -41,8 +41,6 @@ const DEFAULT_HOURS: OpeningHours = {
   sunday: "10:00 AM - 9:00 PM",
 };
 
-const PRICE_OPTIONS: Array<"$" | "$$" | "$$$"> = ["$", "$$", "$$$"];
-
 export default function AddRestaurantScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -50,10 +48,10 @@ export default function AddRestaurantScreen() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [cuisine, setCuisine] = useState("");
+
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
-  const [priceRange, setPriceRange] = useState<"$" | "$$" | "$$$">("$$");
+
   const [photos, setPhotos] = useState<string[]>([]);
   const [openingHours] = useState<OpeningHours>(DEFAULT_HOURS);
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -116,14 +114,14 @@ export default function AddRestaurantScreen() {
       ownerId: user.id,
       name: name.trim(),
       description: description.trim() || "A wonderful place.",
-      cuisine: cuisine || undefined,
+
       photos: photos.length > 0 ? photos : [defaultPhoto],
       address: address.trim(),
       latitude: finalLat,
       longitude: finalLng,
       openingHours,
       phone: phone.trim() || undefined,
-      priceRange,
+
     });
 
     console.log("[AddRestaurant] Registered at:", finalLat, finalLng);
@@ -132,9 +130,7 @@ export default function AddRestaurantScreen() {
     Alert.alert("Success!", "Your business has been registered.", [
       { text: "OK", onPress: () => router.back() },
     ]);
-  }, [user, name, description, cuisine, address, phone, photos, openingHours, priceRange, addRestaurant, router, latitude, longitude, userLocation]);
-
-  const cuisineOptions = CUISINE_TYPES.filter((c) => c !== "All");
+  }, [user, name, description, address, phone, photos, openingHours, addRestaurant, router, latitude, longitude, userLocation]);
 
   return (
     <KeyboardAvoidingView
@@ -186,56 +182,7 @@ export default function AddRestaurantScreen() {
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cuisine Type</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipScroll}
-            >
-              {cuisineOptions.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.chip, cuisine === c && styles.chipActive]}
-                  onPress={() => setCuisine(c)}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      cuisine === c && styles.chipTextActive,
-                    ]}
-                  >
-                    {c}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Price Range</Text>
-            <View style={styles.priceRow}>
-              {PRICE_OPTIONS.map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.priceOption,
-                    priceRange === p && styles.priceOptionActive,
-                  ]}
-                  onPress={() => setPriceRange(p)}
-                >
-                  <Text
-                    style={[
-                      styles.priceOptionText,
-                      priceRange === p && styles.priceOptionTextActive,
-                    ]}
-                  >
-                    {p}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -442,56 +389,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     ...(Platform.OS === "web" ? { outlineStyle: "none" as any } : {}),
   },
-  chipScroll: {
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  chipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  chipText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: "500" as const,
-  },
-  chipTextActive: {
-    color: Colors.white,
-    fontWeight: "700" as const,
-  },
-  priceRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  priceOption: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  priceOptionActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  priceOptionText: {
-    fontSize: 15,
-    fontWeight: "600" as const,
-    color: Colors.textSecondary,
-  },
-  priceOptionTextActive: {
-    color: Colors.white,
-    fontWeight: "700" as const,
-  },
+
   photoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
