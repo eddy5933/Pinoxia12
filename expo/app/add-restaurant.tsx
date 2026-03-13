@@ -152,7 +152,7 @@ export default function AddRestaurantScreen() {
           <View style={styles.feeTextContainer}>
             <Text style={styles.feeTitle}>Registration Fee: $5.00</Text>
             <Text style={styles.feeSubtitle}>
-              One-time fee to list your business. Payment will be available soon.
+              Free in beta version period.
             </Text>
           </View>
         </View>
