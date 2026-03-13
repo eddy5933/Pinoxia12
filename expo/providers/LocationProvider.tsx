@@ -4,6 +4,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
+import {
+  startBackgroundLocationUpdates,
+  stopBackgroundLocationUpdates,
+  setBackgroundUserId,
+} from "@/lib/backgroundLocation";
 
 export interface FriendLocation {
   userId: string;
@@ -226,12 +231,15 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
             setLiveLocationActive(true);
             setLiveLocationDuration('always');
             setLiveLocationEndTime(null);
+            void startBackgroundLocationUpdates();
           } else if (parsed.endTime && parsed.endTime > Date.now()) {
             setLiveLocationActive(true);
             setLiveLocationDuration(parsed.duration);
             setLiveLocationEndTime(parsed.endTime);
+            void startBackgroundLocationUpdates();
           } else {
             await AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+            await stopBackgroundLocationUpdates();
           }
         }
         const bgPerm = await AsyncStorage.getItem(BG_PERM_STORAGE_KEY);
@@ -269,6 +277,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
           setLiveLocationEndTime(null);
           setLiveLocationRemainingLabel(null);
           void AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+          void stopBackgroundLocationUpdates();
           return;
         }
         const mins = Math.ceil(remaining / 60000);
@@ -346,6 +355,10 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     const bgGranted = await requestBackgroundPermission();
     console.log('[LocationProvider] Background permission for live location:', bgGranted);
 
+    if (currentUserId) {
+      await setBackgroundUserId(currentUserId);
+    }
+
     setLiveLocationActive(true);
     setLiveLocationDuration(duration);
 
@@ -358,8 +371,13 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
       await AsyncStorage.setItem(LIVE_LOC_STORAGE_KEY, JSON.stringify({ duration, endTime }));
     }
 
+    if (bgGranted) {
+      const started = await startBackgroundLocationUpdates();
+      console.log('[LocationProvider] Background location task started:', started);
+    }
+
     void requestLocation();
-  }, [requestBackgroundPermission, requestLocation]);
+  }, [requestBackgroundPermission, requestLocation, currentUserId]);
 
   const stopLiveLocation = useCallback(async () => {
     console.log('[LocationProvider] Stopping live location');
@@ -368,6 +386,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
     setLiveLocationEndTime(null);
     setLiveLocationRemainingLabel(null);
     await AsyncStorage.removeItem(LIVE_LOC_STORAGE_KEY);
+    await stopBackgroundLocationUpdates();
   }, []);
 
   const shareLocationToSupabase = useCallback(async (loc: UserLocation, userId: string, sharing: boolean) => {
@@ -397,6 +416,7 @@ export const [LocationProvider, useLocation] = createContextHook(() => {
   const setLocationUser = useCallback((userId: string) => {
     console.log("[LocationProvider] Setting current user for location sharing:", userId);
     setCurrentUserId(userId);
+    void setBackgroundUserId(userId);
   }, []);
 
   useEffect(() => {

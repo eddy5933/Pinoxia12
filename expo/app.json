@@ -43,6 +43,16 @@
           "enableBackgroundRemoteNotifications": true
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Pinoxia to use your location to share with friends and navigate.",
+          "locationWhenInUsePermission": "Allow Pinoxia to use your location to share with friends and navigate.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],
