@@ -904,16 +904,12 @@ function LongPressActionModal({
   onClose,
   onNavigateHere,
   onCreateEvent,
-  onRequestAlwaysGPS,
-  backgroundPermissionGranted,
 }: {
   visible: boolean;
   coordinate: LongPressCoord | null;
   onClose: () => void;
   onNavigateHere: () => void;
   onCreateEvent: () => void;
-  onRequestAlwaysGPS: () => void;
-  backgroundPermissionGranted: boolean;
 }) {
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -1008,41 +1004,6 @@ function LongPressActionModal({
                     <Text style={lpStyles.optionTitle}>Navigate Here</Text>
                     <Text style={lpStyles.optionDesc}>Open directions in maps app</Text>
                   </View>
-                </TouchableOpacity>
-
-                <View style={lpStyles.separator} />
-
-                <TouchableOpacity
-                  style={lpStyles.optionRow}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    handleClose();
-                    setTimeout(() => onRequestAlwaysGPS(), 300);
-                  }}
-                  activeOpacity={0.7}
-                  testID="lp-always-gps"
-                >
-                  <View style={[
-                    lpStyles.optionIcon,
-                    backgroundPermissionGranted
-                      ? { backgroundColor: 'rgba(16,185,129,0.15)' }
-                      : { backgroundColor: 'rgba(168,85,247,0.15)' },
-                  ]}>
-                    <Shield size={18} color={backgroundPermissionGranted ? '#10B981' : '#A855F7'} />
-                  </View>
-                  <View style={lpStyles.optionInfo}>
-                    <Text style={lpStyles.optionTitle}>Always Use GPS</Text>
-                    <Text style={lpStyles.optionDesc}>
-                      {backgroundPermissionGranted
-                        ? 'Background location is enabled'
-                        : 'Allow GPS even when app is closed'}
-                    </Text>
-                  </View>
-                  {backgroundPermissionGranted && (
-                    <View style={[lpStyles.activeBadge, { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
-                      <Check size={12} color="#10B981" />
-                    </View>
-                  )}
                 </TouchableOpacity>
 
                 <View style={lpStyles.separator} />
@@ -2057,6 +2018,25 @@ export default function MapScreenExport() {
                 </Animated.View>
               </View>
 
+              <TouchableOpacity
+                style={[
+                  styles.gpsButton,
+                  backgroundPermissionGranted && styles.gpsButtonActive,
+                ]}
+                onPress={handleRequestAlwaysGPS}
+                activeOpacity={0.7}
+                testID="always-gps-button"
+              >
+                <Shield size={12} color={backgroundPermissionGranted ? Colors.white : Colors.textSecondary} />
+                <Text style={[
+                  styles.gpsButtonText,
+                  backgroundPermissionGranted && styles.gpsButtonTextActive,
+                ]}>
+                  {backgroundPermissionGranted ? 'GPS On' : 'GPS'}
+                </Text>
+                {backgroundPermissionGranted && <View style={styles.liveDotGreen} />}
+              </TouchableOpacity>
+
               <View style={styles.pulseButtonWrapper}>
                 {familySharingEnabled && (
                   <Animated.View
@@ -2503,8 +2483,6 @@ export default function MapScreenExport() {
         onClose={handleLongPressClose}
         onNavigateHere={handleLongPressNavigate}
         onCreateEvent={handleLongPressCreateEvent}
-        onRequestAlwaysGPS={handleRequestAlwaysGPS}
-        backgroundPermissionGranted={backgroundPermissionGranted}
       />
 
       <QuickEventModal
@@ -3702,6 +3680,38 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
     backgroundColor: "#D8B4FE",
     marginLeft: 2,
+  },
+  liveDotGreen: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#6EE7B7",
+    marginLeft: 2,
+  },
+  gpsButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    height: 32,
+  },
+  gpsButtonActive: {
+    backgroundColor: "#059669",
+    borderColor: "#10B981",
+  },
+  gpsButtonText: {
+    fontSize: 10,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  gpsButtonTextActive: {
+    color: Colors.white,
   },
 
   noFriendsText: {
